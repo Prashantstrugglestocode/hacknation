@@ -1,3 +1,42 @@
+import { z } from 'zod';
+
+export const WidgetSpec = z.object({
+  layout: z.enum(['hero', 'compact', 'split', 'fullbleed', 'sticker']),
+  palette: z.object({
+    bg: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    fg: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  }),
+  mood: z.enum(['cozy', 'energetic', 'urgent', 'playful', 'discreet']),
+  hero: z.object({
+    type: z.enum(['icon', 'gradient', 'pattern']),
+    value: z.string(),
+  }),
+  headline: z.string().max(48),
+  subline: z.string().max(80),
+  cta: z.string().max(20),
+  signal_chips: z.array(z.string()).min(2).max(4),
+  pressure: z.object({
+    kind: z.enum(['time', 'stock']),
+    value: z.string(),
+  }).nullable(),
+  reasoning: z.string().max(200),
+  merchant: z.object({
+    id: z.string(),
+    name: z.string(),
+    distance_m: z.number(),
+  }),
+  discount: z.object({
+    kind: z.enum(['pct', 'eur', 'item']),
+    value: z.number(),
+    constraint: z.string().nullable(),
+  }),
+  validity_minutes: z.number().int().min(10).max(120),
+  locale: z.enum(['de', 'en']),
+});
+
+export type WidgetSpecType = z.infer<typeof WidgetSpec>;
+
 export const widgetSpecJsonSchema = {
   type: 'object' as const,
   properties: {
