@@ -8,17 +8,19 @@ services:
     startCommand: "cd server && bun run start"
     envVars:
       - key: SUPABASE_URL
-        sync: false
+        value: "https://ecydsayjmyrbkxthkfli.supabase.co"
       - key: SUPABASE_SERVICE_KEY
-        sync: false
+        sync: false  # paste from Supabase → Settings → API → service_role
       - key: OPENAI_API_KEY
         sync: false
-      - key: OPENWEATHER_API_KEY
-        sync: false
-      - key: TICKETMASTER_API_KEY
-        sync: false
+      # OPENWEATHER_API_KEY is optional — DWD Brightsky used without it
+      # - key: OPENWEATHER_API_KEY
+      #   sync: false
+      # TICKETMASTER_API_KEY is optional
+      # - key: TICKETMASTER_API_KEY
+      #   sync: false
       - key: JWT_SECRET
-        generateValue: true
+        value: "36c5c808f7f6fae9d5161fab689ebfc97d065a44ef34e87e48f9e4130a7ddc5b"
       - key: PORT
         value: "3000"
     healthCheckPath: /health

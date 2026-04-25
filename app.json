@@ -45,8 +45,8 @@
     ],
     "extra": {
       "apiUrl": "https://city-wallet-server.onrender.com",
-      "supabaseUrl": "SUPABASE_URL_PLACEHOLDER",
-      "supabaseAnonKey": "SUPABASE_ANON_KEY_PLACEHOLDER",
+      "supabaseUrl": "https://ecydsayjmyrbkxthkfli.supabase.co",
+      "supabaseAnonKey": "sb_publishable_ynW6q0OGiqA1boYGWVmOVA_JnlvbZZ0",
       "eas": {
         "projectId": "city-wallet"
       }
