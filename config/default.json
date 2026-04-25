@@ -1,0 +1,15 @@
+{
+  "triggers": [
+    { "id": "COZY_QUIET_NEARBY",      "when": { "temp_c_max": 14, "condition_in": ["rain","drizzle","mist","clouds"], "merchant_quiet": true, "merchant_types": ["café","bakery"] } },
+    { "id": "EVENT_DEMAND_SPIKE",     "when": { "events_within_m": 800, "events_starting_in_min": 120 } },
+    { "id": "LATE_AFTERNOON_BROWSE",  "when": { "hour_in": [15,16,17], "movement": "browsing" } },
+    { "id": "CLOSING_SOON_INVENTORY", "when": { "minutes_to_close_max": 30, "has_inventory_tags": true } },
+    { "id": "BAD_WEATHER_INDOOR",     "when": { "condition_in": ["rain","snow"], "merchant_types": ["café","restaurant","bar","bookstore"] } },
+    { "id": "LUNCHTIME_QUIET",        "when": { "hour_in": [11,12,13], "merchant_types": ["café","restaurant"], "merchant_quiet": true } }
+  ],
+  "scoring": {
+    "distance_weight": 0.5,
+    "context_match_weight": 0.4,
+    "freshness_penalty_minutes": 10
+  }
+}

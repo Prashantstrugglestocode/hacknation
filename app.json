@@ -1,30 +1,56 @@
 {
   "expo": {
-    "name": "city-wallet",
+    "name": "City Wallet",
     "slug": "city-wallet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0A0F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "cc.viss.citywallet",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "City Wallet braucht deinen ungefähren Standort, um lokale Angebote zu finden. Wir senden nur eine grobe 1,2 km Zelle.",
+        "NSCameraUsageDescription": "Zum Scannen von Kunden-QR-Codes."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0A0A0F"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "cc.viss.citywallet",
+      "permissions": ["ACCESS_FINE_LOCATION", "CAMERA"]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-camera",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "City Wallet braucht deinen ungefähren Standort, um lokale Angebote zu finden. Wir senden nur eine grobe 1,2 km Zelle."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://city-wallet-server.onrender.com",
+      "supabaseUrl": "SUPABASE_URL_PLACEHOLDER",
+      "supabaseAnonKey": "SUPABASE_ANON_KEY_PLACEHOLDER",
+      "eas": {
+        "projectId": "city-wallet"
+      }
+    },
+    "scheme": "citywallet"
   }
 }

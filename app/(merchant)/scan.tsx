@@ -1,0 +1,132 @@
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { router } from 'expo-router';
+import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
+import i18n from '../../lib/i18n';
+
+const API = Constants.expoConfig?.extra?.apiUrl as string;
+const { width } = Dimensions.get('window');
+
+export default function ScanScreen() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; offer?: any; error?: string } | null>(null);
+  const scanLock = useRef(false);
+
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    if (scanLock.current || scanned) return;
+    scanLock.current = true;
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setScanned(true);
+
+    try {
+      // Extract offer ID from token (JWT sub claim or parse URL)
+      // Token is JWT — we send it to redeem-qr
+      // We need the offer_id — extract from the scanned data which might be "offerId|token"
+      const parts = data.split('|');
+      const offerId = parts[0];
+      const token = parts[1] ?? data;
+
+      const res = await fetch(`${API}/api/offer/${offerId}/redeem-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      if (res.ok) {
+        const offer = await res.json();
+        setResult({ success: true, offer });
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setResult({ success: false, error: err.error ?? i18n.t('errors.invalid_qr') });
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch {
+      setResult({ success: false, error: i18n.t('errors.redemption_failed') });
+    }
+  };
+
+  if (!permission) return <View style={{ flex: 1, backgroundColor: '#0A0A0F' }} />;
+
+  if (!permission.granted) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <Text style={{ color: '#fff', fontSize: 18, textAlign: 'center', paddingHorizontal: 32 }}>
+          Kamerazugriff benötigt zum QR-Scannen.
+        </Text>
+        <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: '#6C63FF', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14 }}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Kamera freigeben</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (result) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center', gap: 24, paddingHorizontal: 32 }}>
+        <MotiView
+          from={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring' }}
+          style={{ alignItems: 'center', gap: 20 }}
+        >
+          <Text style={{ fontSize: 72 }}>{result.success ? '✅' : '❌'}</Text>
+          {result.success ? (
+            <>
+              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', textAlign: 'center' }}>
+                {i18n.t('merchant.scan_success')}
+              </Text>
+              {result.offer?.discount_amount_cents && (
+                <Text style={{ color: '#4CAF50', fontSize: 20, fontWeight: '700' }}>
+                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+                    .format(result.offer.discount_amount_cents / 100)} Rabatt
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={{ color: '#FF6B6B', fontSize: 18, textAlign: 'center' }}>{result.error}</Text>
+          )}
+        </MotiView>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ backgroundColor: '#1A1A2E', borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Zurück</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <CameraView
+        style={{ flex: 1 }}
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+      >
+        {/* Scan overlay */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{
+            width: 240, height: 240, borderRadius: 20,
+            borderWidth: 3, borderColor: '#6C63FF',
+            backgroundColor: 'transparent',
+          }} />
+          <Text style={{ color: '#fff', marginTop: 24, fontSize: 15, fontWeight: '600' }}>
+            QR-Code des Kunden scannen
+          </Text>
+        </View>
+        <View style={{ padding: 24 }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ alignItems: 'center' }}>
+            <Text style={{ color: '#ffffff88', fontSize: 15 }}>Abbrechen</Text>
+          </TouchableOpacity>
+        </View>
+      </CameraView>
+    </View>
+  );
+}

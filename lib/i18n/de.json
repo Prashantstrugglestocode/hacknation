@@ -1,0 +1,59 @@
+{
+  "role_picker": {
+    "title": "City Wallet",
+    "subtitle": "Hyperlokal. In Echtzeit.",
+    "customer": "Kunde",
+    "merchant": "Händler"
+  },
+  "customer": {
+    "loading": "Angebote in der Nähe suchen…",
+    "no_merchant": "Keine teilnehmenden Geschäfte in 500 m. Bewege dich und ziehe nach unten, oder werde selbst Händler in 30 Sekunden.",
+    "become_merchant": "Jetzt Händler werden",
+    "no_location": "City Wallet braucht ungefähre Position, um lokale Angebote zu finden. Wir senden nur eine grobe 1,2 km Zelle.",
+    "grant_location": "Position freigeben",
+    "accept": "Akzeptieren",
+    "decline": "Verstanden",
+    "why": "Warum dieses Angebot?",
+    "pull_refresh": "Neues Angebot laden",
+    "expired": "Verpasst, beim nächsten Mal.",
+    "valid_for": "Gültig noch {{minutes}} Min.",
+    "cashback": "Cashback statt QR",
+    "cashback_redeemed": "Cashback eingelöst",
+    "forget_me": "Verlauf löschen",
+    "what_we_sent": "Was wir gesendet haben",
+    "reasoning_title": "Warum jetzt?"
+  },
+  "merchant": {
+    "setup_title": "Geschäft einrichten",
+    "name_placeholder": "Name des Geschäfts",
+    "type_label": "Typ",
+    "location_label": "Standort (automatisch erkannt)",
+    "goal_label": "Ziel",
+    "goal_fill_quiet": "Ruhige Stunden füllen",
+    "goal_move_stock": "Langsamen Bestand abbauen",
+    "goal_loyalty": "Stammkundschaft aufbauen",
+    "max_discount": "Max. Rabatt",
+    "time_windows": "Zeitfenster",
+    "lunch": "Mittagessen",
+    "afternoon": "Nachmittag",
+    "evening": "Abend",
+    "custom": "Eigene Zeit",
+    "inventory_tags": "Produkte (kommagetrennt)",
+    "submit": "Speichern",
+    "dashboard_title": "Dashboard",
+    "generated": "Generiert",
+    "accepted": "Akzeptiert",
+    "redeemed": "Eingelöst",
+    "accept_rate": "Annahmequote",
+    "eur_moved": "€ umgesetzt",
+    "scan_qr": "Kunden-QR scannen",
+    "scan_success": "Eingelöst",
+    "rules_title": "Regeln bearbeiten",
+    "save_rules": "Regeln speichern"
+  },
+  "errors": {
+    "generation_failed": "Angebot konnte nicht geladen werden. Bitte erneut versuchen.",
+    "redemption_failed": "Einlösung fehlgeschlagen.",
+    "invalid_qr": "Ungültiger oder abgelaufener QR-Code."
+  }
+}

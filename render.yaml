@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: city-wallet-server
+    runtime: image
+    image:
+      url: oven/bun:latest
+    buildCommand: "cd server && bun install"
+    startCommand: "cd server && bun run start"
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: TICKETMASTER_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: "3000"
+    healthCheckPath: /health

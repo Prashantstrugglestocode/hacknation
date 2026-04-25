@@ -1,0 +1,59 @@
+{
+  "role_picker": {
+    "title": "City Wallet",
+    "subtitle": "Hyperlocal. Real-time.",
+    "customer": "Customer",
+    "merchant": "Merchant"
+  },
+  "customer": {
+    "loading": "Finding nearby offers…",
+    "no_merchant": "No participating shops within 500 m. Move around and pull down, or become a merchant in 30 seconds.",
+    "become_merchant": "Become a merchant now",
+    "no_location": "City Wallet needs your approximate location to find local offers. We only send a coarse 1.2 km cell.",
+    "grant_location": "Grant location",
+    "accept": "Accept",
+    "decline": "Got it",
+    "why": "Why this offer?",
+    "pull_refresh": "Load new offer",
+    "expired": "Missed it, next time.",
+    "valid_for": "Valid {{minutes}} min.",
+    "cashback": "Cashback instead",
+    "cashback_redeemed": "Cashback redeemed",
+    "forget_me": "Delete history",
+    "what_we_sent": "What we sent",
+    "reasoning_title": "Why now?"
+  },
+  "merchant": {
+    "setup_title": "Set up your shop",
+    "name_placeholder": "Shop name",
+    "type_label": "Type",
+    "location_label": "Location (auto-detected)",
+    "goal_label": "Goal",
+    "goal_fill_quiet": "Fill quiet hours",
+    "goal_move_stock": "Move slow stock",
+    "goal_loyalty": "Build loyalty",
+    "max_discount": "Max discount",
+    "time_windows": "Time windows",
+    "lunch": "Lunch",
+    "afternoon": "Afternoon",
+    "evening": "Evening",
+    "custom": "Custom",
+    "inventory_tags": "Products (comma-separated)",
+    "submit": "Save",
+    "dashboard_title": "Dashboard",
+    "generated": "Generated",
+    "accepted": "Accepted",
+    "redeemed": "Redeemed",
+    "accept_rate": "Accept rate",
+    "eur_moved": "EUR moved",
+    "scan_qr": "Scan customer QR",
+    "scan_success": "Redeemed",
+    "rules_title": "Edit rules",
+    "save_rules": "Save rules"
+  },
+  "errors": {
+    "generation_failed": "Could not load offer. Please try again.",
+    "redemption_failed": "Redemption failed.",
+    "invalid_qr": "Invalid or expired QR code."
+  }
+}

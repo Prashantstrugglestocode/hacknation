@@ -1,0 +1,21 @@
+{
+  "name": "city-wallet-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch index.ts",
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
+    "hono": "^4.7.7",
+    "jose": "^5.10.0",
+    "ngeohash": "^0.6.3",
+    "openai": "^4.90.0",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ngeohash": "^0.6.6"
+  }
+}
