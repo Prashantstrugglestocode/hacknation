@@ -21,9 +21,21 @@ const TIME_WINDOWS = ['lunch', 'afternoon', 'evening'] as const;
 export default function MerchantSetup() {
   // Translations resolved per render so i18n is ready
   const GOALS = [
-    { id: 'fill_quiet_hours' as const, label: i18n.t('merchant.goal_fill_quiet'), emoji: '☕', desc: 'Ruhige Stunden mit Angeboten füllen' },
-    { id: 'move_slow_stock' as const, label: i18n.t('merchant.goal_move_stock'), emoji: '📦', desc: 'Produkte mit wenig Umsatz abverkaufen' },
-    { id: 'build_loyalty' as const, label: i18n.t('merchant.goal_loyalty'), emoji: '❤️', desc: 'Stammkunden mit Rabatten belohnen' },
+    {
+      id: 'fill_quiet_hours' as const, label: i18n.t('merchant.goal_fill_quiet'), emoji: '☕',
+      desc: 'Ruhige Stunden mit Angeboten füllen',
+      preview: '15 % Mittagsrabatt · Cappuccino',
+    },
+    {
+      id: 'move_slow_stock' as const, label: i18n.t('merchant.goal_move_stock'), emoji: '📦',
+      desc: 'Produkte mit wenig Umsatz abverkaufen',
+      preview: '30 % auf letzte 5 Stück',
+    },
+    {
+      id: 'build_loyalty' as const, label: i18n.t('merchant.goal_loyalty'), emoji: '❤️',
+      desc: 'Stammkunden mit Rabatten belohnen',
+      preview: '+5 % Treuerabatt für Wiederkehrer',
+    },
   ];
 
   const [name, setName] = useState('');
@@ -149,6 +161,18 @@ export default function MerchantSetup() {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: active ? theme.primaryDark : theme.text, fontWeight: '800', fontSize: 15 }}>{g.label}</Text>
                 <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 2 }}>{g.desc}</Text>
+                <View style={{
+                  marginTop: 8, alignSelf: 'flex-start',
+                  backgroundColor: active ? theme.primary : theme.bgMuted,
+                  borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
+                }}>
+                  <Text style={{
+                    color: active ? theme.textOnPrimary : theme.primary,
+                    fontSize: 11, fontWeight: '700', letterSpacing: 0.2,
+                  }}>
+                    z.B. {g.preview}
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
           );

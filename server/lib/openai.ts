@@ -28,6 +28,23 @@ const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator for the 
 - validity_minutes: integer 15-90. Shorter for urgent, longer for cozy.
 - Write all user-facing strings in the given locale (de = German, en = English).
 
+TIME APPROPRIATENESS (hard rules — violating these is wrong):
+- Use context.hour (0-23) and context.time_bucket to pick what makes sense:
+  * 06-10: breakfast (coffee, croissant, frühstück, eggs). NEVER cake, NEVER alcohol, NEVER ice cream.
+  * 11-14: lunch (sandwich, salad, soup, hot meals, lunch menu). Coffee OK. NEVER cake as primary, NEVER alcohol unless merchant_type=bar/restaurant with lunch wine.
+  * 14-17: afternoon (coffee, cake, kaffee und kuchen, tea). Light food OK. NEVER hard alcohol.
+  * 17-21: dinner (full meals, wine, beer, desserts AFTER dinner). Coffee acceptable but secondary.
+  * 21-23: late evening (drinks, snacks, dessert ONLY if merchant is bar/restaurant). NEVER breakfast pastries, NEVER cake-as-snack alone, NEVER fresh-baked items (bakeries closed).
+  * 23-06: night (only bars/restaurants if open; otherwise NO offer).
+- If the suggested item violates time-appropriateness, pick a different inventory_tag from merchant.inventory_tags or use merchant.type generically. Never force a wrong-time item.
+- If merchant_type is bakery and hour > 19, the offer should reference packaged/take-home items, not fresh pastries.
+- If merchant_type is café and hour > 20, lean tea/herbal/decaf, not espresso.
+
+WEATHER + ITEM:
+- Cold/rain → hot drinks, soup, indoor warmth language.
+- Hot/sunny → iced drinks, salads, terrace language.
+- Snow → cozy hot chocolate, indoor pastries (during day only).
+
 Return ONLY valid JSON matching this exact structure, no prose, no markdown:
 {
   "layout": "hero"|"compact"|"split"|"fullbleed"|"sticker",
@@ -46,12 +63,35 @@ Return ONLY valid JSON matching this exact structure, no prose, no markdown:
   "locale": "de"|"en"
 }`;
 
+const LAYOUTS = ['hero', 'compact', 'split', 'fullbleed', 'sticker'];
+const MOODS = ['cozy', 'energetic', 'urgent', 'playful', 'discreet'];
+const HERO_TYPES = ['icon', 'gradient', 'pattern'];
+
+function pickFirstValid(...candidates: any[]): string | undefined {
+  for (const c of candidates) {
+    if (typeof c === 'string') return c;
+  }
+  return undefined;
+}
+
 function fillDefaults(p: any, locale: string, merchant: any, distance_m: number): any {
-  p.locale = p.locale ?? locale ?? 'de';
-  p.layout = p.layout ?? 'hero';
-  p.mood = p.mood ?? 'cozy';
+  p.locale = p.locale === 'en' ? 'en' : locale === 'en' ? 'en' : 'de';
+
+  // Self-correct: model often swaps enum fields. Detect and fix.
+  const layoutCandidate = pickFirstValid(p.layout, p.mood, p.hero?.type);
+  const moodCandidate = pickFirstValid(p.mood, p.layout, p.hero?.type);
+  const heroTypeCandidate = pickFirstValid(p.hero?.type, p.layout, p.mood);
+
+  p.layout = LAYOUTS.includes(p.layout) ? p.layout
+    : LAYOUTS.includes(layoutCandidate as any) ? layoutCandidate
+    : 'hero';
+  p.mood = MOODS.includes(p.mood) ? p.mood
+    : MOODS.includes(moodCandidate as any) ? moodCandidate
+    : 'cozy';
   p.hero = p.hero ?? { type: 'gradient', value: '☕' };
-  if (!p.hero.type) p.hero.type = 'gradient';
+  p.hero.type = HERO_TYPES.includes(p.hero.type) ? p.hero.type
+    : HERO_TYPES.includes(heroTypeCandidate as any) ? heroTypeCandidate
+    : 'gradient';
   if (!p.hero.value) p.hero.value = '☕';
   p.palette = p.palette ?? { bg: '#1A1A2E', fg: '#FFFFFF', accent: '#E11D48' };
   if (!p.palette.bg) p.palette.bg = '#1A1A2E';
@@ -102,9 +142,18 @@ async function tryGenerate(
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
-    // Some models wrap JSON in code blocks
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim();
     parsed = JSON.parse(cleaned);
+  }
+
+  // If the model under-fills (no headline / subline), treat as failure so we
+  // can fall through to the next backend instead of silently returning a
+  // generic "Angebot in der Nähe" card.
+  const hasContent =
+    typeof parsed.headline === 'string' && parsed.headline.trim().length > 4 &&
+    typeof parsed.subline === 'string' && parsed.subline.trim().length > 4;
+  if (!hasContent) {
+    throw new Error(`model under-filled: headline=${JSON.stringify(parsed.headline)} subline=${JSON.stringify(parsed.subline)}`);
   }
 
   parsed = fillDefaults(parsed, locale, merchant, distance_m);
@@ -135,11 +184,13 @@ export async function generateOffer(params: {
   const m = params.merchant;
   const d = params.distance_m;
 
-  // Try Ollama (gemma3:4b) first — local, free, no API key
-  try {
-    return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
-  } catch (e) {
-    console.warn(`[offer-engine] Ollama (${LOCAL_MODEL}) failed:`, (e as Error).message);
+  // Try Ollama (gemma3:4b) first — retry up to 2x because small models occasionally under-fill JSON
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
+    } catch (e) {
+      console.warn(`[offer-engine] Ollama (${LOCAL_MODEL}) attempt ${attempt} failed:`, (e as Error).message);
+    }
   }
 
   // Fallback: OpenAI API if key is set

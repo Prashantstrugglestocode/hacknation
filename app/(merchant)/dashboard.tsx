@@ -127,28 +127,30 @@ export default function MerchantDashboard() {
         </TouchableOpacity>
 
         {/* Stat cards grid */}
-        <MotiView key={pulseKey} from={{ scale: 1.02 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
-            {statCards.map((card, i) => (
-              <View
-                key={i}
-                style={{
-                  backgroundColor: theme.surface,
-                  borderRadius: 16, padding: 16,
-                  width: (width - 42) / 2, gap: 6,
-                  borderWidth: 1, borderColor: theme.border,
-                }}
-              >
-                <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
-                  {card.label.toUpperCase()}
-                </Text>
-                <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
-                  {card.value}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </MotiView>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
+          {statCards.map((card, i) => (
+            <MotiView
+              key={`${i}-${pulseKey}`}
+              from={{ scale: 0.94, backgroundColor: theme.primaryWash }}
+              animate={{ scale: 1, backgroundColor: theme.surface }}
+              transition={{ type: 'spring', damping: 12, stiffness: 220 }}
+              style={{
+                borderRadius: 16, padding: 16,
+                width: (width - 42) / 2, gap: 6,
+                borderWidth: 1, borderColor: theme.border,
+                shadowColor: theme.primary,
+                shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+              }}
+            >
+              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
+                {card.label.toUpperCase()}
+              </Text>
+              <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
+                {card.value}
+              </Text>
+            </MotiView>
+          ))}
+        </View>
 
         {/* Live feed */}
         <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 }}>

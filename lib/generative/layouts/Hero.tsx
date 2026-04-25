@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { MotiView } from 'moti';
-import { LinearGradient } from 'expo-linear-gradient';
 import { WidgetSpecType } from '../widget-spec';
+import { entryTransition, chipDelay, pressTransition, ctaPulseConfig } from '../mood';
+import HeroVisual from './HeroVisual';
 import SaveHeart from '../../components/SaveHeart';
 
 interface Props {
@@ -13,12 +14,9 @@ interface Props {
 }
 
 export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props) {
-  const { palette, headline, subline, cta, signal_chips, pressure, discount, merchant } = spec;
+  const { palette, mood, headline, subline, cta, signal_chips, pressure, discount, merchant } = spec;
   const [pressed, setPressed] = useState(false);
-
-  const gradientColors = spec.hero.type === 'gradient'
-    ? [palette.accent, palette.bg] as const
-    : [palette.bg, palette.bg] as const;
+  const ctaPulse = ctaPulseConfig(mood);
 
   const distance =
     merchant.distance_m < 1000
@@ -29,10 +27,10 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
     <MotiView
       from={{ opacity: 0, translateY: 20 }}
       animate={{ opacity: 1, translateY: 0 }}
-      transition={{ type: 'spring', damping: 18, stiffness: 160 }}
+      transition={entryTransition(mood)}
       style={{ flex: 1, borderRadius: 22, overflow: 'hidden', backgroundColor: palette.bg }}
     >
-      <LinearGradient colors={gradientColors} style={{ height: '60%', justifyContent: 'flex-end', padding: 22 }}>
+      <HeroVisual spec={spec} height="60%">
         {offerId && (
           <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 2 }}>
             <SaveHeart offerId={offerId} />
@@ -45,7 +43,7 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
               key={i}
               from={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 14, delay: 80 + i * 60 }}
+              transition={{ ...entryTransition(mood), delay: chipDelay(mood, i) }}
               style={{
                 backgroundColor: palette.fg + '22',
                 borderRadius: 999,
@@ -61,7 +59,7 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
         <Text style={{ fontSize: 30, fontWeight: '900', color: palette.fg, lineHeight: 34, letterSpacing: -0.6 }}>
           {headline}
         </Text>
-      </LinearGradient>
+      </HeroVisual>
 
       <View style={{ flex: 1, padding: 22, justifyContent: 'space-between' }}>
         <View>
@@ -99,8 +97,8 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
 
         <View>
           <MotiView
-            animate={{ scale: pressed ? 0.96 : 1 }}
-            transition={{ type: 'spring', damping: 14, stiffness: 320 }}
+            animate={{ scale: pressed ? 0.96 : 1, ...(ctaPulse?.animate ?? {}) }}
+            transition={ctaPulse?.transition ?? pressTransition(mood)}
           >
             <Pressable
               onPressIn={() => setPressed(true)}

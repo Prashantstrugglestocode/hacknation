@@ -5,6 +5,7 @@ import { MotiView } from 'moti';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
+import CountdownRing from '../../../lib/components/CountdownRing';
 import { theme } from '../../../lib/theme';
 import i18n from '../../../lib/i18n';
 
@@ -87,17 +88,26 @@ export default function RedeemScreen() {
           style={{ alignItems: 'center', gap: 24 }}
         >
           {loading ? (
-            <View style={{ width: 240, height: 240, backgroundColor: theme.bgMuted, borderRadius: 20 }} />
+            <View style={{ width: 280, height: 280, backgroundColor: theme.bgMuted, borderRadius: 140 }} />
           ) : token && !expiredQR ? (
-            <View style={{
-              padding: 20, backgroundColor: '#FFFFFF', borderRadius: 22,
-              borderWidth: 4, borderColor: theme.primary,
-              shadowColor: theme.primary, shadowOpacity: 0.25, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
-            }}>
-              <QRCode value={token} size={200} color={theme.text} backgroundColor="#FFFFFF" />
+            <View style={{ width: 280, height: 280, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ position: 'absolute' }}>
+                <CountdownRing
+                  size={280}
+                  strokeWidth={10}
+                  progress={secondsLeft / 300}
+                  warn={secondsLeft < 60}
+                />
+              </View>
+              <View style={{
+                padding: 16, backgroundColor: '#FFFFFF', borderRadius: 18,
+                shadowColor: theme.primary, shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+              }}>
+                <QRCode value={token} size={200} color={theme.text} backgroundColor="#FFFFFF" />
+              </View>
             </View>
           ) : (
-            <View style={{ width: 240, height: 240, backgroundColor: theme.bgMuted, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 280, height: 280, backgroundColor: theme.bgMuted, borderRadius: 140, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: theme.danger, fontSize: 16, fontWeight: '700' }}>{i18n.t('customer.expired')}</Text>
             </View>
           )}
@@ -106,7 +116,7 @@ export default function RedeemScreen() {
             <View style={{ alignItems: 'center', gap: 4 }}>
               <Text style={{
                 color: secondsLeft < 60 ? theme.danger : theme.text,
-                fontSize: 32, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -0.5,
+                fontSize: 36, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -0.5,
               }}>
                 {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
               </Text>
