@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -12,5 +14,6 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }
