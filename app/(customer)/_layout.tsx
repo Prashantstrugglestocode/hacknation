@@ -7,6 +7,8 @@ export default function CustomerLayout() {
       <Stack.Screen name="redeem/[id]" options={{ presentation: 'fullScreenModal' }} />
       <Stack.Screen name="why/[id]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="saved" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="history" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="map" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

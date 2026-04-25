@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import { createClient } from '@supabase/supabase-js';
 import ngeohash from 'ngeohash';
+import { generateOffer } from '../lib/openai.ts';
+import { getWeather } from '../lib/weather.ts';
+import { getPayoneDensity } from '../lib/payone-mock.ts';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -97,6 +100,33 @@ merchant.patch('/:id', async (c) => {
   return c.json(data);
 });
 
+// Generate a preview offer for the merchant without persisting — used by
+// the "Vorschau" button on the dashboard so merchants see what customers see.
+merchant.get('/:id/preview', async (c) => {
+  const id = c.req.param('id');
+  const { data: m, error } = await supabase
+    .from('merchants').select('*').eq('id', id).single();
+  if (error || !m) return c.json({ error: 'merchant not found' }, 404);
+
+  const [weather, payone] = await Promise.all([
+    getWeather(m.lat, m.lng),
+    Promise.resolve(getPayoneDensity()),
+  ]);
+  const hour = new Date().getHours();
+  const context = {
+    weather, payone, hour,
+    intent: { browsing: false, hungry_likely: hour >= 11 && hour <= 14, cold: weather.temp_c < 14, rainy: ['rain', 'drizzle'].includes(weather.condition.toLowerCase()) },
+    distance_m: 50,
+  };
+  const widgetSpec = await generateOffer({
+    merchant: m,
+    context,
+    locale: m.locale ?? 'de',
+    distance_m: 50,
+  });
+  return c.json({ widget_spec: widgetSpec, generated_at: new Date().toISOString() });
+});
+
 merchant.get('/:id/stats', async (c) => {
   const id = c.req.param('id');
   const today = new Date();
@@ -118,7 +148,33 @@ merchant.get('/:id/stats', async (c) => {
     .filter(o => o.status === 'redeemed')
     .reduce((sum, o) => sum + (o.discount_amount_cents ?? 0), 0);
 
-  return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved });
+  // 7-day daily breakdown for sparkline
+  const sevenDays = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: weekRows } = await supabase
+    .from('offers')
+    .select('status, generated_at')
+    .eq('merchant_id', id)
+    .gte('generated_at', sevenDays);
+  const buckets: Array<{ day: string; generated: number; accepted: number; rate: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    d.setHours(0, 0, 0, 0);
+    const next = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+    const inDay = (weekRows ?? []).filter(r => {
+      const ts = new Date(r.generated_at).getTime();
+      return ts >= d.getTime() && ts < next.getTime();
+    });
+    const g = inDay.length;
+    const a = inDay.filter(r => ['accepted','redeemed'].includes(r.status)).length;
+    buckets.push({
+      day: d.toISOString().slice(0, 10),
+      generated: g,
+      accepted: a,
+      rate: g > 0 ? a / g : 0,
+    });
+  }
+
+  return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved, weekly: buckets });
 });
 
 merchant.get('s/nearby', async (c) => {

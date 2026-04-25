@@ -5,11 +5,18 @@ import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
 import { signOut, useSession, setPreferredRole } from '../lib/auth';
 import { theme } from '../lib/theme';
-import i18n from '../lib/i18n';
+import i18n, { setLocale, getLocale } from '../lib/i18n';
 
 export default function RolePicker() {
   const session = useSession();
   const [signingOut, setSigningOut] = useState(false);
+  const [locale, setLocaleState] = useState<'de' | 'en'>(getLocale());
+
+  const switchLocale = async (l: 'de' | 'en') => {
+    await setLocale(l);
+    setLocaleState(l);
+    Haptics.selectionAsync();
+  };
 
   const goCustomer = async () => {
     if (session?.user) await setPreferredRole(session.user.id, 'customer');
@@ -102,6 +109,35 @@ export default function RolePicker() {
           </Text>
         </TouchableOpacity>
       </MotiView>
+
+      {/* Language switcher */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: theme.bgMuted, borderRadius: 14, padding: 4,
+        borderWidth: 1, borderColor: theme.border,
+        alignSelf: 'center',
+      }}>
+        {(['de', 'en'] as const).map(l => {
+          const active = locale === l;
+          return (
+            <TouchableOpacity
+              key={l}
+              onPress={() => switchLocale(l)}
+              style={{
+                paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10,
+                backgroundColor: active ? theme.primary : 'transparent',
+              }}
+            >
+              <Text style={{
+                color: active ? theme.textOnPrimary : theme.text,
+                fontSize: 13, fontWeight: '800', letterSpacing: 0.4,
+              }}>
+                {l === 'de' ? '🇩🇪 Deutsch' : '🇬🇧 English'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* Account / sign-out card */}
       <View style={{

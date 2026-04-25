@@ -5,6 +5,8 @@ import { MotiView } from 'moti';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/realtime';
+import Sparkline from '../../lib/components/Sparkline';
+import AnimatedNumber from '../../lib/components/AnimatedNumber';
 import { theme } from '../../lib/theme';
 import i18n from '../../lib/i18n';
 
@@ -17,6 +19,7 @@ interface Stats {
   redeemed: number;
   accept_rate: number;
   eur_moved: number;
+  weekly?: Array<{ day: string; generated: number; accepted: number; rate: number }>;
 }
 
 interface FeedItem {
@@ -77,12 +80,12 @@ export default function MerchantDashboard() {
     }
   };
 
-  const statCards = [
-    { label: i18n.t('merchant.generated'), value: stats.generated },
-    { label: i18n.t('merchant.accepted'), value: stats.accepted },
-    { label: i18n.t('merchant.redeemed'), value: stats.redeemed },
-    { label: i18n.t('merchant.accept_rate'), value: `${Math.round(stats.accept_rate * 100)} %` },
-    { label: i18n.t('merchant.eur_moved'), value: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(stats.eur_moved / 100) },
+  const statCards: Array<{ label: string; value: number; format: (n: number) => string }> = [
+    { label: i18n.t('merchant.generated'), value: stats.generated, format: n => Math.round(n).toString() },
+    { label: i18n.t('merchant.accepted'), value: stats.accepted, format: n => Math.round(n).toString() },
+    { label: i18n.t('merchant.redeemed'), value: stats.redeemed, format: n => Math.round(n).toString() },
+    { label: i18n.t('merchant.accept_rate'), value: stats.accept_rate * 100, format: n => `${Math.round(n)} %` },
+    { label: i18n.t('merchant.eur_moved'), value: stats.eur_moved / 100, format: n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n) },
   ];
 
   return (
@@ -113,6 +116,50 @@ export default function MerchantDashboard() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Sparkline + preview */}
+        {(stats.weekly?.length ?? 0) > 0 && (
+          <View style={{
+            backgroundColor: theme.surface, borderRadius: 16, padding: 14, marginBottom: 12,
+            borderWidth: 1, borderColor: theme.border,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+                ANNAHMEQUOTE · 7 TAGE
+              </Text>
+              <Text style={{ color: theme.primary, fontSize: 16, fontWeight: '900' }}>
+                {Math.round((stats.weekly?.[stats.weekly.length - 1]?.rate ?? 0) * 100)} %
+              </Text>
+            </View>
+            <View style={{ marginTop: 10, alignItems: 'center' }}>
+              <Sparkline values={(stats.weekly ?? []).map(b => b.rate * 100)} width={width - 84} height={56} />
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={() => merchantId && router.push(`/(merchant)/preview?id=${merchantId}`)}
+          style={{
+            backgroundColor: theme.primaryWash, borderRadius: 16, padding: 14,
+            flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12,
+            borderWidth: 1, borderColor: theme.primary + '55',
+          }}>
+          <View style={{
+            width: 44, height: 44, borderRadius: 12, backgroundColor: theme.primary,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: 20 }}>👁</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.primaryDark, fontSize: 15, fontWeight: '800' }}>
+              Vorschau · so sehen Kunden dein Geschäft
+            </Text>
+            <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 2 }}>
+              KI generiert ein Live-Beispiel-Angebot
+            </Text>
+          </View>
+          <Text style={{ color: theme.primary, fontSize: 18, fontWeight: '800' }}>›</Text>
+        </TouchableOpacity>
 
         {/* Quick action: menu */}
         <TouchableOpacity onPress={() => merchantId && router.push(`/(merchant)/menu?id=${merchantId}`)}
@@ -158,9 +205,11 @@ export default function MerchantDashboard() {
               <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
                 {card.label.toUpperCase()}
               </Text>
-              <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
-                {card.value}
-              </Text>
+              <AnimatedNumber
+                value={card.value}
+                format={card.format}
+                style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}
+              />
             </MotiView>
           ))}
         </View>

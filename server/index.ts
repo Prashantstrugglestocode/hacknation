@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import merchantRoutes from './routes/merchant.ts';
 import offerRoutes from './routes/offer.ts';
 import menuRoutes from './routes/menu.ts';
+import contextRoutes from './routes/context.ts';
 
 const app = new Hono();
 
@@ -15,6 +16,7 @@ app.get('/health', (c) => c.json({ ok: true, ts: new Date().toISOString() }));
 app.route('/api/merchant', merchantRoutes);
 app.route('/api/merchant', menuRoutes);
 app.route('/api/offer', offerRoutes);
+app.route('/api/context', contextRoutes);
 
 // Nearby merchants via query param
 app.get('/api/merchants/nearby', async (c) => {

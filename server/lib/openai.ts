@@ -114,6 +114,15 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
   if (!p.discount.kind) p.discount.kind = 'pct';
   if (p.discount.constraint === undefined) p.discount.constraint = null;
   p.validity_minutes = typeof p.validity_minutes === 'number' ? p.validity_minutes : 30;
+
+  // Auto-fill a hero image URL by querying loremflickr with merchant tags
+  if (!p.hero_image_url) {
+    const tags = (merchant.inventory_tags ?? []) as string[];
+    const tag = (tags[0] ?? merchant.type ?? 'cafe').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const type = (merchant.type ?? 'cafe').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    // Loremflickr: free, key-less, supports comma-tagged queries, deterministic by lock
+    p.hero_image_url = `https://loremflickr.com/800/480/${tag},${type}/all?lock=${(merchant.id ?? '').slice(0, 6)}`;
+  }
   return p;
 }
 

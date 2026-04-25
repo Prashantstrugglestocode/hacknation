@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WidgetSpecType } from '../widget-spec';
 
@@ -58,29 +58,53 @@ export default function HeroVisual({ spec, height, children }: Props) {
     overflow: 'hidden' as const,
   };
 
+  // If a real photo is available, layer it under the gradient for richness
+  const photoUrl = (spec as any).hero_image_url as string | undefined;
+  const PhotoLayer = photoUrl ? (
+    <Image
+      source={{ uri: photoUrl }}
+      style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]}
+      resizeMode="cover"
+      blurRadius={hero.type === 'pattern' ? 4 : 0}
+    />
+  ) : null;
+
+  const ScrimColors = [palette.bg + '00', palette.bg + 'BB', palette.bg + 'EE'] as const;
+
   if (hero.type === 'gradient') {
     return (
-      <LinearGradient colors={colors} style={[containerStyle, { padding: 22, justifyContent: 'flex-end' }]}>
-        {children}
-      </LinearGradient>
+      <View style={[containerStyle, { backgroundColor: palette.bg }]}>
+        {PhotoLayer}
+        <LinearGradient
+          colors={photoUrl ? ScrimColors : colors}
+          style={[StyleSheet.absoluteFill, { padding: 22, justifyContent: 'flex-end' }]}
+        >
+          {children}
+        </LinearGradient>
+      </View>
     );
   }
 
   if (hero.type === 'icon') {
     return (
-      <LinearGradient colors={colors} style={[containerStyle, { padding: 22, justifyContent: 'flex-end' }]}>
-        {/* Giant watermark emoji */}
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <Text style={{
-            fontSize: 220, lineHeight: 220, opacity: 0.18,
-            position: 'absolute', right: -20, top: -30,
-            transform: [{ rotate: '-12deg' }],
-          }}>
-            {symbol}
-          </Text>
-        </View>
-        {children}
-      </LinearGradient>
+      <View style={[containerStyle, { backgroundColor: palette.bg }]}>
+        {PhotoLayer}
+        <LinearGradient
+          colors={photoUrl ? ScrimColors : colors}
+          style={[StyleSheet.absoluteFill, { padding: 22, justifyContent: 'flex-end' }]}
+        >
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <Text style={{
+              fontSize: 220, lineHeight: 220, opacity: 0.18,
+              position: 'absolute', right: -20, top: -30,
+              transform: [{ rotate: '-12deg' }],
+            }}>
+              {symbol}
+            </Text>
+          </View>
+          {children}
+        </LinearGradient>
+      </View>
     );
   }
 
@@ -89,25 +113,31 @@ export default function HeroVisual({ spec, height, children }: Props) {
   const rows = 5;
   const cells = Array.from({ length: cols * rows });
   return (
-    <LinearGradient colors={colors} style={[containerStyle, { padding: 22, justifyContent: 'flex-end' }]}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { flexDirection: 'row', flexWrap: 'wrap' }]}>
-        {cells.map((_, i) => {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-          const offsetX = (row % 2) * 12;
-          return (
-            <View key={i} style={{
-              width: `${100 / cols}%`,
-              height: `${100 / rows}%`,
-              alignItems: 'center', justifyContent: 'center',
-              transform: [{ translateX: offsetX }, { rotate: `${(row + col) % 2 === 0 ? -8 : 8}deg` }],
-            }}>
-              <Text style={{ fontSize: 28, opacity: 0.14 }}>{symbol}</Text>
-            </View>
-          );
-        })}
-      </View>
-      {children}
-    </LinearGradient>
+    <View style={[containerStyle, { backgroundColor: palette.bg }]}>
+      {PhotoLayer}
+      <LinearGradient
+        colors={photoUrl ? ScrimColors : colors}
+        style={[StyleSheet.absoluteFill, { padding: 22, justifyContent: 'flex-end' }]}
+      >
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { flexDirection: 'row', flexWrap: 'wrap' }]}>
+          {cells.map((_, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const offsetX = (row % 2) * 12;
+            return (
+              <View key={i} style={{
+                width: `${100 / cols}%`,
+                height: `${100 / rows}%`,
+                alignItems: 'center', justifyContent: 'center',
+                transform: [{ translateX: offsetX }, { rotate: `${(row + col) % 2 === 0 ? -8 : 8}deg` }],
+              }}>
+                <Text style={{ fontSize: 28, opacity: 0.14 }}>{symbol}</Text>
+              </View>
+            );
+          })}
+        </View>
+        {children}
+      </LinearGradient>
+    </View>
   );
 }

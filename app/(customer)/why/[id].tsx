@@ -186,6 +186,37 @@ export default function WhyScreen() {
         </View>
       ) : null}
 
+      {/* Confidence bar — % of available signal categories used in this offer */}
+      {rows.length > 0 && (() => {
+        const max = 6; // weather, time, geohash, pois, payone, events, movement
+        const used = rows.length;
+        const pct = Math.min(100, Math.round((used / max) * 100));
+        return (
+          <View style={{
+            backgroundColor: theme.surface, borderRadius: 16, padding: 14,
+            borderWidth: 1, borderColor: theme.border, gap: 8,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+                KONFIDENZ
+              </Text>
+              <Text style={{ color: theme.primary, fontSize: 18, fontWeight: '900' }}>{pct} %</Text>
+            </View>
+            <View style={{ height: 8, backgroundColor: theme.bgMuted, borderRadius: 4, overflow: 'hidden' }}>
+              <MotiView
+                from={{ width: '0%' }}
+                animate={{ width: `${pct}%` }}
+                transition={{ type: 'timing', duration: 800 }}
+                style={{ height: '100%', backgroundColor: theme.primary, borderRadius: 4 }}
+              />
+            </View>
+            <Text style={{ color: theme.textMuted, fontSize: 12 }}>
+              {used} von {max} Signal-Kategorien aktiv genutzt
+            </Text>
+          </View>
+        );
+      })()}
+
       <View style={{ gap: 8 }}>
         <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
           GENUTZTE SIGNALE

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Share } from 'react-native';
 import { MotiView } from 'moti';
 import { WidgetSpecType } from '../widget-spec';
 import { entryTransition, chipDelay, pressTransition, ctaPulseConfig } from '../mood';
@@ -32,7 +32,23 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
     >
       <HeroVisual spec={spec} height="60%">
         {offerId && (
-          <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 2 }}>
+          <View style={{ position: 'absolute', top: 14, right: 14, zIndex: 2, flexDirection: 'row', gap: 6 }}>
+            <Pressable
+              onPress={async () => {
+                try {
+                  await Share.share({
+                    message: `${headline} bei ${merchant.name} — ${discount.kind === 'pct' ? `${discount.value} % Rabatt` : 'spar dir was'} · City Wallet\ncitywallet://offer/${offerId}`,
+                  });
+                } catch {}
+              }}
+              hitSlop={8}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: '#00000044', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>↗</Text>
+            </Pressable>
             <SaveHeart offerId={offerId} />
           </View>
         )}

@@ -14,7 +14,8 @@ import { WidgetSpecType } from '../../lib/generative/widget-spec';
 import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
-import GlassHeader from '../../lib/components/GlassHeader';
+import LiveHeader from '../../lib/components/LiveHeader';
+import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
 import FreshnessChip from '../../lib/components/FreshnessChip';
 import Confetti from '../../lib/components/Confetti';
@@ -42,6 +43,7 @@ export default function CustomerHome() {
   const [stats, setStats] = useState<SavingsStats>(EMPTY_STATS);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [seeding, setSeeding] = useState(false);
+  const [milestone, setMilestone] = useState<number | null>(null);
 
   const refreshStats = useCallback(async () => {
     setStats(await getStats());
@@ -155,7 +157,9 @@ export default function CustomerHome() {
       merchant_name: spec.merchant.name,
       offer_id: state.offer.id,
     });
-    refreshStats();
+    const next = await getStats();
+    setStats(next);
+    if (isMilestone(next.count_total)) setMilestone(next.count_total);
 
     fetch(`${API}/api/offer/${state.offer.id}/decision`, {
       method: 'POST',
@@ -163,7 +167,10 @@ export default function CustomerHome() {
       body: JSON.stringify({ decision: 'accepted' }),
     }).catch(() => {});
 
-    setTimeout(() => router.push(`/(customer)/redeem/${state.offer.id}`), 600);
+    // If milestone is showing, wait until user dismisses; else go to redeem
+    if (!isMilestone(next.count_total)) {
+      setTimeout(() => router.push(`/(customer)/redeem/${state.offer.id}`), 600);
+    }
   };
 
   const handleDecline = async () => {
@@ -180,6 +187,17 @@ export default function CustomerHome() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <Confetti trigger={confettiTrigger} />
+      <MilestoneModal
+        visible={milestone !== null}
+        count={milestone ?? 0}
+        onClose={() => {
+          const m = milestone;
+          setMilestone(null);
+          if (state.status === 'offer' && m) {
+            router.push(`/(customer)/redeem/${state.offer.id}`);
+          }
+        }}
+      />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1, padding: 16 }}
@@ -187,7 +205,7 @@ export default function CustomerHome() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
         }
       >
-        <GlassHeader stats={stats} />
+        <LiveHeader stats={stats} />
 
         <View style={{ flex: 1, minHeight: height - 220 }}>
           {state.status === 'idle' || state.status === 'loading' ? (
