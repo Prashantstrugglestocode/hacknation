@@ -52,7 +52,11 @@ export default function RulesScreen() {
         body: JSON.stringify({ goal, max_discount_pct: maxDiscount }),
       });
       if (res.ok) {
-        Alert.alert('Gespeichert', 'Regeln aktualisiert.', [{ text: 'OK', onPress: () => router.back() }]);
+        // Route directly into the preview so the merchant sees the new offer regenerate.
+        router.replace({
+          pathname: '/(merchant)/preview',
+          params: { id: merchantId, fromRules: '1' },
+        });
       } else {
         const err = await res.json().catch(() => ({}));
         Alert.alert('Fehler', err.error ?? 'Konnte nicht gespeichert werden.');

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { forgetMe } from '../../../lib/privacy/intent-encoder';
 import { PRIVACY_DISCLOSURE } from '../../../lib/privacy/disclosure';
@@ -130,6 +131,65 @@ function buildSignalRows(ctx: any): SignalRow[] {
   return rows;
 }
 
+const TRIGGER_LABELS: Record<string, { de: string; en: string; emoji: string }> = {
+  COZY_QUIET_NEARBY:      { de: 'Kalt & ruhig — Café-Wetter',     en: 'Cold & quiet — café weather',  emoji: '☕' },
+  EVENT_DEMAND_SPIKE:     { de: 'Event in der Nähe',              en: 'Event nearby',                  emoji: '🎫' },
+  LATE_AFTERNOON_BROWSE:  { de: 'Bummelzeit am Nachmittag',       en: 'Late-afternoon browsing',       emoji: '👀' },
+  CLOSING_SOON_INVENTORY: { de: 'Bald geschlossen · Restbestand', en: 'Closing soon · stock left',     emoji: '⏱' },
+  BAD_WEATHER_INDOOR:     { de: 'Schlechtes Wetter · drinnen',    en: 'Bad weather · indoors',         emoji: '🌧' },
+  LUNCHTIME_QUIET:        { de: 'Mittag · ruhige Stunde',         en: 'Lunchtime · quiet hour',        emoji: '🥪' },
+};
+
+function FiredTriggers({ triggers }: { triggers: string[] }) {
+  if (!triggers || triggers.length === 0) return null;
+  const locale = getLocale();
+  const weight = Math.round(100 / triggers.length);
+  return (
+    <View style={{
+      backgroundColor: theme.surface, borderRadius: 16, padding: 14, gap: 10,
+      borderWidth: 1, borderColor: theme.border,
+    }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+          AUSGELÖSTE REGELN
+        </Text>
+        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>
+          {triggers.length} aktiv
+        </Text>
+      </View>
+      {triggers.map((id, i) => {
+        const meta = TRIGGER_LABELS[id] ?? { de: id, en: id, emoji: '⚙️' };
+        const label = locale === 'en' ? meta.en : meta.de;
+        return (
+          <MotiView
+            key={id}
+            from={{ opacity: 0, translateX: -8 }}
+            animate={{ opacity: 1, translateX: 0 }}
+            transition={{ type: 'timing', duration: 320, delay: i * 70 }}
+            style={{ gap: 5 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700', flex: 1 }}>{label}</Text>
+              <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                {weight} %
+              </Text>
+            </View>
+            <View style={{ height: 6, backgroundColor: theme.bgMuted, borderRadius: 3, overflow: 'hidden' }}>
+              <MotiView
+                from={{ width: '0%' }}
+                animate={{ width: `${weight}%` }}
+                transition={{ type: 'timing', duration: 600, delay: 200 + i * 70 }}
+                style={{ height: '100%', backgroundColor: theme.primary, borderRadius: 3 }}
+              />
+            </View>
+          </MotiView>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function WhyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [offer, setOffer] = useState<any>(null);
@@ -147,6 +207,7 @@ export default function WhyScreen() {
 
   const handleForgetMe = async () => {
     await forgetMe();
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setForgotDone(true);
   };
 
@@ -185,6 +246,8 @@ export default function WhyScreen() {
           </Text>
         </View>
       ) : null}
+
+      <FiredTriggers triggers={contextState?.fired_triggers ?? []} />
 
       {/* Confidence bar — % of available signal categories used in this offer */}
       {rows.length > 0 && (() => {

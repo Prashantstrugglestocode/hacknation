@@ -150,18 +150,6 @@ export default function LiveHeader({ stats }: Props) {
             >
               <Text style={{ fontSize: 14 }}>🕐</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.replace('/role')}
-              hitSlop={10}
-              style={{
-                width: 36, height: 36, borderRadius: 18,
-                backgroundColor: theme.surface,
-                borderWidth: 1, borderColor: theme.border,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 14 }}>↺</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </BlurView>

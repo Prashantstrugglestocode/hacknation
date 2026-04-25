@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity, Dimensions, Alert,
 } from 'react-native';
@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MotiView } from 'moti';
+import { MotiView, AnimatePresence } from 'moti';
 import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
 import { WidgetSpecType } from '../../lib/generative/widget-spec';
@@ -15,6 +15,7 @@ import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
+import RoleSwitch from '../../lib/components/RoleSwitch';
 import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
 import FreshnessChip from '../../lib/components/FreshnessChip';
@@ -44,6 +45,10 @@ export default function CustomerHome() {
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [seeding, setSeeding] = useState(false);
   const [milestone, setMilestone] = useState<number | null>(null);
+  const [morph, setMorph] = useState<{ bg: string; fg: string; accent: string } | null>(null);
+  // Capture the navigation that the morph timer or the milestone-modal
+  // close handler should perform — whichever fires first claims it.
+  const pendingNav = useRef<{ id: string; palette: { bg: string; fg: string; accent: string } } | null>(null);
 
   const refreshStats = useCallback(async () => {
     setStats(await getStats());
@@ -143,34 +148,63 @@ export default function CustomerHome() {
 
   const handleAccept = async () => {
     if (state.status !== 'offer') return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setConfettiTrigger(t => t + 1);
 
     const spec = state.offer.widget_spec;
-    const amount_cents =
-      spec.discount.kind === 'eur' ? Math.round(spec.discount.value * 100) :
-      spec.discount.kind === 'pct' ? Math.round(spec.discount.value * 30) :
-      150;
-    await recordSaving({
-      ts: Date.now(),
-      amount_cents,
-      merchant_name: spec.merchant.name,
-      offer_id: state.offer.id,
-    });
-    const next = await getStats();
-    setStats(next);
-    if (isMilestone(next.count_total)) setMilestone(next.count_total);
+    const offerId = state.offer.id;
 
-    fetch(`${API}/api/offer/${state.offer.id}/decision`, {
+    // Kick off the card→QR morph immediately; redeem screen will open with
+    // the same palette so the colors flow continuously.
+    const stripHash = (h: string) => h.replace(/^#/, '');
+    const paletteParams = {
+      bg: stripHash(spec.palette.bg),
+      fg: stripHash(spec.palette.fg),
+      accent: stripHash(spec.palette.accent),
+    };
+    setMorph(paletteParams);
+    pendingNav.current = { id: offerId, palette: paletteParams };
+
+    // Navigate at a fixed 320ms from tap — independent of any awaits below
+    // so the morph never freezes mid-animation.
+    const navTimer = setTimeout(() => {
+      const nav = pendingNav.current;
+      if (!nav) return; // milestone modal claimed it
+      pendingNav.current = null;
+      router.push({
+        pathname: '/(customer)/redeem/[id]',
+        params: { id: nav.id, ...nav.palette },
+      });
+      setTimeout(() => setMorph(null), 400);
+    }, 320);
+
+    // Fire-and-forget side effects.
+    fetch(`${API}/api/offer/${offerId}/decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision: 'accepted' }),
     }).catch(() => {});
 
-    // If milestone is showing, wait until user dismisses; else go to redeem
-    if (!isMilestone(next.count_total)) {
-      setTimeout(() => router.push(`/(customer)/redeem/${state.offer.id}`), 600);
-    }
+    try {
+      const amount_cents =
+        spec.discount.kind === 'eur' ? Math.round(spec.discount.value * 100) :
+        spec.discount.kind === 'pct' ? Math.round(spec.discount.value * 30) :
+        150;
+      await recordSaving({
+        ts: Date.now(),
+        amount_cents,
+        merchant_name: spec.merchant.name,
+        offer_id: offerId,
+      });
+      const next = await getStats();
+      setStats(next);
+      if (isMilestone(next.count_total)) {
+        // Milestone modal pre-empts navigation; cancel the auto-nav timer
+        // so the redeem screen waits until the user dismisses the modal.
+        clearTimeout(navTimer);
+        setMilestone(next.count_total);
+      }
+    } catch {}
   };
 
   const handleDecline = async () => {
@@ -187,14 +221,39 @@ export default function CustomerHome() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <Confetti trigger={confettiTrigger} />
+      <AnimatePresence>
+        {morph && (
+          <MotiView
+            key="morph"
+            from={{ opacity: 0, scale: 0.4, borderRadius: 22 }}
+            animate={{ opacity: 1, scale: 1, borderRadius: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: 'timing', duration: 320 }}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: morph.bg,
+              zIndex: 999,
+            }}
+          />
+        )}
+      </AnimatePresence>
       <MilestoneModal
         visible={milestone !== null}
         count={milestone ?? 0}
         onClose={() => {
-          const m = milestone;
           setMilestone(null);
-          if (state.status === 'offer' && m) {
-            router.push(`/(customer)/redeem/${state.offer.id}`);
+          const nav = pendingNav.current;
+          if (nav) {
+            pendingNav.current = null;
+            router.push({
+              pathname: '/(customer)/redeem/[id]',
+              params: { id: nav.id, ...nav.palette },
+            });
+            setTimeout(() => setMorph(null), 400);
+          } else {
+            // No pending offer to open — just drop the morph paint.
+            setMorph(null);
           }
         }}
       />
@@ -205,6 +264,9 @@ export default function CustomerHome() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
         }
       >
+        <View style={{ alignItems: 'center', marginBottom: 10 }}>
+          <RoleSwitch active="customer" />
+        </View>
         <LiveHeader stats={stats} />
 
         <View style={{ flex: 1, minHeight: height - 220 }}>

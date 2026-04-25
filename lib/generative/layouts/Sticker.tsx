@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 import { WidgetSpecType } from '../widget-spec';
 
 interface Props {
@@ -13,12 +14,20 @@ interface Props {
 export default function StickerLayout({ spec, onAccept, onDecline }: Props) {
   const { palette, headline, subline, cta, signal_chips, discount, merchant } = spec;
 
+  // Slap-down haptic on entrance — playful sticker dropping onto the page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, 180);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}>
       <MotiView
-        from={{ opacity: 0, rotate: '0deg', scale: 0.85 }}
+        from={{ opacity: 0, rotate: '8deg', scale: 1.2 }}
         animate={{ opacity: 1, rotate: '-3deg', scale: 1 }}
-        transition={{ type: 'spring', stiffness: 180, damping: 12, mass: 0.8 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 11, mass: 1 }}
         style={{
           width: '85%',
           backgroundColor: palette.bg,
@@ -26,11 +35,12 @@ export default function StickerLayout({ spec, onAccept, onDecline }: Props) {
           borderWidth: 4,
           borderColor: palette.accent,
           padding: 24,
+          // Paper shadow — offset more dramatically + softer feathering.
           shadowColor: '#000',
-          shadowOffset: { width: 4, height: 6 },
-          shadowOpacity: 0.18,
-          shadowRadius: 12,
-          elevation: 8,
+          shadowOffset: { width: 6, height: 12 },
+          shadowOpacity: 0.28,
+          shadowRadius: 18,
+          elevation: 12,
         }}
       >
         {/* Hero glyph */}

@@ -19,6 +19,7 @@ const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator for the 
 
 - Match mood to context. Cold and drizzle and quiet = cozy. Sunny and crowded with event nearby = energetic. Closing in under 30 minutes with stock = urgent. Lunchtime quiet café = cozy or discreet.
 - Pick layout to fit mood. Cozy or playful favors hero or sticker. Factual or discreet favors compact. Energetic favors split. Urgent favors fullbleed.
+- If context.previous_layout is provided, DO NOT pick the same layout again. Choose a visibly distinct one so pull-to-refresh feels different.
 - Palette: 3 hex colors (#RRGGBB) that harmonize with the mood and pass WCAG AA contrast for fg-on-bg.
 - signal_chips: array of 2-4 short strings showing actual context signals. Use the locale language.
 - Copy is concrete, never marketing fluff. No emojis unless mood is playful.

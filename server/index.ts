@@ -13,6 +13,20 @@ app.use('*', logger());
 
 app.get('/health', (c) => c.json({ ok: true, ts: new Date().toISOString() }));
 
+// Fire-and-forget Ollama warm-up — splash hits this so the gemma3 model is
+// already loaded into memory by the time the customer screen calls
+// /api/offer/generate. No-ops if Ollama is unreachable.
+app.post('/api/warm', async (c) => {
+  const target = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
+  const model = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
+  fetch(`${target}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, prompt: 'hi', stream: false, options: { num_predict: 1 } }),
+  }).catch(() => {});
+  return c.json({ ok: true });
+});
+
 app.route('/api/merchant', merchantRoutes);
 app.route('/api/merchant', menuRoutes);
 app.route('/api/offer', offerRoutes);

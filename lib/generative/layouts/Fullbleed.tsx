@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
 import { WidgetSpecType } from '../widget-spec';
-
-const { height } = Dimensions.get('window');
+import { entryTransition, ctaPulseConfig } from '../mood';
 
 interface Props {
   spec: WidgetSpecType;
@@ -13,13 +12,14 @@ interface Props {
 }
 
 export default function FullbleedLayout({ spec, onAccept, onDecline }: Props) {
-  const { palette, headline, subline, cta, signal_chips, discount, merchant, pressure } = spec;
+  const { palette, mood, headline, subline, cta, signal_chips, discount, merchant, pressure } = spec;
+  const ctaPulse = ctaPulseConfig(mood);
 
   return (
     <MotiView
-      from={{ opacity: 0, scale: 1.04 }}
+      from={{ opacity: 0, scale: 1.06 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+      transition={entryTransition(mood)}
       style={{ flex: 1, backgroundColor: palette.bg, borderRadius: 20, overflow: 'hidden' }}
     >
       {/* Full bleed content — centered */}
@@ -38,12 +38,19 @@ export default function FullbleedLayout({ spec, onAccept, onDecline }: Props) {
           {subline}
         </Text>
 
-        {/* Discount + pressure — urgent, factual */}
-        <View style={{
-          backgroundColor: palette.accent,
-          borderRadius: 16, paddingHorizontal: 24, paddingVertical: 12,
-          marginTop: 20
-        }}>
+        {/* Discount + pressure — urgent, factual; pulses on urgent mood */}
+        <MotiView
+          animate={mood === 'urgent' ? { scale: [1, 1.04, 1] as any } : { scale: 1 }}
+          transition={mood === 'urgent'
+            ? { type: 'timing', duration: 1100, loop: true }
+            : { type: 'timing', duration: 0 }}
+          style={{
+            backgroundColor: palette.accent,
+            borderRadius: 16, paddingHorizontal: 24, paddingVertical: 12,
+            marginTop: 20,
+            shadowColor: palette.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+          }}
+        >
           <Text style={{ color: palette.bg, fontSize: 22, fontWeight: '900', textAlign: 'center' }}>
             {discount.kind === 'pct' ? `−${discount.value} %` :
              discount.kind === 'eur' ? `−${discount.value.toFixed(2).replace('.', ',')} €` : cta}
@@ -53,7 +60,7 @@ export default function FullbleedLayout({ spec, onAccept, onDecline }: Props) {
               {pressure.value}
             </Text>
           )}
-        </View>
+        </MotiView>
 
         <Text style={{ color: palette.fg + '66', fontSize: 13, marginTop: 12 }}>
           {merchant.name} · {Math.round(merchant.distance_m)} m
@@ -71,12 +78,20 @@ export default function FullbleedLayout({ spec, onAccept, onDecline }: Props) {
 
       {/* CTA pinned bottom */}
       <View style={{ paddingHorizontal: 24, paddingBottom: 32 }}>
-        <TouchableOpacity
-          onPress={onAccept}
-          style={{ backgroundColor: palette.accent, borderRadius: 16, paddingVertical: 18, alignItems: 'center' }}
+        <MotiView
+          animate={ctaPulse?.animate ?? { scale: 1 }}
+          transition={ctaPulse?.transition ?? { type: 'timing', duration: 0 }}
         >
-          <Text style={{ color: palette.bg, fontSize: 18, fontWeight: '800' }}>{cta}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onAccept}
+            style={{
+              backgroundColor: palette.accent, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
+              shadowColor: palette.accent, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+            }}
+          >
+            <Text style={{ color: palette.bg, fontSize: 18, fontWeight: '800' }}>{cta}</Text>
+          </TouchableOpacity>
+        </MotiView>
         <TouchableOpacity onPress={onDecline} style={{ alignItems: 'center', marginTop: 12 }}>
           <Text style={{ color: palette.fg + '66', fontSize: 14 }}>Verstanden</Text>
         </TouchableOpacity>

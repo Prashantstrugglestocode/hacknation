@@ -16,7 +16,13 @@ import i18n from '../../lib/i18n';
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
 const TYPES = ['café', 'bakery', 'bookstore', 'restaurant', 'bar', 'retail', 'services', 'other'] as const;
-const TIME_WINDOWS = ['lunch', 'afternoon', 'evening'] as const;
+const TIME_WINDOWS = ['lunch', 'afternoon', 'evening', 'custom'] as const;
+const TIME_WINDOW_LABELS: Record<typeof TIME_WINDOWS[number], string> = {
+  lunch: 'Mittag',
+  afternoon: 'Nachmittag',
+  evening: 'Abend',
+  custom: '⏱ Eigene Zeit',
+};
 
 export default function MerchantSetup() {
   // Translations resolved per render so i18n is ready
@@ -43,6 +49,8 @@ export default function MerchantSetup() {
   const [goal, setGoal] = useState<'fill_quiet_hours' | 'move_slow_stock' | 'build_loyalty'>('fill_quiet_hours');
   const [maxDiscount, setMaxDiscount] = useState(15);
   const [timeWindows, setTimeWindows] = useState<string[]>(['lunch']);
+  const [customFrom, setCustomFrom] = useState(18);
+  const [customUntil, setCustomUntil] = useState(22);
   const [tags, setTags] = useState('');
   const [location, setLocation] = useState<PickedLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +67,12 @@ export default function MerchantSetup() {
       const { lat, lng } = location;
       const deviceHash = await getDeviceHash();
 
+      const encodedWindows = timeWindows.map(w =>
+        w === 'custom'
+          ? `custom:${String(customFrom).padStart(2, '0')}-${String(customUntil).padStart(2, '0')}`
+          : w
+      );
+
       const body = {
         owner_device_id: deviceHash,
         name: name.trim(),
@@ -67,7 +81,7 @@ export default function MerchantSetup() {
         geohash6: encodeGeohash6(lat, lng),
         goal,
         max_discount_pct: maxDiscount,
-        time_windows: timeWindows,
+        time_windows: encodedWindows,
         inventory_tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         locale: getLocale(),
       };
@@ -81,7 +95,11 @@ export default function MerchantSetup() {
       if (!res.ok) throw new Error('Server error');
       const merchant = await res.json();
       await AsyncStorage.setItem('merchant_id', merchant.id);
-      router.replace('/(merchant)/dashboard');
+      // Land in preview so the merchant sees the AI compose for their store first.
+      router.replace({
+        pathname: '/(merchant)/preview',
+        params: { id: merchant.id, fromSetup: '1' },
+      });
     } catch (e) {
       Alert.alert('Fehler', 'Geschäft konnte nicht gespeichert werden. Bitte erneut versuchen.');
     } finally {
@@ -197,7 +215,7 @@ export default function MerchantSetup() {
 
       <View style={{ gap: 10 }}>
         <Text style={labelStyle}>{i18n.t('merchant.time_windows').toUpperCase()}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {TIME_WINDOWS.map(w => {
             const active = timeWindows.includes(w);
             return (
@@ -211,12 +229,57 @@ export default function MerchantSetup() {
                 }}
               >
                 <Text style={{ color: active ? theme.textOnPrimary : theme.text, fontWeight: active ? '800' : '600' }}>
-                  {i18n.t(`merchant.${w}`)}
+                  {TIME_WINDOW_LABELS[w]}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
+
+        {timeWindows.includes('custom') && (
+          <View style={{
+            marginTop: 4,
+            backgroundColor: theme.surface,
+            borderRadius: 14, padding: 14, gap: 10,
+            borderWidth: 1, borderColor: theme.primary + '55',
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '800' }}>Von</Text>
+              <Text style={{ color: theme.primary, fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                {String(customFrom).padStart(2, '0')}:00
+              </Text>
+            </View>
+            <Slider
+              minimumValue={0}
+              maximumValue={23}
+              step={1}
+              value={customFrom}
+              onValueChange={(v) => {
+                setCustomFrom(v);
+                if (v >= customUntil) setCustomUntil(Math.min(23, v + 1));
+              }}
+              minimumTrackTintColor={theme.primary}
+              maximumTrackTintColor={theme.border}
+              thumbTintColor={theme.primary}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '800' }}>Bis</Text>
+              <Text style={{ color: theme.primary, fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                {String(customUntil).padStart(2, '0')}:00
+              </Text>
+            </View>
+            <Slider
+              minimumValue={Math.min(23, customFrom + 1)}
+              maximumValue={23}
+              step={1}
+              value={customUntil}
+              onValueChange={setCustomUntil}
+              minimumTrackTintColor={theme.primary}
+              maximumTrackTintColor={theme.border}
+              thumbTintColor={theme.primary}
+            />
+          </View>
+        )}
       </View>
 
       <View style={{ gap: 8 }}>

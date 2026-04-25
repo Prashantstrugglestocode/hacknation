@@ -38,7 +38,7 @@ offer.post('/generate', async (c) => {
     Promise.resolve(getPayoneDensity()),
   ]);
 
-  const contextState = {
+  const contextState: Record<string, any> = {
     geohash6,
     intent,
     weather,
@@ -102,12 +102,33 @@ offer.post('/generate', async (c) => {
     return c.json({ reason: 'no_suitable_merchant' }, 204);
   }
 
+  // Persist the triggers that fired so the why-screen can visualize them.
+  contextState.fired_triggers = best.triggers;
+
+  // Layout diversity bias: don't repeat the same layout for the same
+  // device+merchant pair on consecutive refreshes — otherwise pull-to-refresh
+  // can yield "different colors, same structure" which breaks the GenUI claim.
+  const { data: lastOfferRow } = await supabase
+    .from('offers')
+    .select('widget_spec')
+    .eq('customer_device_hash', device_hash)
+    .eq('merchant_id', best.merchant.id)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const previousLayout: string | undefined = lastOfferRow?.widget_spec?.layout;
+
   // Generate offer via OpenAI
   let widgetSpec: any;
   try {
     widgetSpec = await generateOffer({
       merchant: best.merchant,
-      context: { ...contextState, distance_m: Math.round(best.dist), fired_triggers: best.triggers },
+      context: {
+        ...contextState,
+        distance_m: Math.round(best.dist),
+        fired_triggers: best.triggers,
+        previous_layout: previousLayout,
+      },
       locale,
       distance_m: best.dist,
     });
@@ -117,6 +138,12 @@ offer.post('/generate', async (c) => {
       name: best.merchant.name,
       distance_m: Math.round(best.dist),
     };
+    // Post-process safeguard: force a different layout if model repeats.
+    if (previousLayout && widgetSpec.layout === previousLayout) {
+      const ALL = ['hero', 'compact', 'split', 'fullbleed', 'sticker'] as const;
+      const pool = ALL.filter(l => l !== previousLayout);
+      widgetSpec.layout = pool[Math.floor(Math.random() * pool.length)];
+    }
   } catch {
     return c.json({ error: 'AI generation failed' }, 503);
   }

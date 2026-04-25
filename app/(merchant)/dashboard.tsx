@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, Pressable } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, Dimensions, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { MotiView } from 'moti';
+import { MotiView, AnimatePresence } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/realtime';
 import Sparkline from '../../lib/components/Sparkline';
 import AnimatedNumber from '../../lib/components/AnimatedNumber';
+import RoleSwitch from '../../lib/components/RoleSwitch';
 import { theme } from '../../lib/theme';
-import i18n from '../../lib/i18n';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 const { width } = Dimensions.get('window');
@@ -59,6 +59,13 @@ const eventDot = (t: MerchantEvent['type']) => ({
   'offer.redeemed': theme.success,
 }[t]);
 
+const eventToastBg = (t: MerchantEvent['type']) => ({
+  'offer.shown': theme.primary,
+  'offer.accepted': theme.success,
+  'offer.declined': theme.warn,
+  'offer.redeemed': theme.success,
+}[t]);
+
 const eventEmoji = (t: MerchantEvent['type']) => ({
   'offer.shown': '👁',
   'offer.accepted': '✓',
@@ -71,6 +78,8 @@ export default function MerchantDashboard() {
   const [stats, setStats] = useState<Stats>({ generated: 0, accepted: 0, redeemed: 0, accept_rate: 0, eur_moved: 0 });
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [pulseKey, setPulseKey] = useState(0);
+  const [eventToast, setEventToast] = useState<{ key: number; type: MerchantEvent['type']; cents?: number } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchStats = useCallback(async (id: string) => {
     try {
@@ -96,9 +105,16 @@ export default function MerchantDashboard() {
           discount_amount_cents: event.discount_amount_cents,
         }, ...prev].slice(0, 12));
         setPulseKey(k => k + 1);
+        const key = Date.now();
+        setEventToast({ key, type: event.type, cents: event.discount_amount_cents });
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setEventToast(null), 2000);
         fetchStats(id);
       });
-      return unsub;
+      return () => {
+        unsub();
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+      };
     })();
   }, []);
 
@@ -109,10 +125,46 @@ export default function MerchantDashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      <AnimatePresence>
+        {eventToast && (
+          <MotiView
+            key={eventToast.key}
+            from={{ opacity: 0, translateY: -16, scale: 0.9 }}
+            animate={{ opacity: 1, translateY: 0, scale: 1 }}
+            exit={{ opacity: 0, translateY: -8 }}
+            transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+            style={{
+              position: 'absolute', top: 64, left: 0, right: 0,
+              alignItems: 'center', zIndex: 100, pointerEvents: 'none',
+            }}
+          >
+            <View style={{
+              backgroundColor: eventToastBg(eventToast.type),
+              borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10,
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              shadowColor: eventToastBg(eventToast.type), shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 8 },
+            }}>
+              <Text style={{ fontSize: 16 }}>{eventEmoji(eventToast.type)}</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 0.3 }}>
+                {eventLabel(eventToast.type)}
+              </Text>
+              {eventToast.cents != null && eventToast.cents > 0 && (
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900' }}>
+                  · {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(eventToast.cents / 100)}
+                </Text>
+              )}
+            </View>
+          </MotiView>
+        )}
+      </AnimatePresence>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
       >
+        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+          <RoleSwitch active="merchant" />
+        </View>
+
         {/* HERO BAND — warm greeting + identity over a soft red wash */}
         <View style={{
           marginHorizontal: 14, marginTop: 8, borderRadius: 28, overflow: 'hidden',
@@ -133,24 +185,14 @@ export default function MerchantDashboard() {
                   {merchant?.name ?? 'Dein Geschäft'}
                 </Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
-                  hitSlop={8}
-                  style={{
-                    width: 38, height: 38, borderRadius: 19,
-                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                  <Text style={{ fontSize: 16 }}>⚙️</Text>
-                </Pressable>
-                <Pressable onPress={() => router.replace('/role')}
-                  hitSlop={8}
-                  style={{
-                    width: 38, height: 38, borderRadius: 19,
-                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                  <Text style={{ fontSize: 14, color: '#fff' }}>↺</Text>
-                </Pressable>
-              </View>
+              <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
+                hitSlop={8}
+                style={{
+                  width: 38, height: 38, borderRadius: 19,
+                  backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
+                }}>
+                <Text style={{ fontSize: 16 }}>⚙️</Text>
+              </Pressable>
             </View>
 
             {/* Hero stat: today's redeemed + EUR moved */}
@@ -158,21 +200,35 @@ export default function MerchantDashboard() {
               <View>
                 <Text style={{ color: '#FFFFFFAA', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>HEUTE</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <AnimatedNumber
-                    value={stats.redeemed}
-                    style={{ color: '#fff', fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 }}
-                  />
+                  <MotiView
+                    key={`redeemed-${pulseKey}`}
+                    from={{ scale: 1.22 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', damping: 9, stiffness: 280 }}
+                  >
+                    <AnimatedNumber
+                      value={stats.redeemed}
+                      style={{ color: '#fff', fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 }}
+                    />
+                  </MotiView>
                   <Text style={{ color: '#FFFFFFCC', fontSize: 14, fontWeight: '700' }}>eingelöst</Text>
                 </View>
               </View>
               <View style={{ flex: 1 }} />
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ color: '#FFFFFFAA', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>UMSATZ</Text>
-                <AnimatedNumber
-                  value={stats.eur_moved / 100}
-                  format={n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)}
-                  style={{ color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 }}
-                />
+                <MotiView
+                  key={`eur-${pulseKey}`}
+                  from={{ scale: 1.18 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', damping: 10, stiffness: 280 }}
+                >
+                  <AnimatedNumber
+                    value={stats.eur_moved / 100}
+                    format={n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)}
+                    style={{ color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 }}
+                  />
+                </MotiView>
               </View>
             </View>
 
@@ -395,15 +451,18 @@ function SecondaryStat({
   label, big, sub, pulseKey, tone,
 }: { label: string; big: string; sub: string; pulseKey: number; tone?: 'muted' }) {
   const isMuted = tone === 'muted';
+  const restingBg = isMuted ? theme.bgMuted : theme.surface;
   return (
     <MotiView
       key={pulseKey}
-      from={{ scale: 0.96 }}
-      animate={{ scale: 1 }}
-      transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+      from={{ scale: 0.94, backgroundColor: theme.success + '55' }}
+      animate={{ scale: 1, backgroundColor: restingBg }}
+      transition={{
+        scale: { type: 'spring', damping: 12, stiffness: 240 },
+        backgroundColor: { type: 'timing', duration: 700 },
+      }}
       style={{
         flex: 1, padding: 14, borderRadius: 18,
-        backgroundColor: isMuted ? theme.bgMuted : theme.surface,
         borderWidth: 1, borderColor: theme.border,
       }}
     >

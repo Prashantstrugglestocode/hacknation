@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
-import { signOut, useSession, setPreferredRole } from '../lib/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../lib/theme';
 import i18n, { setLocale, getLocale } from '../lib/i18n';
 
+const ROLE_KEY = 'cw_preferred_role';
+
 export default function RolePicker() {
-  const session = useSession();
-  const [signingOut, setSigningOut] = useState(false);
   const [locale, setLocaleState] = useState<'de' | 'en'>(getLocale());
 
   const switchLocale = async (l: 'de' | 'en') => {
@@ -19,27 +19,15 @@ export default function RolePicker() {
   };
 
   const goCustomer = async () => {
-    if (session?.user) await setPreferredRole(session.user.id, 'customer');
+    await AsyncStorage.setItem(ROLE_KEY, 'customer');
     Haptics.selectionAsync();
     router.replace('/(customer)/home');
   };
   const goMerchant = async () => {
-    if (session?.user) await setPreferredRole(session.user.id, 'merchant');
+    await AsyncStorage.setItem(ROLE_KEY, 'merchant');
     Haptics.selectionAsync();
-    router.replace('/(merchant)/setup');
-  };
-
-  const confirmSignOut = () => {
-    Alert.alert('Abmelden?', 'Du wirst zur Login-Seite weitergeleitet.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Abmelden', style: 'destructive', onPress: doSignOut },
-    ]);
-  };
-
-  const doSignOut = async () => {
-    setSigningOut(true);
-    await signOut();
-    router.replace('/(auth)/login');
+    const existing = await AsyncStorage.getItem('merchant_id');
+    router.replace(existing ? '/(merchant)/dashboard' : '/(merchant)/setup');
   };
 
   return (
@@ -139,42 +127,10 @@ export default function RolePicker() {
         })}
       </View>
 
-      {/* Account / sign-out card */}
-      <View style={{
-        backgroundColor: theme.bgMuted, borderRadius: 16, padding: 16, gap: 12,
-        borderWidth: 1, borderColor: theme.border,
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{
-            width: 36, height: 36, borderRadius: 18,
-            backgroundColor: theme.primary,
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Text style={{ fontSize: 16 }}>👤</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
-              ANGEMELDET
-            </Text>
-            <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
-              {session?.user?.email ?? '—'}
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          onPress={confirmSignOut}
-          disabled={signingOut}
-          style={{
-            backgroundColor: theme.surface, borderRadius: 12,
-            paddingVertical: 12, alignItems: 'center',
-            borderWidth: 1, borderColor: theme.danger + '55',
-          }}
-        >
-          <Text style={{ color: theme.danger, fontWeight: '800', fontSize: 14 }}>
-            {signingOut ? 'Abmelden…' : '🚪  Abmelden'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Anonymity hint replaces sign-out card */}
+      <Text style={{ color: theme.textMuted, fontSize: 12, textAlign: 'center', fontWeight: '600' }}>
+        🔒 Anonymes Gerät · keine Anmeldung nötig
+      </Text>
     </View>
   );
 }

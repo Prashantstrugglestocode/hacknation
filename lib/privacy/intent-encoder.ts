@@ -29,10 +29,15 @@ export async function getDeviceHash(): Promise<string> {
 }
 
 export async function forgetMe(): Promise<void> {
-  // Rotate device hash, wipe stored intent history
+  // Rotate device hash + wipe ALL local customer-side history.
+  // Merchant_id is intentionally preserved (it represents the owner role, not customer activity).
   const newHash = Math.random().toString(36).slice(2) + Date.now().toString(36);
   await AsyncStorage.setItem(DEVICE_HASH_KEY, newHash);
-  await AsyncStorage.removeItem('city_wallet_last_offers');
+  await AsyncStorage.multiRemove([
+    'city_wallet_last_offers',
+    'cw_savings_v1',
+    'cw_saved_offers_v1',
+  ]);
 }
 
 export function encodeIntent(params: {
