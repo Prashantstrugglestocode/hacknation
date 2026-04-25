@@ -23,6 +23,10 @@ export default function Index() {
       const profile = await getProfile(session.user.id);
       if (!profile || !profile.first_login_completed) {
         router.replace('/onboarding');
+      } else if (profile.preferred_role === 'customer') {
+        router.replace('/(customer)/home');
+      } else if (profile.preferred_role === 'merchant') {
+        router.replace('/(merchant)/dashboard');
       } else {
         router.replace('/role');
       }

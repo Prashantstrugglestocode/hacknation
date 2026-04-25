@@ -95,10 +95,23 @@ export default function MerchantDashboard() {
               {i18n.t('merchant.dashboard_title')}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => merchantId && router.push('/(merchant)/rules')}
-            style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-            <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '700' }}>Regeln ✏️</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            <TouchableOpacity onPress={() => merchantId && router.push('/(merchant)/rules')}
+              hitSlop={8}
+              style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+              <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '700' }}>Regeln ✏️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.replace('/role')}
+              hitSlop={8}
+              style={{
+                paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10,
+                backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+              }}>
+              <Text style={{ fontSize: 12 }}>↺</Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>Rolle</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Quick action: menu */}
