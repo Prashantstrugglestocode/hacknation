@@ -13,6 +13,8 @@ export default function RootLayout() {
     segments[0] === '(customer)' ? 'customer' :
     segments[0] === '(merchant)' ? 'merchant' : null;
 
+  const inAuthFlow = segments[0] === '(auth)' || segments[0] === 'onboarding';
+
   const switchRole = (r: 'customer' | 'merchant') => {
     if (r === 'customer') router.replace('/(customer)/home');
     else router.replace('/(merchant)/dashboard');
@@ -23,7 +25,8 @@ export default function RootLayout() {
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
         <StatusBar style="dark" />
 
-        {role && (
+        {/* Role toggle only inside customer/merchant flows, never on auth or onboarding */}
+        {role && !inAuthFlow && (
           <View style={{
             flexDirection: 'row',
             backgroundColor: theme.bgMuted,

@@ -4,11 +4,11 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
-import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { encodeGeohash6 } from '../../lib/context/geohash';
 import { getDeviceHash } from '../../lib/privacy/intent-encoder';
+import LocationPicker, { PickedLocation } from '../../lib/components/LocationPicker';
 import { theme } from '../../lib/theme';
 import { getLocale } from '../../lib/i18n';
 import i18n from '../../lib/i18n';
@@ -44,6 +44,7 @@ export default function MerchantSetup() {
   const [maxDiscount, setMaxDiscount] = useState(15);
   const [timeWindows, setTimeWindows] = useState<string[]>(['lunch']);
   const [tags, setTags] = useState('');
+  const [location, setLocation] = useState<PickedLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const toggleWindow = (w: string) => {
@@ -52,13 +53,10 @@ export default function MerchantSetup() {
 
   const handleSubmit = async () => {
     if (!name.trim()) { Alert.alert('Name fehlt', 'Bitte gib den Namen deines Geschäfts ein.'); return; }
+    if (!location) { Alert.alert('Standort fehlt', 'Bitte Standort bestätigen oder Adresse eingeben.'); return; }
     setSubmitting(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('Standort benötigt', 'Wir brauchen deinen Standort, um Angebote zu generieren.'); setSubmitting(false); return; }
-
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const { latitude: lat, longitude: lng } = loc.coords;
+      const { lat, lng } = location;
       const deviceHash = await getDeviceHash();
 
       const body = {
@@ -120,6 +118,8 @@ export default function MerchantSetup() {
           style={inputStyle}
         />
       </View>
+
+      <LocationPicker value={location} onChange={setLocation} />
 
       <View style={{ gap: 10 }}>
         <Text style={labelStyle}>{i18n.t('merchant.type_label').toUpperCase()}</Text>
