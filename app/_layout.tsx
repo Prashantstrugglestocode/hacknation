@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Slot, router, useSegments } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import i18n from '../lib/i18n';
 
@@ -44,7 +44,7 @@ export default function RootLayout() {
           </View>
         )}
 
-        <Slot />
+        <Stack screenOptions={{ headerShown: false }} />
 
       </SafeAreaView>
     </SafeAreaProvider>

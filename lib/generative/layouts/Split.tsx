@@ -8,6 +8,7 @@ const { height } = Dimensions.get('window');
 
 interface Props {
   spec: WidgetSpecType;
+  offerId?: string;
   onAccept: () => void;
   onDecline: () => void;
 }

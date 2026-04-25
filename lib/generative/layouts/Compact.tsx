@@ -5,6 +5,7 @@ import { WidgetSpecType } from '../widget-spec';
 
 interface Props {
   spec: WidgetSpecType;
+  offerId?: string;
   onAccept: () => void;
   onDecline: () => void;
 }

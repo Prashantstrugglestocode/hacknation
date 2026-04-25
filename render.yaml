@@ -9,7 +9,7 @@ services:
     envVars:
       - key: SUPABASE_URL
         value: "https://ecydsayjmyrbkxthkfli.supabase.co"
-      - key: SUPABASE_SERVICE_KEY
+      - key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjeWRzYXlqbXlyYmt4dGhrZmxpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzEyNzc0MSwiZXhwIjoyMDkyNzAzNzQxfQ.0gntQiKO2GbLQLD2XtgGEsZk7jp2SJmp6JnM4crAovU"
         sync: false
       - key: OPENAI_API_KEY
         sync: false

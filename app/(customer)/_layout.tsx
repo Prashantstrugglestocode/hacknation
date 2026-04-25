@@ -1,4 +1,11 @@
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
+
 export default function CustomerLayout() {
-  return <Slot />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="home" />
+      <Stack.Screen name="redeem/[id]" options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="why/[id]" options={{ presentation: 'modal' }} />
+    </Stack>
+  );
 }

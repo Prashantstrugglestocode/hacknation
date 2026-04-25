@@ -1,20 +1,23 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, RefreshControl, TouchableOpacity,
-  Dimensions, ActivityIndicator, Animated
+  View, Text, ScrollView, RefreshControl, TouchableOpacity, Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { MotiView } from 'moti';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
 import { WidgetSpecType } from '../../lib/generative/widget-spec';
 import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
+import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
+import GlassHeader from '../../lib/components/GlassHeader';
+import ShimmerCard from '../../lib/components/Shimmer';
+import FreshnessChip from '../../lib/components/FreshnessChip';
+import Confetti from '../../lib/components/Confetti';
 import i18n from '../../lib/i18n';
 
-const { height, width } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
 type State =
@@ -22,13 +25,21 @@ type State =
   | { status: 'location_denied' }
   | { status: 'loading' }
   | { status: 'no_merchant' }
-  | { status: 'offer'; offer: { id: string; widget_spec: WidgetSpecType }; payload: object }
+  | { status: 'offer'; offer: { id: string; widget_spec: WidgetSpecType }; payload: object; generatedAt: number }
   | { status: 'declined' }
   | { status: 'error'; message: string };
+
+const EMPTY_STATS: SavingsStats = { total_eur: 0, count_total: 0, count_this_week: 0, recent: [] };
 
 export default function CustomerHome() {
   const [state, setState] = useState<State>({ status: 'idle' });
   const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<SavingsStats>(EMPTY_STATS);
+  const [confettiTrigger, setConfettiTrigger] = useState(0);
+
+  const refreshStats = useCallback(async () => {
+    setStats(await getStats());
+  }, []);
 
   const generate = useCallback(async () => {
     setState({ status: 'loading' });
@@ -40,7 +51,6 @@ export default function CustomerHome() {
       const { latitude: lat, longitude: lng } = loc.coords;
       const deviceHash = await getDeviceHash();
 
-      // Client-side intent encoding — exact coords never leave device
       const payload = encodeIntent({
         lat, lng,
         weatherCondition: 'unknown',
@@ -59,115 +69,145 @@ export default function CustomerHome() {
       if (!res.ok) { setState({ status: 'error', message: i18n.t('errors.generation_failed') }); return; }
 
       const data = await res.json();
-      setState({ status: 'offer', offer: data, payload });
+      setState({ status: 'offer', offer: data, payload, generatedAt: Date.now() });
     } catch (e) {
       setState({ status: 'error', message: i18n.t('errors.generation_failed') });
     }
   }, []);
 
-  useEffect(() => { generate(); }, []);
+  useEffect(() => { refreshStats(); generate(); }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await generate();
+    await Promise.all([generate(), refreshStats()]);
     setRefreshing(false);
   };
 
   const handleAccept = async () => {
     if (state.status !== 'offer') return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await fetch(`${API}/api/offer/${state.offer.id}/decision`, {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setConfettiTrigger(t => t + 1);
+
+    const spec = state.offer.widget_spec;
+    const amount_cents =
+      spec.discount.kind === 'eur' ? Math.round(spec.discount.value * 100) :
+      spec.discount.kind === 'pct' ? Math.round(spec.discount.value * 30) :
+      150;
+    await recordSaving({
+      ts: Date.now(),
+      amount_cents,
+      merchant_name: spec.merchant.name,
+      offer_id: state.offer.id,
+    });
+    refreshStats();
+
+    fetch(`${API}/api/offer/${state.offer.id}/decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision: 'accepted' }),
-    });
-    router.push(`/(customer)/redeem/${state.offer.id}`);
+    }).catch(() => {});
+
+    setTimeout(() => {
+      router.push(`/(customer)/redeem/${state.offer.id}`);
+    }, 600);
   };
 
   const handleDecline = async () => {
     if (state.status !== 'offer') return;
-    await fetch(`${API}/api/offer/${state.offer.id}/decision`, {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    fetch(`${API}/api/offer/${state.offer.id}/decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision: 'declined' }),
-    });
+    }).catch(() => {});
     setState({ status: 'declined' });
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: '#0A0A0F' }}
-      contentContainerStyle={{ flexGrow: 1 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6C63FF" />}
-    >
-      <View style={{ flex: 1, padding: 16, minHeight: height - 120 }}>
-        {/* Header */}
-        <Text style={{ color: '#ffffff44', fontSize: 13, fontWeight: '600', letterSpacing: 1.5, marginBottom: 16, textAlign: 'center' }}>
-          CITY WALLET
-        </Text>
+    <View style={{ flex: 1, backgroundColor: '#0A0A0F' }}>
+      <Confetti trigger={confettiTrigger} />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6C63FF" />
+        }
+      >
+        <GlassHeader stats={stats} />
 
-        {state.status === 'idle' || state.status === 'loading' ? (
-          <SkeletonCard />
-        ) : state.status === 'location_denied' ? (
-          <LocationDeniedState onRetry={generate} />
-        ) : state.status === 'no_merchant' ? (
-          <NoMerchantState />
-        ) : state.status === 'error' ? (
-          <ErrorState message={state.message} onRetry={generate} />
-        ) : state.status === 'declined' ? (
-          <DeclinedState onRefresh={generate} />
-        ) : state.status === 'offer' ? (
-          <View style={{ flex: 1, gap: 12 }}>
-            <View style={{ flex: 1, minHeight: height * 0.58 }}>
-              <WidgetRenderer
-                spec={state.offer.widget_spec}
-                onAccept={handleAccept}
-                onDecline={handleDecline}
-              />
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
-              style={{ alignItems: 'center', paddingVertical: 12 }}
+        <View style={{ flex: 1, minHeight: height - 200 }}>
+          {state.status === 'idle' || state.status === 'loading' ? (
+            <ShimmerCard />
+          ) : state.status === 'location_denied' ? (
+            <LocationDeniedState onRetry={generate} />
+          ) : state.status === 'no_merchant' ? (
+            <NoMerchantState />
+          ) : state.status === 'error' ? (
+            <ErrorState message={state.message} onRetry={generate} />
+          ) : state.status === 'declined' ? (
+            <DeclinedState onRefresh={generate} />
+          ) : state.status === 'offer' ? (
+            <MotiView
+              key={state.offer.id}
+              from={{ opacity: 0, translateY: 12, scale: 0.98 }}
+              animate={{ opacity: 1, translateY: 0, scale: 1 }}
+              transition={{ type: 'spring', damping: 18, stiffness: 180 }}
+              style={{ flex: 1, gap: 8 }}
             >
-              <Text style={{ color: '#6C63FF', fontSize: 14 }}>
-                {i18n.t('customer.why')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
-    </ScrollView>
+              <View style={{ flex: 1, minHeight: height * 0.58 }}>
+                <WidgetRenderer
+                  spec={state.offer.widget_spec}
+                  offerId={state.offer.id}
+                  onAccept={handleAccept}
+                  onDecline={handleDecline}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <FreshnessChip generatedAt={state.generatedAt} />
+                <TouchableOpacity
+                  onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
+                  hitSlop={12}
+                >
+                  <Text style={{ color: '#6C63FF', fontSize: 13, fontWeight: '600' }}>
+                    {i18n.t('customer.why')}  ›
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </MotiView>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-function SkeletonCard() {
+function AnimatedEmoji({ emoji, delay = 0 }: { emoji: string; delay?: number }) {
   return (
     <MotiView
-      from={{ opacity: 0.4 }}
-      animate={{ opacity: 0.8 }}
-      transition={{ type: 'timing', duration: 800, loop: true }}
-      style={{ flex: 1, minHeight: 400, borderRadius: 20, backgroundColor: '#1A1A2E' }}
+      from={{ scale: 0.6, rotate: '-12deg', opacity: 0 }}
+      animate={{ scale: 1, rotate: '0deg', opacity: 1 }}
+      transition={{ type: 'spring', damping: 10, stiffness: 140, delay }}
     >
-      <View style={{ height: '55%', backgroundColor: '#2A2A3E', borderRadius: 20 }} />
-      <View style={{ padding: 20, gap: 12 }}>
-        <View style={{ height: 24, backgroundColor: '#2A2A3E', borderRadius: 8, width: '70%' }} />
-        <View style={{ height: 16, backgroundColor: '#2A2A3E', borderRadius: 8, width: '90%' }} />
-        <View style={{ height: 16, backgroundColor: '#2A2A3E', borderRadius: 8, width: '60%' }} />
-      </View>
+      <Text style={{ fontSize: 64 }}>{emoji}</Text>
     </MotiView>
   );
 }
 
 function LocationDeniedState({ onRetry }: { onRetry: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 20 }}>
-      <Text style={{ fontSize: 40 }}>📍</Text>
-      <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' }}>
-        {i18n.t('customer.no_location')}
-      </Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 24 }}>
+      <AnimatedEmoji emoji="📍" />
+      <View style={{ gap: 8 }}>
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
+          Standort gebraucht
+        </Text>
+        <Text style={{ color: '#ffffff88', fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 280 }}>
+          {i18n.t('customer.no_location')}
+        </Text>
+      </View>
       <TouchableOpacity
         onPress={onRetry}
-        style={{ backgroundColor: '#6C63FF', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14 }}
+        style={{ backgroundColor: '#6C63FF', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 16 }}
       >
         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
           {i18n.t('customer.grant_location')}
@@ -179,17 +219,22 @@ function LocationDeniedState({ onRetry }: { onRetry: () => void }) {
 
 function NoMerchantState() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 20 }}>
-      <Text style={{ fontSize: 40 }}>🗺️</Text>
-      <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center', lineHeight: 24 }}>
-        {i18n.t('customer.no_merchant')}
-      </Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 24 }}>
+      <AnimatedEmoji emoji="🗺️" />
+      <View style={{ gap: 8 }}>
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
+          Niemand in der Nähe
+        </Text>
+        <Text style={{ color: '#ffffff88', fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 300 }}>
+          {i18n.t('customer.no_merchant')}
+        </Text>
+      </View>
       <TouchableOpacity
         onPress={() => router.replace('/(merchant)/setup')}
-        style={{ backgroundColor: '#1A1A2E', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14, borderWidth: 1, borderColor: '#6C63FF44' }}
+        style={{ backgroundColor: '#1A1A2E', borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, borderWidth: 1, borderColor: '#6C63FF66' }}
       >
         <Text style={{ color: '#6C63FF', fontWeight: '700', fontSize: 15 }}>
-          {i18n.t('customer.become_merchant')}
+          {i18n.t('customer.become_merchant')}  ›
         </Text>
       </TouchableOpacity>
     </View>
@@ -198,10 +243,15 @@ function NoMerchantState() {
 
 function DeclinedState({ onRefresh }: { onRefresh: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-      <Text style={{ color: '#ffffff66', fontSize: 18 }}>Verstanden</Text>
-      <TouchableOpacity onPress={onRefresh}>
-        <Text style={{ color: '#6C63FF', fontSize: 15 }}>{i18n.t('customer.pull_refresh')}</Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+      <AnimatedEmoji emoji="👌" />
+      <Text style={{ color: '#ffffff88', fontSize: 18, fontWeight: '600' }}>Verstanden</Text>
+      <TouchableOpacity onPress={onRefresh} style={{
+        backgroundColor: '#1A1A2E', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12,
+      }}>
+        <Text style={{ color: '#6C63FF', fontSize: 14, fontWeight: '700' }}>
+          Anderes Angebot anzeigen
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -210,9 +260,12 @@ function DeclinedState({ onRefresh }: { onRefresh: () => void }) {
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-      <Text style={{ color: '#FF6B6B', fontSize: 16, textAlign: 'center' }}>{message}</Text>
-      <TouchableOpacity onPress={onRetry}>
-        <Text style={{ color: '#6C63FF', fontSize: 15 }}>Erneut versuchen</Text>
+      <AnimatedEmoji emoji="⚠️" />
+      <Text style={{ color: '#FF6B6B', fontSize: 16, textAlign: 'center', maxWidth: 280 }}>{message}</Text>
+      <TouchableOpacity onPress={onRetry} style={{
+        backgroundColor: '#1A1A2E', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12,
+      }}>
+        <Text style={{ color: '#6C63FF', fontSize: 14, fontWeight: '700' }}>Erneut versuchen</Text>
       </TouchableOpacity>
     </View>
   );

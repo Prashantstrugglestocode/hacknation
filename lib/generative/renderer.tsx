@@ -8,21 +8,18 @@ import StickerLayout from './layouts/Sticker';
 
 interface Props {
   spec: WidgetSpecType;
+  offerId?: string;
   onAccept: () => void;
   onDecline: () => void;
 }
 
-export default function WidgetRenderer({ spec, onAccept, onDecline }: Props) {
+export default function WidgetRenderer({ spec, offerId, onAccept, onDecline }: Props) {
+  const props = { spec, offerId, onAccept, onDecline };
   switch (spec.layout) {
-    case 'hero':
-      return <HeroLayout spec={spec} onAccept={onAccept} onDecline={onDecline} />;
-    case 'compact':
-      return <CompactLayout spec={spec} onAccept={onAccept} onDecline={onDecline} />;
-    case 'split':
-      return <SplitLayout spec={spec} onAccept={onAccept} onDecline={onDecline} />;
-    case 'fullbleed':
-      return <FullbleedLayout spec={spec} onAccept={onAccept} onDecline={onDecline} />;
-    case 'sticker':
-      return <StickerLayout spec={spec} onAccept={onAccept} onDecline={onDecline} />;
+    case 'hero':      return <HeroLayout {...props} />;
+    case 'compact':   return <CompactLayout {...props} />;
+    case 'split':     return <SplitLayout {...props} />;
+    case 'fullbleed': return <FullbleedLayout {...props} />;
+    case 'sticker':   return <StickerLayout {...props} />;
   }
 }
