@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import merchantRoutes from './routes/merchant.ts';
 import offerRoutes from './routes/offer.ts';
+import menuRoutes from './routes/menu.ts';
 
 const app = new Hono();
 
@@ -12,6 +13,7 @@ app.use('*', logger());
 app.get('/health', (c) => c.json({ ok: true, ts: new Date().toISOString() }));
 
 app.route('/api/merchant', merchantRoutes);
+app.route('/api/merchant', menuRoutes);
 app.route('/api/offer', offerRoutes);
 
 // Nearby merchants via query param

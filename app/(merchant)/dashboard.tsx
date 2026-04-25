@@ -5,6 +5,7 @@ import { MotiView } from 'moti';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/realtime';
+import { theme } from '../../lib/theme';
 import i18n from '../../lib/i18n';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -69,10 +70,10 @@ export default function MerchantDashboard() {
 
   const eventColor = (type: MerchantEvent['type']) => {
     switch (type) {
-      case 'offer.shown': return '#6C63FF';
-      case 'offer.accepted': return '#4CAF50';
-      case 'offer.declined': return '#FF9800';
-      case 'offer.redeemed': return '#4CAF50';
+      case 'offer.shown': return theme.primary;
+      case 'offer.accepted': return theme.success;
+      case 'offer.declined': return theme.warn;
+      case 'offer.redeemed': return theme.success;
     }
   };
 
@@ -85,16 +86,45 @@ export default function MerchantDashboard() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0F' }}>
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 8 }}>
-          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>
-            {i18n.t('merchant.dashboard_title')}
-          </Text>
-          <TouchableOpacity onPress={() => merchantId && router.push('/(merchant)/rules')}>
-            <Text style={{ color: '#6C63FF', fontSize: 14 }}>Regeln ✏️</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 }}>
+          <View>
+            <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>HÄNDLER-DASHBOARD</Text>
+            <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
+              {i18n.t('merchant.dashboard_title')}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => merchantId && router.push('/(merchant)/rules')}
+            style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+            <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '700' }}>Regeln ✏️</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Quick action: menu */}
+        <TouchableOpacity onPress={() => merchantId && router.push(`/(merchant)/menu?id=${merchantId}`)}
+          style={{
+            backgroundColor: theme.bgMuted, borderRadius: 16, padding: 14,
+            flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16,
+            borderWidth: 1, borderColor: theme.border,
+          }}>
+          <View style={{
+            width: 44, height: 44, borderRadius: 12,
+            backgroundColor: theme.primary,
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: 20 }}>📋</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }}>
+              Speisekarte & KI-Insights
+            </Text>
+            <Text style={{ color: theme.textMuted, fontSize: 12, marginTop: 2 }}>
+              Karte fotografieren · sehen, was nicht läuft
+            </Text>
+          </View>
+          <Text style={{ color: theme.primary, fontSize: 18, fontWeight: '800' }}>›</Text>
+        </TouchableOpacity>
 
         {/* Stat cards grid */}
         <MotiView key={pulseKey} from={{ scale: 1.02 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
@@ -103,17 +133,16 @@ export default function MerchantDashboard() {
               <View
                 key={i}
                 style={{
-                  backgroundColor: '#1A1A2E',
-                  borderRadius: 16,
-                  padding: 16,
-                  width: (width - 42) / 2,
-                  gap: 6,
+                  backgroundColor: theme.surface,
+                  borderRadius: 16, padding: 16,
+                  width: (width - 42) / 2, gap: 6,
+                  borderWidth: 1, borderColor: theme.border,
                 }}
               >
-                <Text style={{ color: '#ffffff66', fontSize: 12, fontWeight: '600', letterSpacing: 0.5 }}>
+                <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
                   {card.label.toUpperCase()}
                 </Text>
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>
+                <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
                   {card.value}
                 </Text>
               </View>
@@ -122,13 +151,19 @@ export default function MerchantDashboard() {
         </MotiView>
 
         {/* Live feed */}
-        <Text style={{ color: '#ffffff66', fontSize: 13, fontWeight: '600', letterSpacing: 1, marginBottom: 12 }}>
+        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 }}>
           LIVE FEED
         </Text>
         {feed.length === 0 ? (
-          <Text style={{ color: '#ffffff33', fontSize: 14, textAlign: 'center', paddingVertical: 20 }}>
-            Noch keine Ereignisse. Warte auf Kunden…
-          </Text>
+          <View style={{
+            backgroundColor: theme.bgMuted, borderRadius: 14, paddingVertical: 28,
+            alignItems: 'center', borderWidth: 1, borderColor: theme.border,
+            borderStyle: 'dashed',
+          }}>
+            <Text style={{ color: theme.textMuted, fontSize: 14 }}>
+              Noch keine Ereignisse. Warte auf Kunden…
+            </Text>
+          </View>
         ) : (
           <View style={{ gap: 8 }}>
             {feed.map((item, i) => (
@@ -138,17 +173,18 @@ export default function MerchantDashboard() {
                 animate={{ opacity: 1, translateY: 0 }}
                 transition={{ type: 'timing', duration: 300 }}
                 style={{
-                  backgroundColor: '#1A1A2E', borderRadius: 12,
-                  paddingHorizontal: 16, paddingVertical: 12,
+                  backgroundColor: theme.surface, borderRadius: 12,
+                  paddingHorizontal: 14, paddingVertical: 12,
                   flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                  borderLeftWidth: 3, borderLeftColor: eventColor(item.type)
+                  borderWidth: 1, borderColor: theme.border,
+                  borderLeftWidth: 4, borderLeftColor: eventColor(item.type),
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 14 }}>{eventLabel(item.type)}</Text>
+                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{eventLabel(item.type)}</Text>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: '#ffffff55', fontSize: 12 }}>{item.ts}</Text>
+                  <Text style={{ color: theme.textMuted, fontSize: 12 }}>{item.ts}</Text>
                   {item.discount_amount_cents ? (
-                    <Text style={{ color: '#4CAF50', fontSize: 12, fontWeight: '700' }}>
+                    <Text style={{ color: theme.success, fontSize: 12, fontWeight: '800' }}>
                       {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
                         .format(item.discount_amount_cents / 100)}
                     </Text>
@@ -163,17 +199,18 @@ export default function MerchantDashboard() {
       {/* Sticky scan button */}
       <View style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: 16, backgroundColor: '#0A0A0F',
-        borderTopWidth: 1, borderTopColor: '#ffffff11'
+        padding: 16, backgroundColor: theme.bg,
+        borderTopWidth: 1, borderTopColor: theme.border,
       }}>
         <TouchableOpacity
           onPress={() => router.push('/(merchant)/scan')}
           style={{
-            backgroundColor: '#6C63FF', borderRadius: 18,
-            paddingVertical: 20, alignItems: 'center'
+            backgroundColor: theme.primary, borderRadius: 18,
+            paddingVertical: 18, alignItems: 'center',
+            shadowColor: theme.primary, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>
+          <Text style={{ color: theme.textOnPrimary, fontSize: 17, fontWeight: '800', letterSpacing: 0.3 }}>
             {i18n.t('merchant.scan_qr')}
           </Text>
         </TouchableOpacity>

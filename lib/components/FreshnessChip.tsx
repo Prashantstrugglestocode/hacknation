@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { MotiView } from 'moti';
+import { theme } from '../theme';
 
 export default function FreshnessChip({ generatedAt }: { generatedAt: number }) {
   const [now, setNow] = useState(Date.now());
@@ -17,14 +18,14 @@ export default function FreshnessChip({ generatedAt }: { generatedAt: number }) 
     `vor ${Math.floor(sec / 3600)} Std.`;
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 5 }}>
       <MotiView
         from={{ scale: 0.9, opacity: 0.4 }}
-        animate={{ scale: 1.4, opacity: 1 }}
+        animate={{ scale: 1.5, opacity: 1 }}
         transition={{ type: 'timing', duration: 1100, loop: true }}
-        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#48E5C2' }}
+        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
       />
-      <Text style={{ color: '#ffffff66', fontSize: 11, fontWeight: '600', letterSpacing: 0.3 }}>
+      <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>
         Live · KI-generiert {label}
       </Text>
     </View>

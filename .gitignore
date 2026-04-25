@@ -36,6 +36,10 @@ yarn-error.*
 server/.env
 server/node_modules/
 
+# Team config — contains live tunnel URLs + secret keys (paste-ready for WhatsApp)
+TEAM-SETUP.md
+team-setup.md
+
 # typescript
 *.tsbuildinfo
 

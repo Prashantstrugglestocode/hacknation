@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import Constants from 'expo-constants';
 import { forgetMe } from '../../../lib/privacy/intent-encoder';
 import { PRIVACY_DISCLOSURE } from '../../../lib/privacy/disclosure';
+import { theme } from '../../../lib/theme';
 import i18n, { getLocale } from '../../../lib/i18n';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -32,72 +33,91 @@ export default function WhyScreen() {
   const contextState = offer?.context_state ?? {};
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#0A0A0F' }} contentContainerStyle={{ padding: 24, gap: 24 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 22, gap: 20 }}>
       <TouchableOpacity onPress={() => router.back()} style={{ alignSelf: 'flex-start' }}>
-        <Text style={{ color: '#6C63FF', fontSize: 15, marginBottom: 8 }}>← Zurück</Text>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
       </TouchableOpacity>
 
-      <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>
-        {i18n.t('customer.why')}
-      </Text>
+      <View>
+        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>TRANSPARENZ</Text>
+        <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
+          {i18n.t('customer.why')}
+        </Text>
+      </View>
 
-      {/* Signal chips */}
       {chips.length > 0 && (
         <View>
-          <Text style={{ color: '#ffffff99', fontSize: 13, marginBottom: 10, fontWeight: '600', letterSpacing: 1 }}>
+          <Text style={{ color: theme.textMuted, fontSize: 12, marginBottom: 10, fontWeight: '800', letterSpacing: 1 }}>
             SIGNALE
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {chips.map((chip, i) => (
-              <View key={i} style={{ backgroundColor: '#6C63FF22', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: '#6C63FF44' }}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{chip}</Text>
+              <View key={i} style={{
+                backgroundColor: theme.primaryWash, borderRadius: 999,
+                paddingHorizontal: 14, paddingVertical: 7,
+                borderWidth: 1, borderColor: theme.primary + '55',
+              }}>
+                <Text style={{ color: theme.primaryDark, fontSize: 13, fontWeight: '700' }}>{chip}</Text>
               </View>
             ))}
           </View>
         </View>
       )}
 
-      {/* Reasoning */}
       {reasoning ? (
-        <View style={{ backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16 }}>
-          <Text style={{ color: '#ffffff99', fontSize: 12, fontWeight: '600', letterSpacing: 1, marginBottom: 6 }}>
+        <View style={{
+          backgroundColor: theme.bgMuted, borderRadius: 16, padding: 16,
+          borderWidth: 1, borderColor: theme.border,
+        }}>
+          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 6 }}>
             {i18n.t('customer.reasoning_title').toUpperCase()}
           </Text>
-          <Text style={{ color: '#fff', fontSize: 15, lineHeight: 22 }}>{reasoning}</Text>
+          <Text style={{ color: theme.text, fontSize: 15, lineHeight: 22 }}>{reasoning}</Text>
         </View>
       ) : null}
 
-      {/* What we sent */}
       <View>
-        <Text style={{ color: '#ffffff99', fontSize: 13, fontWeight: '600', letterSpacing: 1, marginBottom: 10 }}>
+        <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 10 }}>
           {i18n.t('customer.what_we_sent').toUpperCase()}
         </Text>
-        <View style={{ backgroundColor: '#0F0F1A', borderRadius: 14, padding: 14 }}>
-          <Text style={{ color: '#A0A0CC', fontSize: 12, fontFamily: 'monospace', lineHeight: 20 }}>
+        <View style={{
+          backgroundColor: '#1F1F23', borderRadius: 14, padding: 14,
+        }}>
+          <Text style={{ color: '#FECACA', fontSize: 11, fontFamily: 'Courier', lineHeight: 17 }}>
             {JSON.stringify(contextState, null, 2)}
           </Text>
         </View>
       </View>
 
-      {/* Privacy disclosure */}
-      <View style={{ backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, gap: 8 }}>
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{disclosure.title}</Text>
-        <Text style={{ color: '#ffffff99', fontSize: 13, lineHeight: 20 }}>{disclosure.body}</Text>
-        <Text style={{ color: '#6C63FF', fontSize: 12, marginTop: 4 }}>✓ {disclosure.what_stays}</Text>
-        <Text style={{ color: '#ffffff66', fontSize: 12 }}>↑ {disclosure.what_sent}</Text>
+      <View style={{
+        backgroundColor: theme.surface, borderRadius: 16, padding: 16, gap: 8,
+        borderWidth: 1, borderColor: theme.border,
+      }}>
+        <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }}>{disclosure.title}</Text>
+        <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 20 }}>{disclosure.body}</Text>
+        <Text style={{ color: theme.success, fontSize: 12, marginTop: 4, fontWeight: '700' }}>✓ {disclosure.what_stays}</Text>
+        <Text style={{ color: theme.textMuted, fontSize: 12 }}>↑ {disclosure.what_sent}</Text>
       </View>
 
-      {/* Forget me */}
       {forgotDone ? (
-        <Text style={{ color: '#6C63FF', textAlign: 'center', fontSize: 14 }}>
-          Verlauf gelöscht. Dein Gerätekennzeichen wurde rotiert.
-        </Text>
+        <View style={{
+          backgroundColor: theme.primaryWash, padding: 14, borderRadius: 14, alignItems: 'center',
+          borderWidth: 1, borderColor: theme.primary + '66',
+        }}>
+          <Text style={{ color: theme.primaryDark, textAlign: 'center', fontSize: 14, fontWeight: '700' }}>
+            ✓ Verlauf gelöscht. Gerätekennzeichen rotiert.
+          </Text>
+        </View>
       ) : (
         <TouchableOpacity
           onPress={handleForgetMe}
-          style={{ backgroundColor: '#FF6B6B22', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#FF6B6B44' }}
+          style={{
+            backgroundColor: theme.danger + '11', borderRadius: 14,
+            paddingVertical: 15, alignItems: 'center',
+            borderWidth: 1, borderColor: theme.danger + '44',
+          }}
         >
-          <Text style={{ color: '#FF6B6B', fontSize: 15, fontWeight: '700' }}>
+          <Text style={{ color: theme.danger, fontSize: 15, fontWeight: '800' }}>
             {i18n.t('customer.forget_me')}
           </Text>
         </TouchableOpacity>

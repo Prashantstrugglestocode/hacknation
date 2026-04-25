@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { createClient } from '@supabase/supabase-js';
+import ngeohash from 'ngeohash';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -10,6 +11,7 @@ const merchant = new Hono();
 
 merchant.post('/', async (c) => {
   const body = await c.req.json();
+  const geohash6 = body.geohash6 ?? ngeohash.encode(body.lat, body.lng, 6);
   const { data, error } = await supabase
     .from('merchants')
     .insert({
@@ -18,12 +20,45 @@ merchant.post('/', async (c) => {
       type: body.type,
       lat: body.lat,
       lng: body.lng,
-      geohash6: body.geohash6,
+      geohash6,
       goal: body.goal,
       max_discount_pct: body.max_discount_pct,
       time_windows: body.time_windows,
       inventory_tags: body.inventory_tags,
       locale: body.locale ?? 'de',
+    })
+    .select()
+    .single();
+
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data, 201);
+});
+
+merchant.post('/seed-demo', async (c) => {
+  const body = await c.req.json();
+  const { lat, lng, owner_device_id } = body;
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
+    return c.json({ error: 'lat,lng required' }, 400);
+  }
+  const geohash6 = ngeohash.encode(lat, lng, 6);
+  const SEEDS = [
+    { name: 'Café Anatolia', type: 'café', goal: 'fill_quiet_hours', max_discount_pct: 20, time_windows: ['lunch','afternoon'], inventory_tags: ['cappuccino','sandwich','croissant','latte'] },
+    { name: 'Bäckerei Sonne', type: 'bakery', goal: 'move_slow_stock', max_discount_pct: 25, time_windows: ['afternoon','evening'], inventory_tags: ['brezel','kuchen','vollkornbrot'] },
+    { name: 'Buchladen Lena', type: 'bookstore', goal: 'fill_quiet_hours', max_discount_pct: 15, time_windows: ['afternoon'], inventory_tags: ['krimi','sachbuch','kinderbuch'] },
+  ];
+  const seed = SEEDS[Math.floor(Math.random() * SEEDS.length)];
+  const { data, error } = await supabase
+    .from('merchants')
+    .insert({
+      owner_device_id: owner_device_id ?? `seed-${Date.now()}`,
+      name: seed.name,
+      type: seed.type,
+      lat, lng, geohash6,
+      goal: seed.goal,
+      max_discount_pct: seed.max_discount_pct,
+      time_windows: seed.time_windows,
+      inventory_tags: seed.inventory_tags,
+      locale: 'de',
     })
     .select()
     .single();

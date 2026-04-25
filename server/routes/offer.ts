@@ -4,6 +4,7 @@ import { SignJWT } from 'jose';
 import { getWeather } from '../lib/weather.ts';
 import { getNearbyEvents } from '../lib/events.ts';
 import { getPayoneDensity } from '../lib/payone-mock.ts';
+import { getNearbyPOIs } from '../lib/pois.ts';
 import { center, neighbors, distanceMeters } from '../lib/geohash.ts';
 import { firedTriggers, scoreMerchant } from '../lib/composite.ts';
 import { generateOffer } from '../lib/openai.ts';
@@ -30,9 +31,10 @@ offer.post('/generate', async (c) => {
   const hour = new Date().getHours();
 
   // Parallel context fetch
-  const [weather, events, payone] = await Promise.all([
+  const [weather, events, pois, payone] = await Promise.all([
     getWeather(lat, lng),
     getNearbyEvents(lat, lng),
+    getNearbyPOIs(lat, lng, 500),
     Promise.resolve(getPayoneDensity()),
   ]);
 
@@ -41,6 +43,7 @@ offer.post('/generate', async (c) => {
     intent,
     weather,
     events: events.slice(0, 3),
+    pois,
     payone,
     hour,
     locale,

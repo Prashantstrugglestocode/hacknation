@@ -7,6 +7,7 @@ export interface IntentVector {
   hungry_likely: boolean;
   browsing: boolean;
   time_bucket: 'morning' | 'lunch' | 'afternoon' | 'evening' | 'night';
+  movement?: 'stationary' | 'browsing' | 'walking' | 'transit';
 }
 
 export interface EncodedPayload {
@@ -41,8 +42,9 @@ export function encodeIntent(params: {
   tempC: number;
   locale: string;
   deviceHash: string;
+  movement?: 'stationary' | 'browsing' | 'walking' | 'transit';
 }): EncodedPayload {
-  const { lat, lng, weatherCondition, tempC, locale, deviceHash } = params;
+  const { lat, lng, weatherCondition, tempC, locale, deviceHash, movement } = params;
   const hour = new Date().getHours();
 
   const rainy = ['rain', 'drizzle', 'mist', 'snow', 'thunderstorm'].includes(
@@ -50,7 +52,8 @@ export function encodeIntent(params: {
   );
   const cold = tempC < 14;
   const hungry_likely = hour >= 11 && hour <= 14;
-  const browsing = hour >= 15 && hour <= 18;
+  // Browsing = movement signal says browsing OR mid-afternoon hour
+  const browsing = movement === 'browsing' || (movement === undefined && hour >= 15 && hour <= 18);
 
   let time_bucket: IntentVector['time_bucket'];
   if (hour < 10) time_bucket = 'morning';
@@ -61,7 +64,7 @@ export function encodeIntent(params: {
 
   return {
     geohash6: encodeGeohash6(lat, lng),
-    intent: { rainy, cold, hungry_likely, browsing, time_bucket },
+    intent: { rainy, cold, hungry_likely, browsing, time_bucket, movement },
     locale: locale === 'en' ? 'en' : 'de',
     device_hash: deviceHash,
   };

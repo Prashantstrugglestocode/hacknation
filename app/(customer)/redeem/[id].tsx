@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MotiView } from 'moti';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
+import { theme } from '../../../lib/theme';
 import i18n from '../../../lib/i18n';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
 export default function RedeemScreen() {
@@ -54,23 +55,28 @@ export default function RedeemScreen() {
   const expiredQR = secondsLeft === 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 40 }}>
-      {/* Mode tabs */}
-      <View style={{ flexDirection: 'row', backgroundColor: '#1A1A2E', borderRadius: 12, padding: 3, width: 220 }}>
-        {(['qr', 'cashback'] as const).map((m) => (
-          <TouchableOpacity
-            key={m}
-            onPress={() => setMode(m)}
-            style={{
-              flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
-              backgroundColor: mode === m ? '#6C63FF' : 'transparent',
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: mode === m ? '700' : '400', fontSize: 13 }}>
-              {m === 'qr' ? 'QR-Code' : i18n.t('customer.cashback')}
-            </Text>
-          </TouchableOpacity>
-        ))}
+    <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 40 }}>
+      <View style={{
+        flexDirection: 'row', backgroundColor: theme.bgMuted, borderRadius: 14,
+        padding: 3, width: 240, borderWidth: 1, borderColor: theme.border,
+      }}>
+        {(['qr', 'cashback'] as const).map((m) => {
+          const active = mode === m;
+          return (
+            <TouchableOpacity
+              key={m}
+              onPress={() => setMode(m)}
+              style={{
+                flex: 1, paddingVertical: 9, borderRadius: 11, alignItems: 'center',
+                backgroundColor: active ? theme.primary : 'transparent',
+              }}
+            >
+              <Text style={{ color: active ? theme.textOnPrimary : theme.text, fontWeight: active ? '800' : '600', fontSize: 13 }}>
+                {m === 'qr' ? 'QR-Code' : i18n.t('customer.cashback')}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {mode === 'qr' ? (
@@ -81,22 +87,33 @@ export default function RedeemScreen() {
           style={{ alignItems: 'center', gap: 24 }}
         >
           {loading ? (
-            <View style={{ width: 240, height: 240, backgroundColor: '#1A1A2E', borderRadius: 20 }} />
+            <View style={{ width: 240, height: 240, backgroundColor: theme.bgMuted, borderRadius: 20 }} />
           ) : token && !expiredQR ? (
-            <View style={{ padding: 20, backgroundColor: '#fff', borderRadius: 20 }}>
-              <QRCode value={token} size={200} />
+            <View style={{
+              padding: 20, backgroundColor: '#FFFFFF', borderRadius: 22,
+              borderWidth: 4, borderColor: theme.primary,
+              shadowColor: theme.primary, shadowOpacity: 0.25, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
+            }}>
+              <QRCode value={token} size={200} color={theme.text} backgroundColor="#FFFFFF" />
             </View>
           ) : (
-            <View style={{ width: 240, height: 240, backgroundColor: '#1A1A2E', borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#FF6B6B', fontSize: 16 }}>{i18n.t('customer.expired')}</Text>
+            <View style={{ width: 240, height: 240, backgroundColor: theme.bgMuted, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: theme.danger, fontSize: 16, fontWeight: '700' }}>{i18n.t('customer.expired')}</Text>
             </View>
           )}
 
-          {/* Countdown */}
           {!expiredQR && (
-            <Text style={{ color: secondsLeft < 60 ? '#FF6B6B' : '#ffffff99', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
-              {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-            </Text>
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <Text style={{
+                color: secondsLeft < 60 ? theme.danger : theme.text,
+                fontSize: 32, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: -0.5,
+              }}>
+                {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+              </Text>
+              <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+                ZEIT ZUM EINLÖSEN
+              </Text>
+            </View>
           )}
         </MotiView>
       ) : (
@@ -109,20 +126,23 @@ export default function RedeemScreen() {
               style={{ alignItems: 'center', gap: 16 }}
             >
               <Text style={{ fontSize: 64 }}>✅</Text>
-              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>
+              <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800', textAlign: 'center' }}>
                 {i18n.t('customer.cashback_redeemed')}
               </Text>
             </MotiView>
           ) : (
             <>
-              <Text style={{ color: '#fff', fontSize: 18, textAlign: 'center', lineHeight: 26 }}>
+              <Text style={{ color: theme.text, fontSize: 17, textAlign: 'center', lineHeight: 24, fontWeight: '600' }}>
                 Cashback wird direkt auf dein Konto gutgeschrieben.
               </Text>
               <TouchableOpacity
                 onPress={handleCashback}
-                style={{ backgroundColor: '#6C63FF', borderRadius: 16, paddingHorizontal: 40, paddingVertical: 18 }}
+                style={{
+                  backgroundColor: theme.primary, borderRadius: 16, paddingHorizontal: 40, paddingVertical: 18,
+                  shadowColor: theme.primary, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+                }}
               >
-                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800' }}>
+                <Text style={{ color: theme.textOnPrimary, fontSize: 17, fontWeight: '800' }}>
                   {i18n.t('customer.cashback')}
                 </Text>
               </TouchableOpacity>
@@ -132,7 +152,7 @@ export default function RedeemScreen() {
       )}
 
       <TouchableOpacity onPress={() => router.back()} style={{ paddingVertical: 12 }}>
-        <Text style={{ color: '#ffffff55', fontSize: 15 }}>Zurück</Text>
+        <Text style={{ color: theme.textMuted, fontSize: 15, fontWeight: '600' }}>Zurück</Text>
       </TouchableOpacity>
     </View>
   );

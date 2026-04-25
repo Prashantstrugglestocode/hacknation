@@ -3,7 +3,7 @@ import { View, Dimensions } from 'react-native';
 import { MotiView } from 'moti';
 
 const { width, height } = Dimensions.get('window');
-const COLORS = ['#FF7A45', '#6C63FF', '#FFD93D', '#48E5C2', '#FF6B9D', '#A78BFA'];
+const COLORS = ['#E11D48', '#FB7185', '#9F1239', '#FDA4AF', '#FFFFFF', '#1F1F23'];
 
 interface Particle {
   id: number;

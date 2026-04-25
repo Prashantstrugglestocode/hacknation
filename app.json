@@ -46,7 +46,7 @@
     "extra": {
       "apiUrl": "https://state-falls-new-volleyball.trycloudflare.com",
       "supabaseUrl": "https://ecydsayjmyrbkxthkfli.supabase.co",
-      "supabaseAnonKey": "sb_publishable_ynW6q0OGiqA1boYGWVmOVA_JnlvbZZ0",
+      "supabaseAnonKey": "sb_publishable_fmdfzUzIJjlF4iUcTGyRGg_4ikNYusx",
       "eas": {
         "projectId": "city-wallet"
       }
