@@ -10,17 +10,11 @@ services:
       - key: SUPABASE_URL
         value: "https://ecydsayjmyrbkxthkfli.supabase.co"
       - key: SUPABASE_SERVICE_KEY
-        sync: false  # paste from Supabase → Settings → API → service_role
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
-      # OPENWEATHER_API_KEY is optional — DWD Brightsky used without it
-      # - key: OPENWEATHER_API_KEY
-      #   sync: false
-      # TICKETMASTER_API_KEY is optional
-      # - key: TICKETMASTER_API_KEY
-      #   sync: false
       - key: JWT_SECRET
-        value: "36c5c808f7f6fae9d5161fab689ebfc97d065a44ef34e87e48f9e4130a7ddc5b"
+        sync: false
       - key: PORT
         value: "3000"
     healthCheckPath: /health
