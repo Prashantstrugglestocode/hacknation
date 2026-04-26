@@ -201,8 +201,25 @@ offer.post('/generate', async (c) => {
     return c.json({ error: 'AI generation failed' }, 503);
   }
 
+  // Anchor base_amount_cents so the customer's pay screen has a real total.
+  // Prefer a featured menu item's price, then any active menu item, then a
+  // sensible default. Without this the post-scan slide-to-pay shows €0.00.
+  if (!widgetSpec.base_amount_cents || widgetSpec.base_amount_cents <= 0) {
+    const featuredId = Array.isArray(widgetSpec.featured_item_ids)
+      ? widgetSpec.featured_item_ids[0]
+      : undefined;
+    const featuredItem = featuredId
+      ? menuItems.find(it => it.id === featuredId)
+      : undefined;
+    widgetSpec.base_amount_cents =
+      featuredItem?.price_cents
+      ?? menuItems[0]?.price_cents
+      ?? 1200;
+  }
+
+  const baseCents = widgetSpec.base_amount_cents;
   const discountCents = widgetSpec.discount.kind === 'pct'
-    ? null
+    ? Math.round(baseCents * (widgetSpec.discount.value / 100))
     : widgetSpec.discount.kind === 'eur'
     ? Math.round(widgetSpec.discount.value * 100)
     : null;

@@ -46,17 +46,6 @@ interface OfferData {
   discount_amount_cents?: number;
 }
 
-// Bilingual labels for the trigger ids defined in /config/default.json.
-// Keep in sync with the why-screen's TRIGGER_LABELS map.
-const TRIGGER_LABELS: Record<string, { de: string; en: string; emoji: string }> = {
-  COZY_QUIET_NEARBY:      { de: 'Kalt & ruhig · Café-Wetter',   en: 'Cold & quiet · café weather',  emoji: '☕' },
-  EVENT_DEMAND_SPIKE:     { de: 'Event in der Nähe',            en: 'Event nearby',                  emoji: '🎫' },
-  LATE_AFTERNOON_BROWSE:  { de: 'Bummelzeit am Nachmittag',     en: 'Late-afternoon browsing',       emoji: '👀' },
-  CLOSING_SOON_INVENTORY: { de: 'Bald geschlossen · Restbestand', en: 'Closing soon · stock left',   emoji: '⏱' },
-  BAD_WEATHER_INDOOR:     { de: 'Schlechtes Wetter · drinnen',  en: 'Bad weather · indoors',         emoji: '🌧' },
-  LUNCHTIME_QUIET:        { de: 'Mittag · ruhige Stunde',       en: 'Lunchtime · quiet hour',        emoji: '🥪' },
-};
-
 export default function RedeemScreen() {
   const { id, bg, fg, accent } = useLocalSearchParams<{
     id: string; bg?: string; fg?: string; accent?: string;
@@ -646,54 +635,6 @@ export default function RedeemScreen() {
         )}
       </MotiView>
 
-      {/* "Why now" footer — reads context_state.fired_triggers from the
-          server-persisted offer. Demonstrates real DB-driven personalisation
-          ("we picked this because: bad weather + lunch quiet + payone-low"). */}
-      {(() => {
-        const triggers = offer?.context_state?.fired_triggers ?? [];
-        const merchantPayone = offer?.context_state?.merchant_payone;
-        const locale = i18n.locale === 'en' ? 'en' : 'de';
-        const labelled = triggers.map(t => TRIGGER_LABELS[t]).filter(Boolean) as Array<{ de: string; en: string; emoji: string }>;
-        if (labelled.length === 0 && !merchantPayone) return null;
-        return (
-          <MotiView
-            from={{ opacity: 0, translateY: 6 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 320, delay: 320 }}
-            style={{
-              marginTop: space.md,
-              backgroundColor: palette.fg + '14',
-              borderRadius: radius.lg,
-              padding: space.md,
-              gap: space.sm,
-            }}
-          >
-            <Text style={{
-              color: palette.fg + 'CC', fontSize: 11, fontWeight: '900', letterSpacing: 1.6,
-            }}>
-              {i18n.t('customer.context_signals').toUpperCase()}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {labelled.map((l, i) => (
-                <View key={i} style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: palette.fg + '1F',
-                  borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5,
-                }}>
-                  <Text style={{ fontSize: 11 }}>{l.emoji}</Text>
-                  <Text style={{ color: palette.fg, fontSize: 11, fontWeight: '800', letterSpacing: 0.2 }}>
-                    {locale === 'en' ? l.en : l.de}
-                  </Text>
-                </View>
-              ))}
-              {/* Payone density chip removed from the payment-flow screen.
-                  "Payone: busy" reads as a payment-service error here; the
-                  signal lives on the home / why screens where the foot-
-                  traffic context is actually useful. */}
-            </View>
-          </MotiView>
-        );
-      })()}
     </View>
   );
 }
