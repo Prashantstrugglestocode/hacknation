@@ -62,16 +62,16 @@ export default function Index() {
         {/* Wordmark */}
         <View style={{ alignItems: 'center', gap: 6 }}>
           <Text style={{
-            fontSize: 36, fontWeight: '900', color: theme.text,
-            letterSpacing: -1.2,
+            fontSize: 40, fontWeight: '900', color: theme.text,
+            letterSpacing: -1.4,
           }}>
-            City Wallet
+            Stadtpuls
           </Text>
           <Text style={{
             color: theme.textMuted, fontSize: 14, fontWeight: '700',
             letterSpacing: 0.4, textAlign: 'center',
           }}>
-            Hyperlokal · Echtzeit · KI-komponiert
+            Der Puls deiner Stadt · KI-komponiert
           </Text>
         </View>
 

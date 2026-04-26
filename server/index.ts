@@ -62,7 +62,7 @@ app.get('/api/merchants/owned', async (c) => {
 });
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
-console.log(`City Wallet server starting on port ${port}`);
+console.log(`Stadtpuls server starting on port ${port}`);
 
 export default {
   port,

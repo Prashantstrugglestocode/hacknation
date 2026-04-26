@@ -8,12 +8,12 @@ import { theme } from '../theme';
 const { width } = Dimensions.get('window');
 
 const MILESTONES: Record<number, { emoji: string; title: string; subtitle: string }> = {
-  1: { emoji: '🎉', title: 'Erstes Angebot!', subtitle: 'Willkommen bei City Wallet.' },
+  1: { emoji: '🎉', title: 'Erstes Angebot!', subtitle: 'Willkommen bei Stadtpuls.' },
   3: { emoji: '🔥', title: '3-Tage-Streak', subtitle: 'Du bist im Flow.' },
   10: { emoji: '⚡', title: '10 Angebote', subtitle: 'Stammkunde der Stadt.' },
   25: { emoji: '🏆', title: '25 Angebote', subtitle: 'Lokal-Held.' },
   50: { emoji: '💎', title: '50 Angebote', subtitle: 'Teil der Bewegung.' },
-  100: { emoji: '👑', title: '100 Angebote', subtitle: 'City Wallet Legende.' },
+  100: { emoji: '👑', title: '100 Angebote', subtitle: 'Stadtpuls Legende.' },
 };
 
 export function isMilestone(count: number): boolean {

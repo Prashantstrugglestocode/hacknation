@@ -41,7 +41,7 @@ export interface Insight {
   confidence: 'low' | 'medium' | 'high';
 }
 
-const SYS = `Du bist Café/Restaurant-Analyst für City Wallet. Eingabe: ein Händler und Performance-Daten der letzten 7 Tage pro Menüposten.
+const SYS = `Du bist Café/Restaurant-Analyst für Stadtpuls. Eingabe: ein Händler und Performance-Daten der letzten 7 Tage pro Menüposten.
 
 Du erhältst zwei Listen:
 - low_performers: Posten die ≥3 Mal angezeigt wurden, aber niedrige Annahmequote haben.

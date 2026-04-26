@@ -265,7 +265,7 @@ export default function MerchantDashboard() {
                   }}>
                   <Text style={{ fontSize: 16 }}>📐</Text>
                 </Pressable>
-                <Pressable onPress={() => router.push('/settings' as any)}
+                <Pressable onPress={() => router.push('/(merchant)/settings')}
                   hitSlop={8}
                   style={{
                     width: 38, height: 38, borderRadius: 19,

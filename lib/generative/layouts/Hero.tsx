@@ -56,7 +56,7 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
               onPress={async () => {
                 try {
                   await Share.share({
-                    message: `${headline} bei ${merchant.name} — ${discount.kind === 'pct' ? `${discount.value} % Rabatt` : 'spar dir was'} · City Wallet\ncitywallet://offer/${offerId}`,
+                    message: `${headline} bei ${merchant.name} — ${discount.kind === 'pct' ? `${discount.value} % Rabatt` : 'spar dir was'} · Stadtpuls\ncitywallet://offer/${offerId}`,
                   });
                 } catch {}
               }}

@@ -26,7 +26,7 @@ export default function GlassHeader({ stats }: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
             <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }}>
-              CITY WALLET
+              STADTPULS
             </Text>
             <Text style={{ color: theme.text, fontSize: 22, fontWeight: '900', marginTop: 2, letterSpacing: -0.5 }}>
               {formatEur(stats.total_eur)}{' '}

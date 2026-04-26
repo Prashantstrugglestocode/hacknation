@@ -33,7 +33,7 @@ const openaiClient = process.env.OPENAI_API_KEY
 const LOCAL_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-latest';
 
-const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator. Produce ONE JSON offer.
+const SYSTEM_PROMPT = `You are Stadtpuls's hyperlocal offer generator. Produce ONE JSON offer.
 
 GENERAL
 - Match mood to context (cold+quiet=cozy, sunny+event=energetic, closing-soon+stock=urgent, lunch+quiet café=discreet).

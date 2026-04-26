@@ -12,6 +12,7 @@ export default function MerchantLayout() {
       <Stack.Screen name="preview" options={{ presentation: 'modal' }} />
       <Stack.Screen name="flash-sale" options={{ presentation: 'modal' }} />
       <Stack.Screen name="picker" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

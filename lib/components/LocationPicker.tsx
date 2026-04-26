@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Pressable, GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import * as Location from 'expo-location';
 import { MotiView } from 'moti';
 import { theme } from '../theme';
@@ -35,6 +35,18 @@ function osmTileUrl(lat: number, lng: number, z = 16): string {
   return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 }
 
+// Inverse: given a tile (x,y at z) and a fractional position within it,
+// compute the lat/lng. Used for tap-to-move on the static map.
+function worldToLatLng(tx: number, ty: number, fracX: number, fracY: number, z: number) {
+  const n = Math.pow(2, z);
+  const wx = tx + fracX;
+  const wy = ty + fracY;
+  const lng = (wx / n) * 360 - 180;
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * wy) / n)));
+  const lat = (latRad * 180) / Math.PI;
+  return { lat, lng };
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
@@ -64,6 +76,21 @@ export default function LocationPicker({ value, onChange }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [tileState, setTileState] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [tileNonce, setTileNonce] = useState(0); // bump to force <Image> reload on retry
+  const [tileSize, setTileSize] = useState({ w: 0, h: 0 });
+
+  // Tap on the map → recenter the pin to that point. Reverse-geocodes for
+  // a clean address. Cheap "draggable" without needing a real map module.
+  const handleMapTap = async (e: GestureResponderEvent) => {
+    if (!value || tileSize.w === 0 || tileSize.h === 0) return;
+    const { locationX, locationY } = e.nativeEvent;
+    const fracX = Math.max(0, Math.min(1, locationX / tileSize.w));
+    const fracY = Math.max(0, Math.min(1, locationY / tileSize.h));
+    const { x: tx, y: ty } = tileCoords(value.lat, value.lng, 16);
+    const { lat, lng } = worldToLatLng(tx, ty, fracX, fracY, 16);
+    const address = await reverseGeocode(lat, lng);
+    onChange({ lat, lng, address: address || `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+    setAddressDraft(address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+  };
 
   const useGps = useCallback(async () => {
     setLoadingGps(true); setError(null);
@@ -130,23 +157,31 @@ export default function LocationPicker({ value, onChange }: Props) {
               position: 'relative',
               height: HEIGHT,
             }}
+            onLayout={(e: LayoutChangeEvent) => setTileSize({
+              w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height,
+            })}
           >
             {/* Skeleton sits behind everything; Image loads on top when ready. */}
             <ShimmerBlock height={HEIGHT} style={{ borderRadius: 0 }} />
 
             {tileState !== 'error' && (
-              <Image
-                key={tileNonce}
-                source={{ uri: osmTileUrl(value.lat, value.lng, 16) }}
-                style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                  opacity: tileState === 'loaded' ? 1 : 0,
-                }}
-                resizeMode="cover"
-                onLoadStart={() => setTileState('loading')}
-                onLoad={() => setTileState('loaded')}
-                onError={() => setTileState('error')}
-              />
+              <Pressable
+                onPress={handleMapTap}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              >
+                <Image
+                  key={tileNonce}
+                  source={{ uri: osmTileUrl(value.lat, value.lng, 16) }}
+                  style={{
+                    width: '100%', height: '100%',
+                    opacity: tileState === 'loaded' ? 1 : 0,
+                  }}
+                  resizeMode="cover"
+                  onLoadStart={() => setTileState('loading')}
+                  onLoad={() => setTileState('loaded')}
+                  onError={() => setTileState('error')}
+                />
+              </Pressable>
             )}
 
             {/* Error overlay with retry */}
@@ -187,15 +222,26 @@ export default function LocationPicker({ value, onChange }: Props) {
 
             {/* Attribution */}
             {tileState === 'loaded' && (
-              <View style={{
-                position: 'absolute', bottom: 6, right: 8,
-                backgroundColor: '#FFFFFFCC', borderRadius: 6,
-                paddingHorizontal: 6, paddingVertical: 2,
-              }}>
-                <Text style={{ color: '#1F1F23', fontSize: 9, fontWeight: '700' }}>
-                  © OpenStreetMap
-                </Text>
-              </View>
+              <>
+                <View style={{
+                  position: 'absolute', bottom: 6, right: 8,
+                  backgroundColor: '#FFFFFFCC', borderRadius: 6,
+                  paddingHorizontal: 6, paddingVertical: 2,
+                }}>
+                  <Text style={{ color: '#1F1F23', fontSize: 9, fontWeight: '700' }}>
+                    © OpenStreetMap
+                  </Text>
+                </View>
+                <View style={{
+                  position: 'absolute', bottom: 6, left: 8,
+                  backgroundColor: '#FFFFFFCC', borderRadius: 6,
+                  paddingHorizontal: 8, paddingVertical: 3,
+                }}>
+                  <Text style={{ color: '#1F1F23', fontSize: 10, fontWeight: '800' }}>
+                    👆 Tippe für neue Position
+                  </Text>
+                </View>
+              </>
             )}
           </MotiView>
         );

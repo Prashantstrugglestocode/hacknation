@@ -135,7 +135,7 @@ export default function RedeemScreen() {
             color: palette.fg + 'BB', fontSize: typo.caption,
             fontWeight: '800', letterSpacing: 1.6,
           }}>
-            CITY WALLET · ANGEBOT
+            STADTPULS · ANGEBOT
           </Text>
           <Text style={{
             color: palette.fg, fontSize: typo.display - 2,
