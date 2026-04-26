@@ -338,8 +338,37 @@ offer.post('/feed', async (c) => {
   scored.sort((a, b) => b.score - a.score);
   const top = scored.filter(s => s.score >= -0.3).slice(0, count);
 
+  // Diversity bias: collect items + combos this device saw in the last 30 min
+  // so the LLM avoids re-pitching the same things on pull-to-refresh. The
+  // dedupe is across ALL nearby merchants, not just one — the user-visible
+  // problem is "I keep seeing Cappuccino", not "merchant X keeps showing X".
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: recentShownOffers } = await supabase
+    .from('offers')
+    .select('widget_spec')
+    .eq('customer_device_hash', device_hash)
+    .gte('generated_at', thirtyMinAgo)
+    .limit(10);
+  const recentlyShownItemNames = new Set<string>();
+  const recentlyPitchedComboIds = new Set<string>();
+  for (const row of (recentShownOffers ?? [])) {
+    const spec = row.widget_spec as any;
+    const head = (spec?.headline ?? '').trim();
+    if (head) recentlyShownItemNames.add(head);
+    const ids: any = spec?.featured_item_ids;
+    if (Array.isArray(ids)) for (const id of ids) recentlyShownItemNames.add(String(id));
+    const cid = spec?.combo_id;
+    if (typeof cid === 'string' && cid.length > 0) recentlyPitchedComboIds.add(cid);
+  }
+
   // Generate offers in parallel. Each one persists + broadcasts independently
   // so the merchant dashboard tick still fires for every visible card.
+  // We also dedupe in-feed: track items featured in earlier-resolving siblings
+  // and bias the next prompt against them. (Promise.all races, so this is
+  // best-effort — the real guarantee is the recently_shown_item_names DB
+  // query above which spans the whole 30-min window.)
+  const inFeedFeaturedItemNames = new Set<string>();
+  const inFeedComboIds = new Set<string>();
   const results = await Promise.all(top.map(async (entry) => {
     try {
       // Loyalty signal: how many times has THIS device redeemed at THIS merchant?
@@ -364,17 +393,46 @@ offer.post('/feed', async (c) => {
       const menuItems = menuItemRows ?? [];
 
       const flash = getFlash(entry.merchant.id);
+      // Resolve combo IDs in the flash to enriched combo records the LLM can
+      // pitch from. Multiple flash combos = the LLM picks the weather-fit one.
+      const flashCombos = flash && flash.combo_ids.length > 0
+        ? listCombos(entry.merchant.id)
+            .filter(co => flash.combo_ids.includes(co.id))
+            .map(co => {
+              const items = co.menu_item_ids
+                .map(iid => menuItems.find(it => it.id === iid))
+                .filter(Boolean) as any[];
+              const baseSum = items.reduce((s, it) => s + (it?.price_cents ?? 0), 0);
+              return {
+                id: co.id,
+                name: co.name,
+                items,
+                combo_price_cents: co.combo_price_cents,
+                base_total_cents: baseSum,
+                savings_cents: Math.max(0, baseSum - co.combo_price_cents),
+              };
+            })
+        : [];
       const flashCtx = flash ? {
         items: menuItems.filter(it => flash.menu_item_ids.includes(it.id)),
         menu_item_ids: flash.menu_item_ids,
+        combos: flashCombos,
         pct: flash.pct,
         minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
       } : undefined;
 
       // Combos: enriched bundles the LLM can pitch as a single offer.
-      const combosForMerchant = listCombos(entry.merchant.id);
-      const combosCtx = combosForMerchant.length > 0
-        ? combosForMerchant.map(co => {
+      // Filter out combos already pitched to this device (last 30 min) so
+      // pull-to-refresh surfaces a different bundle when one is available.
+      const combosForMerchant = listCombos(entry.merchant.id)
+        .filter(co => !recentlyPitchedComboIds.has(co.id) && !inFeedComboIds.has(co.id));
+      // Fallback: if dedupe wiped everything, surface the original list rather
+      // than starve the LLM of combo context entirely.
+      const combosPool = combosForMerchant.length > 0
+        ? combosForMerchant
+        : listCombos(entry.merchant.id);
+      const combosCtx = combosPool.length > 0
+        ? combosPool.map(co => {
             const items = co.menu_item_ids
               .map(iid => menuItems.find(it => it.id === iid))
               .filter(Boolean) as any[];
@@ -400,6 +458,15 @@ offer.post('/feed', async (c) => {
           flash_sale: flashCtx,
           combos: combosCtx,
           menu_items: menuItems.length > 0 ? menuItems : undefined,
+          // Diversity hints — see comment block above the Promise.all().
+          recently_shown_item_names: [
+            ...recentlyShownItemNames,
+            ...inFeedFeaturedItemNames,
+          ].slice(0, 12),
+          recently_pitched_combo_ids: [
+            ...recentlyPitchedComboIds,
+            ...inFeedComboIds,
+          ].slice(0, 12),
         },
         locale,
         distance_m: entry.dist,
@@ -409,6 +476,25 @@ offer.post('/feed', async (c) => {
         name: entry.merchant.name,
         distance_m: Math.round(entry.dist),
       };
+      // Track what we just pitched so other siblings in this Promise.all
+      // batch can avoid duplicating it. Best-effort under parallelism.
+      if (typeof widgetSpec.headline === 'string') {
+        inFeedFeaturedItemNames.add(widgetSpec.headline.trim());
+      }
+      if (Array.isArray(widgetSpec.featured_item_ids)) {
+        for (const id of widgetSpec.featured_item_ids) inFeedFeaturedItemNames.add(String(id));
+      }
+      // Heuristic: if the LLM pitched a combo, the headline names it; we
+      // store the matching combo id so refreshes diversify.
+      if (combosCtx) {
+        for (const co of combosCtx) {
+          if (typeof widgetSpec.headline === 'string' && widgetSpec.headline.toLowerCase().includes(co.name.toLowerCase())) {
+            widgetSpec.combo_id = co.id;
+            inFeedComboIds.add(co.id);
+            break;
+          }
+        }
+      }
       if (previousLayout && widgetSpec.layout === previousLayout) {
         const ALL = ['hero', 'compact', 'split', 'fullbleed', 'sticker'] as const;
         const pool = ALL.filter(l => l !== previousLayout);

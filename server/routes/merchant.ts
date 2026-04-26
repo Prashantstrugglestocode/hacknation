@@ -254,7 +254,8 @@ merchant.get('/:id/payone', async (c) => {
 // Flash-sale: merchant-managed boost on specific menu_items.
 // Read by /api/offer/generate so the LLM prioritizes the flagged items.
 merchant.get('/:id/flash', async (c) => {
-  const sale = getFlash(c.req.param('id'));
+  const id = c.req.param('id');
+  const sale = getFlash(id);
   if (!sale) return c.json({ active: false });
   const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
   // Enrich with actual menu_item rows so the client can show names + prices.
@@ -266,10 +267,34 @@ merchant.get('/:id/flash', async (c) => {
       .in('id', sale.menu_item_ids);
     items = data ?? [];
   }
+  // Enrich combo_ids with full combo + item info so the merchant UI can
+  // render "🔥 AI is pushing [Combo X]" without a second roundtrip.
+  let combos: any[] = [];
+  if (sale.combo_ids.length > 0) {
+    const all = listCombos(id).filter(co => sale.combo_ids.includes(co.id));
+    const ids = [...new Set(all.flatMap(co => co.menu_item_ids))];
+    const { data: rows } = ids.length > 0
+      ? await supabase.from('menu_items').select('id, name, price_cents, category').in('id', ids)
+      : { data: [] as any[] };
+    const itemMap = new Map((rows ?? []).map(it => [it.id, it]));
+    combos = all.map(co => {
+      const resolved = co.menu_item_ids.map(iid => itemMap.get(iid)).filter(Boolean) as any[];
+      const baseSum = resolved.reduce((s, it) => s + (it.price_cents ?? 0), 0);
+      return {
+        id: co.id, name: co.name,
+        items: resolved,
+        combo_price_cents: co.combo_price_cents,
+        base_total_cents: baseSum,
+        savings_cents: Math.max(0, baseSum - co.combo_price_cents),
+      };
+    });
+  }
   return c.json({
     active: true,
     menu_item_ids: sale.menu_item_ids,
     items,
+    combo_ids: sale.combo_ids,
+    combos,
     pct: sale.pct,
     minutes_left,
   });
@@ -281,21 +306,48 @@ merchant.post('/:id/flash', async (c) => {
   const menu_item_ids = Array.isArray(body.menu_item_ids)
     ? (body.menu_item_ids as string[])
     : Array.isArray(body.items) ? (body.items as string[]) : []; // back-compat
+  const combo_ids = Array.isArray(body.combo_ids) ? (body.combo_ids as string[]) : [];
   const pct = typeof body.pct === 'number' ? body.pct : 20;
   const duration_min = typeof body.duration_min === 'number' ? body.duration_min : 60;
-  if (menu_item_ids.length === 0) return c.json({ error: 'menu_item_ids required' }, 400);
-  const sale = setFlash(id, menu_item_ids, pct, duration_min);
+  if (menu_item_ids.length === 0 && combo_ids.length === 0) {
+    return c.json({ error: 'menu_item_ids or combo_ids required' }, 400);
+  }
+  const sale = setFlash(id, menu_item_ids, pct, duration_min, combo_ids);
   const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
   let items: any[] = [];
-  const { data } = await supabase
-    .from('menu_items')
-    .select('id, name, price_cents, category')
-    .in('id', sale.menu_item_ids);
-  items = data ?? [];
+  if (sale.menu_item_ids.length > 0) {
+    const { data } = await supabase
+      .from('menu_items')
+      .select('id, name, price_cents, category')
+      .in('id', sale.menu_item_ids);
+    items = data ?? [];
+  }
+  let combos: any[] = [];
+  if (sale.combo_ids.length > 0) {
+    const all = listCombos(id).filter(co => sale.combo_ids.includes(co.id));
+    const ids = [...new Set(all.flatMap(co => co.menu_item_ids))];
+    const { data: rows } = ids.length > 0
+      ? await supabase.from('menu_items').select('id, name, price_cents, category').in('id', ids)
+      : { data: [] as any[] };
+    const itemMap = new Map((rows ?? []).map(it => [it.id, it]));
+    combos = all.map(co => {
+      const resolved = co.menu_item_ids.map(iid => itemMap.get(iid)).filter(Boolean) as any[];
+      const baseSum = resolved.reduce((s, it) => s + (it.price_cents ?? 0), 0);
+      return {
+        id: co.id, name: co.name,
+        items: resolved,
+        combo_price_cents: co.combo_price_cents,
+        base_total_cents: baseSum,
+        savings_cents: Math.max(0, baseSum - co.combo_price_cents),
+      };
+    });
+  }
   return c.json({
     active: true,
     menu_item_ids: sale.menu_item_ids,
     items,
+    combo_ids: sale.combo_ids,
+    combos,
     pct: sale.pct,
     minutes_left,
   });

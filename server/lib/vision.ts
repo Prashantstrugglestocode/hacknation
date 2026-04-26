@@ -39,18 +39,45 @@ const MenuExtract = z.object({
 
 export type ExtractedItem = z.infer<typeof MenuItem>;
 
-const VISION_PROMPT = `You are reading a printed café/restaurant menu from a photograph. Extract all menu items as a JSON object.
+const VISION_PROMPT = `You are an OCR-grade menu reader for printed German/English café & restaurant menus. Accuracy beats coverage — a wrong item is worse than a missing one.
 
-Rules:
-- Output ONLY JSON: {"items": [{"name": "...", "price_eur": 3.5, "category": "drink"|"food"|"dessert"|"special", "tags": ["vegan","seasonal","hot"]}]}
-- price_eur: a number in euros (e.g. 3.5 for "3,50 €"), or null if no price visible
-- category: best guess. drinks = coffee/tea/water/beer/wine/juice. dessert = cake/ice/pudding. special = "Tagesgericht"/"Mittagsmenü"/seasonal. otherwise food.
-- tags: short lowercase labels you can infer from name (e.g. "vegan", "vegetarisch", "hot", "cold", "seasonal", "kids")
-- Keep names exactly as printed. No translation. No marketing fluff.
-- Skip section headings, prices alone, addresses, opening hours.
-- If you cannot find any items, return {"items": []}.
+OUTPUT FORMAT (strict, no prose, no code fences)
+{"items": [{"name": "...", "price_eur": 3.5, "category": "drink"|"food"|"dessert"|"special", "tags": ["vegan","seasonal","hot"]}]}
 
-Return only valid JSON, no prose, no code fences.`;
+NAME — verbatim, case-preserving
+- Copy the name exactly as printed. Preserve umlauts (ä ö ü ß) and capitalisation.
+- DO NOT translate. DO NOT paraphrase. DO NOT add marketing words like "delicious".
+- If a description line follows the name (e.g. "mit Tomate, Mozzarella, Basilikum"), MERGE it into the name only if it's <= 4 words and clearly part of the dish name. Otherwise drop it — descriptions are not menu items.
+- Strip leading bullets, numbers like "1.", "•", "-", or stars.
+- Skip ALL CAPS section headers (e.g. "GETRÄNKE", "BREAKFAST", "DESSERTS"). They're navigation, not items.
+
+PRICE — be conservative
+- Only set price_eur when a number is unambiguously next to the item. Patterns: "3,50 €", "3.50€", "EUR 3.50", "€3.50".
+- "from 3,50" / "ab 3,50" / "kl 2,50 / gr 4,00" → set price_eur to the LOWEST visible number, add tag "from".
+- If no price is on the same line/visually adjacent → price_eur: null. Do NOT guess.
+- Reject sub-€0.50 or above €200 — those are page numbers / dates / phone digits, not prices.
+
+CATEGORY
+- drink: coffee, tea, espresso, water, beer, wine, cocktail, juice, smoothie, soda, schorle.
+- dessert: cake (Kuchen, Torte), ice cream (Eis), pudding, tiramisu, mousse, crème brûlée.
+- special: explicit "Tagesgericht" / "Mittagsmenü" / "Wochenkarte" / "saisonal" / "chef's special".
+- food: everything else (sandwich, pizza, pasta, salad, soup, breakfast plates).
+
+TAGS — only when explicit
+- Add ONLY when the menu text says it: "vegan", "vegetarisch", "vegan", "glutenfrei", "lactosefrei", "scharf", "spicy", "hot" (only for hot drinks), "cold", "seasonal", "saisonal", "bio", "kids", "from".
+- Don't infer from item names — "Sandwich Caprese" does NOT auto-tag "vegetarisch" unless the menu marks it.
+
+SKIP — never as items
+- Section headings (single-word categories, ALL CAPS lines).
+- Allergen legends ("A,B,C..."), opening hours, phone numbers, addresses, social handles, hashtags.
+- Floating prices with no name on the same row.
+- "Free wifi" / wifi password lines / payment-method icons ("Wir akzeptieren ...").
+
+CONFIDENCE GATE
+- If the photo is too blurry / dark / partial to read confidently → return {"items": []} rather than guessing.
+- Prefer 5 correct items over 12 partly-correct ones.
+
+Output strictly valid JSON. No markdown, no commentary, no trailing text.`;
 
 async function tryVision(client: OpenAI, model: string, dataUrl: string): Promise<ExtractedItem[]> {
   const res = await client.chat.completions.create({
@@ -77,7 +104,17 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
 }
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
-  // Tier 1: Mistral pixtral cloud — fast vision OCR.
+  // Tier 1: OpenAI gpt-4o-mini if available — strongest OCR by a wide margin
+  // for printed menus with mixed fonts/layouts. Only used when key is set;
+  // otherwise we go straight to Mistral.
+  if (openaiClient) {
+    try {
+      return await tryVision(openaiClient, 'gpt-4o-mini', dataUrl);
+    } catch (e) {
+      console.warn('[vision] OpenAI gpt-4o-mini failed:', (e as Error).message);
+    }
+  }
+  // Tier 2: Mistral pixtral cloud — fast vision OCR.
   if (mistralClient) {
     try {
       return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
@@ -85,7 +122,7 @@ export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
       console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) failed:`, (e as Error).message);
     }
   }
-  // Tier 2: on-device SLM (Ollama llava:7b) — local vision fallback.
+  // Tier 3: on-device SLM (Ollama llava:7b) — local vision fallback.
   try {
     return await tryVision(ollama, VISION_MODEL, dataUrl);
   } catch (e) {

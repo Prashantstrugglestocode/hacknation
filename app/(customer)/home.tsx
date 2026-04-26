@@ -21,6 +21,8 @@ import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
 import { subscribeOfferChannel } from '../../lib/supabase/realtime';
+import { showOfferNotification } from '../../lib/notifications';
+import { AppState, AppStateStatus } from 'react-native';
 import RoleSwitch from '../../lib/components/RoleSwitch';
 import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
@@ -228,6 +230,83 @@ export default function CustomerHome() {
   }, [state, generate]);
 
   useEffect(() => { refreshStats(); generate(); }, []);
+
+  // Foreground 5s polling. Apple's BackgroundFetch minimum is ~15 min, so true
+  // 5s background polling is impossible. Instead: while the app is in the
+  // foreground, peek the /feed endpoint every 5s. When a brand-new offer ID
+  // appears that the user hasn't seen, we fire a local notification AND
+  // silently swap the visible card to the better/newer offer.
+  // Backgrounded > 30s → JS suspends; user gets the notification on next
+  // wake. There's no spec-compliant way around that on iOS.
+  const seenOfferIds = useRef<Set<string>>(new Set());
+  const pollingActive = useRef(true);
+  useEffect(() => {
+    const poll = async () => {
+      if (!pollingActive.current) return;
+      // Only poll when we already have a successful first generate; before
+      // that, the main generate() flow handles permission prompts.
+      if (state.status !== 'offer' && state.status !== 'no_merchant' && state.status !== 'declined' && state.status !== 'expired') return;
+      try {
+        const existing = await Location.getForegroundPermissionsAsync();
+        if (existing.status !== 'granted') return;
+        const [loc, deviceHash] = await Promise.all([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          getDeviceHash(),
+        ]);
+        const payload = encodeIntent({
+          lat: loc.coords.latitude, lng: loc.coords.longitude,
+          weatherCondition: 'unknown', tempC: 15,
+          locale: i18n.locale, deviceHash,
+        });
+        const r = await fetch(`${API}/api/offer/feed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, count: 3 }),
+        });
+        if (!r.ok) return;
+        const data = await r.json();
+        const offers: OfferEntry[] = Array.isArray(data?.offers) ? data.offers : [];
+        if (offers.length === 0) return;
+        const newOnes = offers.filter(o => !seenOfferIds.current.has(o.id));
+        for (const o of offers) seenOfferIds.current.add(o.id);
+        if (newOnes.length > 0 && state.status === 'offer') {
+          // Fire a local notification — picks up automatically on the OS
+          // banner/lock screen the moment the app foregrounds again.
+          const top = newOnes[0];
+          showOfferNotification(
+            top.widget_spec.headline,
+            top.widget_spec.merchant.name,
+          ).catch(() => {});
+        }
+      } catch {}
+    };
+    // Seed the seen-set with what's already on screen so the first poll
+    // doesn't notify the user about offers they're already looking at.
+    if (state.status === 'offer') {
+      seenOfferIds.current.add(state.offer.id);
+      for (const e of state.extras) seenOfferIds.current.add(e.id);
+    }
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [state]);
+
+  // AppState transition: clear the seen-set on background>foreground so the
+  // first foreground poll definitely notifies the user about whatever has
+  // changed while they were away. (Backgrounded JS doesn't run reliably on
+  // iOS, but local notifications still surface from the server's broadcast
+  // path when the user re-opens.)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') {
+        // Force a fresh peek next tick; clear seen-set so any new offer pings.
+        seenOfferIds.current = state.status === 'offer'
+          ? new Set([state.offer.id, ...state.extras.map(e => e.id)])
+          : new Set();
+        refreshStats();
+      }
+    });
+    return () => sub.remove();
+  }, [state, refreshStats]);
 
   // Auto-seed of a fake demo merchant disabled — judges should see only
   // the real merchant the teammate sets up. The "no_merchant" empty state

@@ -22,10 +22,21 @@ interface MenuItem {
   active?: boolean;
 }
 
+interface ComboLite {
+  id: string;
+  name: string;
+  items: MenuItem[];
+  combo_price_cents: number;
+  base_total_cents: number;
+  savings_cents: number;
+}
+
 interface FlashState {
   active: boolean;
   menu_item_ids?: string[];
   items?: MenuItem[];
+  combo_ids?: string[];
+  combos?: ComboLite[];
   pct?: number;
   minutes_left?: number;
 }
@@ -36,8 +47,10 @@ const fmtPrice = (cents: number | null | undefined) =>
 export default function FlashSale() {
   const [merchantId, setMerchantId] = useState<string | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [combos, setCombos] = useState<ComboLite[]>([]);
   const [maxDiscount, setMaxDiscount] = useState(30);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedCombos, setSelectedCombos] = useState<Set<string>>(new Set());
   const [pct, setPct] = useState(20);
   const [duration, setDuration] = useState(60);
   const [current, setCurrent] = useState<FlashState>({ active: false });
@@ -57,9 +70,10 @@ export default function FlashSale() {
       if (!id) { router.replace('/(merchant)/setup'); return; }
       setMerchantId(id);
       try {
-        const [merchantRes, menuRes] = await Promise.all([
+        const [merchantRes, menuRes, combosRes] = await Promise.all([
           fetch(`${API}/api/merchant/${id}`),
           fetch(`${API}/api/merchant/${id}/menu`),
+          fetch(`${API}/api/merchant/${id}/combos`),
         ]);
         if (merchantRes.ok) {
           const m = await merchantRes.json();
@@ -70,6 +84,10 @@ export default function FlashSale() {
           const data = await menuRes.json();
           const list = Array.isArray(data) ? data : [];
           setItems(list.filter((it: MenuItem) => it.active !== false));
+        }
+        if (combosRes.ok) {
+          const d = await combosRes.json();
+          setCombos(Array.isArray(d?.combos) ? d.combos : []);
         }
       } catch {}
       await loadCurrent(id);
@@ -92,10 +110,18 @@ export default function FlashSale() {
       return next;
     });
   };
+  const toggleCombo = (id: string) => {
+    setSelectedCombos(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      Haptics.selectionAsync();
+      return next;
+    });
+  };
 
   const startFlash = async () => {
-    if (!merchantId || selected.size === 0) {
-      Alert.alert('Auswahl fehlt', 'Wähle mindestens einen Posten für die Flash-Sale.');
+    if (!merchantId || (selected.size === 0 && selectedCombos.size === 0)) {
+      Alert.alert('Auswahl fehlt', 'Wähle mindestens einen Posten oder eine Combo für die Flash-Sale.');
       return;
     }
     setSubmitting(true);
@@ -105,6 +131,7 @@ export default function FlashSale() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           menu_item_ids: Array.from(selected),
+          combo_ids: Array.from(selectedCombos),
           pct,
           duration_min: duration,
         }),
@@ -113,6 +140,7 @@ export default function FlashSale() {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setCurrent(await res.json());
         setSelected(new Set());
+        setSelectedCombos(new Set());
       } else {
         Alert.alert('Fehler', 'Konnte nicht gestartet werden.');
       }
@@ -176,6 +204,27 @@ export default function FlashSale() {
                   </Text>
                 </View>
                 <View style={{ gap: 4 }}>
+                  {(current.combos ?? []).length > 0 && (
+                    <View style={{
+                      backgroundColor: '#FFFFFF14', borderRadius: 10,
+                      paddingHorizontal: 10, paddingVertical: 8, gap: 4,
+                      borderWidth: 1, borderColor: '#FFFFFF44',
+                    }}>
+                      <Text style={{ color: '#FFFFFFCC', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>
+                        🤖 KI WÄHLT JE NACH WETTER
+                      </Text>
+                      {(current.combos ?? []).map(co => (
+                        <View key={co.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                            🎁 {co.name}
+                          </Text>
+                          <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700' }}>
+                            {fmtPrice(co.combo_price_cents)}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                   {(current.items ?? []).map(it => (
                     <View key={it.id} style={{
                       flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -206,6 +255,67 @@ export default function FlashSale() {
             </MotiView>
           )}
         </AnimatePresence>
+
+        {combos.length > 0 && (
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, flex: 1 }}>
+                COMBOS · KI WÄHLT JE NACH WETTER
+              </Text>
+              <Text style={{ color: theme.primary, fontSize: 10, fontWeight: '900' }}>
+                {selectedCombos.size}/{combos.length}
+              </Text>
+            </View>
+            <Text style={{ color: theme.textMuted, fontSize: 11, lineHeight: 15 }}>
+              Wähle mehrere — die KI pitcht je Kunde die wetter-passende Combo
+              (z.B. heißer Kaffee bei Regen, Eis bei Sonne).
+            </Text>
+            <View style={{ gap: 8 }}>
+              {combos.map(co => {
+                const active = selectedCombos.has(co.id);
+                return (
+                  <Pressable key={co.id} onPress={() => toggleCombo(co.id)}>
+                    <MotiView
+                      animate={{
+                        scale: active ? 1 : 0.99,
+                        backgroundColor: active ? theme.primary : theme.surface,
+                      }}
+                      transition={{ type: 'timing', duration: 160 }}
+                      style={{
+                        borderRadius: 14, padding: 14,
+                        borderWidth: 1.5, borderColor: active ? theme.primary : theme.border,
+                        gap: 6,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 18 }}>{active ? '🔥' : '🎁'}</Text>
+                        <Text style={{
+                          color: active ? '#FFF' : theme.text,
+                          fontSize: 15, fontWeight: '900', flex: 1,
+                        }} numberOfLines={1}>
+                          {co.name}
+                        </Text>
+                        <Text style={{
+                          color: active ? '#FFF' : theme.primary,
+                          fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'],
+                        }}>
+                          {fmtPrice(co.combo_price_cents)}
+                        </Text>
+                      </View>
+                      <Text style={{
+                        color: active ? '#FFFFFFCC' : theme.textMuted,
+                        fontSize: 11, fontWeight: '700',
+                      }} numberOfLines={1}>
+                        {co.items.map(it => it.name).join(' · ')}
+                        {co.savings_cents > 0 ? `  ·  spart ${fmtPrice(co.savings_cents)}` : ''}
+                      </Text>
+                    </MotiView>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <View style={{ gap: 8 }}>
           <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
@@ -333,15 +443,17 @@ export default function FlashSale() {
           />
         </View>
 
-        <TouchableOpacity onPress={startFlash} disabled={submitting || selected.size === 0}
+        <TouchableOpacity onPress={startFlash} disabled={submitting || (selected.size === 0 && selectedCombos.size === 0)}
           style={{
-            backgroundColor: (submitting || selected.size === 0) ? theme.primaryWash : theme.primary,
+            backgroundColor: (submitting || (selected.size === 0 && selectedCombos.size === 0)) ? theme.primaryWash : theme.primary,
             borderRadius: 16, paddingVertical: 17, alignItems: 'center', marginTop: 6,
             shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
           }}
         >
           <Text style={{ color: theme.textOnPrimary, fontSize: 16, fontWeight: '900', letterSpacing: 0.3 }}>
-            {submitting ? 'Wird gestartet…' : `🔥 Flash starten · ${selected.size} Posten`}
+            {submitting
+              ? 'Wird gestartet…'
+              : `🔥 Flash starten · ${selected.size + selectedCombos.size} Auswahl${selectedCombos.size > 0 ? ` (${selectedCombos.size} Combo)` : ''}`}
           </Text>
         </TouchableOpacity>
 

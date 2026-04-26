@@ -182,6 +182,65 @@ ollama serve   # listens on http://localhost:11434
 
 ---
 
+## How we hit the brief's rubric
+
+**1. Real context in action — concrete scenario, plausible offer.**
+The composite trigger engine in `server/lib/composite.ts` reads live signals
+every request: DWD Brightsky weather (no key needed, GDPR-friendly),
+Ticketmaster events, time-of-day, a per-merchant Payone density signal
+(`server/lib/payone-mock.ts`) that varies by merchant type and hour, and a
+foot-traffic proxy from POI density. A demo trigger like
+**`COZY_QUIET_NEARBY`** fires when `temp_c ≤ 14 + condition ∈ {rain,drizzle,
+mist,clouds} + merchant_quiet=true + merchant.type ∈ {café, bakery}` — at
+which point the LLM receives that exact composite state and is told (in the
+system prompt) to reason about what a customer in that weather/hour actually
+wants right now, then pick a real menu item from `menu_items` to feature.
+Same trigger on a sunny day produces a different offer; same trigger at 3pm
+vs. 9am produces a different item. The `Why this offer?` screen on the
+customer side surfaces the actual fired triggers + signals so judges can
+inspect the reasoning chain end-to-end.
+
+**2. 3-second comprehension.**
+Layout hierarchy on the hero card (`lib/generative/layouts/Hero.tsx`):
+discount value (largest number on screen — eye lands here first) → headline
+(named menu item, ≤8 words) → 2 signal chips capped (anything beyond 2
+breaks the read) → CTA. Subline + merchant name + distance collapsed to one
+body row to stop the eye fragmenting. Pressure cue (`Noch 8 Min`) and EU/
+GDPR trust mark sit below the fold so they don't compete with the headline.
+Generative layout choice is tuned to mood (cozy → hero/sticker, urgent →
+fullbleed) — same data, different presentation per situation. `LiveHeader`
+streams a typing-cursor "AI is generating…" pill so the user understands
+the card is being made for them in this moment, not pulled from a list.
+
+**3. Closed loop — context → generation → display → accept → checkout.**
+The full path is real, not stubbed. Server-side: `/api/offer/feed` runs
+context fetch → trigger composition → top-N merchant scoring → parallel LLM
+generation (Mistral primary, OpenAI fallback, on-device Ollama tier, then
+deterministic safety fallback) → persist to `offers` + broadcast `offer.shown`
+on the merchant's Supabase Realtime channel. Customer accepts → `/decision`
++ card morphs into a QR (10-min signed JWT). Merchant scans → `/redeem-qr`
+flips status to `scan_pending` and broadcasts on `offer:{id}` so the
+customer's QR card morphs into a slide-to-pay confirmation in real time.
+Customer slides → `/confirm-payment` writes a `redemptions` row, broadcasts
+`offer.redeemed` to BOTH the merchant dashboard (sparkline ticks) and the
+customer card (savings tile updates). Cashback path is the alternate route
+when the merchant doesn't have a scanner.
+
+**4. GDPR — privacy by design.**
+Location never leaves the device as a raw lat/lng — it's reduced to a
+6-character geohash (~1.2 km cell) by `lib/privacy/intent-encoder.ts` before
+any network request. Every prompt the server sends to a hosted LLM passes
+through `server/lib/pii-scrubber.ts` which strips emails, phones, IBANs, and
+IPs. The on-device Ollama tier (`gemma3:4b`) demonstrates the
+no-cloud-inference path the brief encourages — only an abstract `intent`
+signal would need to leave the device. Supabase RLS is enforced and the
+client only carries the publishable `sb_publishable_*` anon key — the
+`service_role` key lives in `server/.env` and is never shipped. The trust
+mark `🇪🇺 GDPR · 1,2 km` is on every offer card so the privacy story is
+visible, not hidden.
+
+---
+
 ## The four UX questions, answered
 
 - **Where?** In-app live card on the customer home tab, plus a foreground push

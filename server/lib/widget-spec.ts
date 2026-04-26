@@ -40,6 +40,10 @@ export const WidgetSpec = z.object({
   // Server-set baseline of what the customer pays for this offer (before
   // discount). Drives the slide-to-pay amount and the savings math.
   base_amount_cents: z.number().int().positive().optional(),
+  // Set when the LLM picked a combo from a list (esp. flash_sale.combos with
+  // multiple options). Used by /feed dedupe + merchant dashboard "AI is pushing
+  // [Combo X]" surface.
+  combo_id: z.string().optional().nullable(),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;

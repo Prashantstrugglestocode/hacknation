@@ -59,6 +59,19 @@ COMBOS (context.combos — second-highest priority after flash_sale)
 - Headline names the combo (e.g. "Frühstücks-Set: Cappuccino + Croissant"). Subline mentions the savings vs individual prices.
 - Use discount.kind="eur" with value = savings_cents/100. featured_item_ids = combo.items[].id.
 - signal_chips include the word "Combo" or "Set".
+- If MULTIPLE combos are available, pick the one whose items best match weather + time-of-day:
+  - Cold/rain → hot drinks, soup, baked goods (e.g. Frühstücks-Set with hot coffee).
+  - Hot/sunny → cold drinks, salads, ice cream, light items.
+  - Late evening → desserts, drinks, NOT breakfast bundles.
+  Reasoning field MUST mention which combo you chose and why this weather/time made it the right pick.
+
+DIVERSITY (context.recently_shown_item_names + context.recently_pitched_combo_ids)
+- recently_shown_item_names: items featured to THIS device in the last 30 minutes.
+  → Do NOT feature any item with a name on this list. Pick a different menu_item.
+  → If only repeat items remain, reframe with a different angle (different time-of-day fit, different combo) — never headline an identical product.
+- recently_pitched_combo_ids: combos already pitched to this device recently.
+  → Avoid these combo ids; pick a different combo from context.combos if available.
+  → If the only combo is on this list, pitch a single item instead.
 
 FLASH-SALE OVERRIDE (highest priority — context.flash_sale)
 - Build the offer around flash_sale.items[0]: headline names it.
@@ -67,6 +80,23 @@ FLASH-SALE OVERRIDE (highest priority — context.flash_sale)
 - pressure={kind:"time", value:"Noch <minutes_left> Min"} from flash_sale.minutes_left.
 - signal_chips must include "🔥 Flash" + item name.
 - featured_item_ids must include the flash item ids.
+
+FLASH-SALE COMBOS (context.flash_sale.combos — even higher priority when present)
+- If flash_sale.combos has >=1 entries, IGNORE flash_sale.items and pitch ONE combo.
+- If MULTIPLE combos are listed, pick the single combo whose items best fit current weather + time-of-day. This is the headline "AI suggests" feature — do it well:
+  - Cold (<12°C) or rain → combo with hot drinks/soup/baked goods.
+  - Warm (>22°C) or sunny → combo with cold drinks/salads/ice/light items.
+  - Morning (06-10) → breakfast combos (coffee + pastry).
+  - Lunch (11-14) → savory combos (sandwich/soup/salad).
+  - Evening (17+) → dessert/dinner/drink combos.
+- Headline names the combo (e.g. "Frühstücks-Set: Cappuccino + Croissant").
+- Subline mentions weather/time fit AND the EUR savings vs individual prices.
+- discount.kind="eur", value = chosen combo savings_cents/100.
+- featured_item_ids = chosen combo.items[].id (NOT flash_sale.menu_item_ids).
+- Set top-level "combo_id" to the chosen combo's id (used for analytics/dedupe).
+- pressure={kind:"time", value:"Noch <minutes_left> Min"} still applies.
+- signal_chips must include "🔥 Flash" + the combo name.
+- reasoning MUST explain WHY you chose this combo over the others ("rainy + cold → hot coffee combo wins") — this is the AI-suggestion proof for the merchant dashboard.
 
 TIME-OF-DAY (context.hour) — wrong-time items break the demo
 - 06-10 breakfast: coffee, croissant. NO cake/alcohol/ice cream.

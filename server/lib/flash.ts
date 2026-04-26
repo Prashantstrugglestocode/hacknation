@@ -6,17 +6,26 @@
 
 export interface FlashSale {
   menu_item_ids: string[]; // UUIDs from menu_items table
-  pct: number;             // discount % (1-50)
+  combo_ids: string[];     // optional — combo bundle ids in this flash
+  pct: number;             // discount % (1-50) — applies to menu_item_ids only
   until: number;           // ms epoch
 }
 
 const STORE = new Map<string, FlashSale>();
 
-export function setFlash(merchantId: string, menu_item_ids: string[], pct: number, durationMin: number): FlashSale {
+export function setFlash(
+  merchantId: string,
+  menu_item_ids: string[],
+  pct: number,
+  durationMin: number,
+  combo_ids: string[] = [],
+): FlashSale {
   const sale: FlashSale = {
     menu_item_ids: menu_item_ids
       .filter(id => typeof id === 'string' && id.length > 0)
-      // Tolerate any string here; the offer engine will validate against menu_items.
+      .map(id => id.trim()),
+    combo_ids: combo_ids
+      .filter(id => typeof id === 'string' && id.length > 0)
       .map(id => id.trim()),
     pct: Math.max(1, Math.min(50, Math.round(pct))),
     until: Date.now() + Math.max(5, Math.min(240, Math.round(durationMin))) * 60 * 1000,

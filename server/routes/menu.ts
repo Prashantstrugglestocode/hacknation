@@ -10,14 +10,31 @@ const supabase = createClient(
 
 const menu = new Hono();
 
-// POST /api/merchant/:id/menu/scan  body: { photo_data_url: 'data:image/jpeg;base64,...' }
+// POST /api/merchant/:id/menu/scan
+// body: { photo_data_url: 'data:image/jpeg;base64,...', dry_run?: boolean }
+// dry_run=true → return extracted items WITHOUT persisting (so the merchant
+//   can edit/delete on the review screen before committing). The client then
+//   calls /menu/bulk with the cleaned-up list.
 menu.post('/:id/menu/scan', async (c) => {
   const merchantId = c.req.param('id');
-  const body = await c.req.json() as { photo_data_url?: string };
+  const body = await c.req.json() as { photo_data_url?: string; dry_run?: boolean };
   if (!body.photo_data_url) return c.json({ error: 'photo_data_url required' }, 400);
 
   const items = await extractMenu(body.photo_data_url);
   if (items.length === 0) return c.json({ items: [] });
+
+  // dry_run: return the OCR result without writing — the client review screen
+  // lets the merchant edit/delete before bulk-saving via /menu/bulk.
+  if (body.dry_run) {
+    return c.json({
+      items: items.map(i => ({
+        name: i.name,
+        price_cents: i.price_eur != null ? Math.round(i.price_eur * 100) : null,
+        category: i.category ?? 'food',
+        tags: i.tags ?? [],
+      })),
+    });
+  }
 
   const rows = items.map(i => ({
     merchant_id: merchantId,
@@ -33,6 +50,33 @@ menu.post('/:id/menu/scan', async (c) => {
     .insert(rows)
     .select('*');
 
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ items: data ?? [] }, 201);
+});
+
+// POST /api/merchant/:id/menu/bulk  body: { items: [{ name, price_cents?, category?, tags? }] }
+// Bulk-save items from the scan-review screen after the merchant has edited
+// the OCR output.
+menu.post('/:id/menu/bulk', async (c) => {
+  const merchantId = c.req.param('id');
+  const body = await c.req.json() as { items?: Array<{ name?: string; price_cents?: number | null; category?: string; tags?: string[] }> };
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return c.json({ error: 'items required' }, 400);
+  }
+  const rows = body.items
+    .map(i => ({
+      merchant_id: merchantId,
+      name: typeof i.name === 'string' ? i.name.trim() : '',
+      price_cents: typeof i.price_cents === 'number' ? Math.round(i.price_cents) : null,
+      category: typeof i.category === 'string' ? i.category : 'food',
+      tags: Array.isArray(i.tags) ? i.tags : [],
+    }))
+    .filter(r => r.name.length > 0);
+  if (rows.length === 0) return c.json({ error: 'no valid items' }, 400);
+  const { data, error } = await supabase
+    .from('menu_items')
+    .insert(rows)
+    .select('*');
   if (error) return c.json({ error: error.message }, 500);
   return c.json({ items: data ?? [] }, 201);
 });
