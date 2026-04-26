@@ -23,7 +23,6 @@ import LiveHeader from '../../lib/components/LiveHeader';
 import { subscribeOfferChannel } from '../../lib/supabase/realtime';
 import { showOfferNotification } from '../../lib/notifications';
 import { AppState, AppStateStatus } from 'react-native';
-import RoleSwitch from '../../lib/components/RoleSwitch';
 import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
 import LlmStatusPill from '../../lib/components/LlmStatusPill';
@@ -499,9 +498,9 @@ export default function CustomerHome() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
         }
       >
-        <View style={{ alignItems: 'center', marginBottom: space.xs }}>
-          <RoleSwitch active="customer" />
-        </View>
+        {/* Role is locked once chosen on first run — RoleSwitch removed
+            so the customer never sees merchant tools and vice versa.
+            Switching roles is still possible via Settings → Account. */}
         <LiveHeader stats={stats} />
 
         <View style={{ flex: 1, minHeight: height - 220 }}>

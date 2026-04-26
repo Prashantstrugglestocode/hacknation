@@ -6,8 +6,7 @@ import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import { encodeGeohash6 } from '../context/geohash';
 import { SavingsStats } from '../savings';
-import AnimatedNumber from './AnimatedNumber';
-import i18n, { useLocaleVersion } from '../i18n';
+import { useLocaleVersion } from '../i18n';
 import { theme, space, radius, type } from '../theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -23,10 +22,6 @@ interface Props {
   stats: SavingsStats;
 }
 
-function fmtEur(eur: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(eur);
-}
-
 function conditionEmoji(c: string): string {
   const k = c.toLowerCase();
   if (k.includes('rain') || k.includes('drizzle')) return '🌧';
@@ -37,10 +32,9 @@ function conditionEmoji(c: string): string {
   return '☀️';
 }
 
-export default function LiveHeader({ stats }: Props) {
+export default function LiveHeader({ stats: _stats }: Props) {
   const [live, setLive] = useState<LiveCtx | null>(null);
-  const showStreak = stats.count_this_week > 0;
-  useLocaleVersion(); // Re-render on language change so i18n.t() refreshes
+  useLocaleVersion(); // kept as a no-op tick; harmless
 
   useEffect(() => {
     let mounted = true;
@@ -96,51 +90,11 @@ export default function LiveHeader({ stats }: Props) {
         </Text>
       </View>
 
-      {/* Row 2 — savings number stack (left) + streak + heart (right).
-          alignItems flex-end keeps the display number's baseline tied to the
-          bottom of the 44pt icon row — don't switch to center. */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <View style={{ gap: space.xs }}>
-          <Text style={{
-            color: theme.textMuted, fontSize: type.caption, fontWeight: '700',
-            letterSpacing: 1, textTransform: 'uppercase',
-          }}>
-            {i18n.t('common.saved_label')}
-          </Text>
-          <AnimatedNumber
-            value={stats.total_eur}
-            format={fmtEur}
-            style={{
-              color: theme.text, fontSize: type.display, fontWeight: '900',
-              letterSpacing: -0.8, lineHeight: type.display + 4,
-              fontVariant: ['tabular-nums'],
-            }}
-          />
-        </View>
-
+      {/* Row 2 — settings cog only. Savings amount + streak removed
+          per product decision; the customer sees what they save in the
+          Hero card / receipt, no need for a running tally on top. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          {showStreak && (
-            <MotiView
-              from={{ scale: 0.7, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', damping: 14 }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: space.xs,
-                backgroundColor: theme.primary, borderRadius: radius.pill,
-                paddingHorizontal: space.md, paddingVertical: space.xs,
-                shadowColor: theme.primary, shadowOpacity: 0.28,
-                shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <Text style={{ fontSize: type.body }}>🔥</Text>
-              <Text style={{
-                color: theme.textOnPrimary, fontSize: type.small, fontWeight: '900',
-                fontVariant: ['tabular-nums'],
-              }}>
-                {stats.count_this_week}
-              </Text>
-            </MotiView>
-          )}
           <Pressable
             onPress={() => router.push('/settings' as any)}
             hitSlop={12}

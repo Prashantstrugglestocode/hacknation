@@ -8,7 +8,6 @@ import Constants from 'expo-constants';
 import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/realtime';
 import Sparkline from '../../lib/components/Sparkline';
 import AnimatedNumber from '../../lib/components/AnimatedNumber';
-import RoleSwitch from '../../lib/components/RoleSwitch';
 import FallbackImage from '../../lib/components/FallbackImage';
 import { shopImageUrl } from '../../lib/images';
 import i18n, { useLocaleVersion } from '../../lib/i18n';
@@ -281,9 +280,8 @@ export default function MerchantDashboard() {
         contentContainerStyle={{ paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
-          <RoleSwitch active="merchant" />
-        </View>
+        {/* Role-switch removed — once a merchant always a merchant on this
+            device (until they reset via Settings → Account). */}
 
         {/* HERO BAND — warm greeting + identity over a soft red wash.
             Type system inside band: 2 weights (700 labels, 900 numbers) ×
