@@ -35,6 +35,7 @@ yarn-error.*
 .env
 server/.env
 server/node_modules/
+server/venv/
 
 # Team config — contains live tunnel URLs + secret keys (paste-ready for WhatsApp)
 TEAM-SETUP.md
