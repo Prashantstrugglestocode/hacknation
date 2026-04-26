@@ -97,6 +97,14 @@ menu.delete('/:id/menu/:itemId', async (c) => {
   return c.json({ ok: true });
 });
 
+// DELETE /api/merchant/:id/menu — wipe all menu_items for merchant.
+menu.delete('/:id/menu', async (c) => {
+  const merchantId = c.req.param('id');
+  const { error } = await supabase.from('menu_items').delete().eq('merchant_id', merchantId);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ ok: true });
+});
+
 // GET /api/merchant/:id/insights — analyzes 7d performance + LLM suggestions
 menu.get('/:id/insights', async (c) => {
   const merchantId = c.req.param('id');

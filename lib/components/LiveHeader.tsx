@@ -73,25 +73,22 @@ export default function LiveHeader({ stats }: Props) {
     }}>
       <BlurView intensity={30} tint="light" style={{ paddingVertical: space.md, paddingHorizontal: space.lg, gap: space.md }}>
 
-        {/* Row 1 — small live ticker + lang toggle */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flex: 1 }}>
-            <MotiView
-              from={{ scale: 0.9, opacity: 0.5 }}
-              animate={{ scale: 1.4, opacity: 1 }}
-              transition={{ type: 'timing', duration: 1100, loop: true }}
-              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
-            />
-            <Text
-              style={{ color: theme.primary, fontSize: type.micro, fontWeight: '800', letterSpacing: 1.4 }}
-              numberOfLines={1}
-            >
-              {live
-                ? `${i18n.t('common.live')} · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
-                : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
-            </Text>
-          </View>
-          <LangToggle variant="dark" />
+        {/* Row 1 — small live ticker (lang toggle moved to settings only) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+          <MotiView
+            from={{ scale: 0.9, opacity: 0.5 }}
+            animate={{ scale: 1.4, opacity: 1 }}
+            transition={{ type: 'timing', duration: 1100, loop: true }}
+            style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
+          />
+          <Text
+            style={{ color: theme.primary, fontSize: type.micro, fontWeight: '800', letterSpacing: 1.4, flex: 1 }}
+            numberOfLines={1}
+          >
+            {live
+              ? `${i18n.t('common.live')} · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
+              : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
+          </Text>
         </View>
 
         {/* Row 2 — savings number stack (left) + streak + heart (right) */}

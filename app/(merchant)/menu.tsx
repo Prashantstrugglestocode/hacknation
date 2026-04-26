@@ -145,12 +145,57 @@ export default function MenuScreen() {
         text: 'Löschen',
         style: 'destructive',
         onPress: async () => {
-          await fetch(`${API}/api/merchant/${merchantId}/menu/${item.id}`, { method: 'DELETE' });
-          setItems(items.filter(i => i.id !== item.id));
+          // Use live merchant_id from AsyncStorage — state can be stale.
+          const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? merchantId;
+          if (!mid) return;
+          // Optimistic remove.
+          setItems(prev => prev.filter(i => i.id !== item.id));
+          try {
+            const res = await fetch(`${API}/api/merchant/${mid}/menu/${item.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+              Alert.alert('Fehler', `Löschen fehlgeschlagen (${res.status})`);
+              load(); // re-sync to undo optimistic remove
+            }
+          } catch {
+            Alert.alert('Fehler', 'Netzwerkfehler beim Löschen');
+            load();
+          }
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         },
       },
     ]);
+  };
+
+  const onDeleteAll = async () => {
+    Alert.alert(
+      'Alle Posten löschen?',
+      'Das löscht ALLE Speisekarte-Posten. Diese Aktion kann nicht rückgängig gemacht werden.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Alle löschen',
+          style: 'destructive',
+          onPress: async () => {
+            const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? merchantId;
+            if (!mid) return;
+            const before = items;
+            setItems([]); // optimistic
+            try {
+              const res = await fetch(`${API}/api/merchant/${mid}/menu`, { method: 'DELETE' });
+              if (!res.ok) {
+                setItems(before);
+                Alert.alert('Fehler', `Konnte nicht löschen (${res.status})`);
+              } else {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            } catch {
+              setItems(before);
+              Alert.alert('Fehler', 'Netzwerkfehler');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -185,9 +230,18 @@ export default function MenuScreen() {
       }
     >
       {/* Header */}
-      <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={{ alignSelf: 'flex-start' }}>
-        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+        </TouchableOpacity>
+        {items.length > 0 ? (
+          <TouchableOpacity onPress={onDeleteAll} hitSlop={10}>
+            <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '700' }}>
+              🗑  Alle löschen
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>SPEISEKARTE</Text>

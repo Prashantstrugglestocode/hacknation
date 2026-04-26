@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { router, usePathname } from 'expo-router';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { setLocale, getLocale } from '../i18n';
 import { theme } from '../theme';
@@ -10,19 +10,22 @@ interface Props {
   variant?: 'light' | 'dark';
 }
 
-// Minimal DE/EN toggle pill. Shown in customer LiveHeader + merchant dashboard.
-// Replaces the previous "language is set on /role only" friction.
+// DE/EN toggle pill — only used inside Settings now.
+// Switching locale routes through the splash so the entire navigation
+// tree re-mounts and EVERY i18n.t() call re-evaluates with the new locale.
 export default function LangToggle({ variant = 'dark' }: Props) {
   const [locale, setLocaleState] = useState<'de' | 'en'>(getLocale());
-  const pathname = usePathname();
 
   const switchTo = async (l: 'de' | 'en') => {
     if (l === locale) return;
     Haptics.selectionAsync().catch(() => {});
     await setLocale(l);
     setLocaleState(l);
-    // Force the current route to re-mount so localized strings refresh.
-    if (pathname) router.replace(pathname as any);
+    // Hard-reset navigation through splash → splash routes back to the
+    // user's last screen via AsyncStorage, fully re-mounting the tree so
+    // every i18n.t() call evaluates against the new locale.
+    router.dismissAll?.();
+    router.replace('/');
   };
 
   const isLight = variant === 'light';

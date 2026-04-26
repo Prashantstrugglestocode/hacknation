@@ -259,23 +259,22 @@ export default function MerchantDashboard() {
             </Pressable>
 
             {/* Row 2 — action icons, separated from name with breathing room */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-              <LangToggle variant="light" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
               <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
                 hitSlop={10}
                 style={{
-                  width: 36, height: 36, borderRadius: 18,
+                  width: 38, height: 38, borderRadius: 19,
                   backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
                 }}>
-                <Text style={{ fontSize: 14 }}>📐</Text>
+                <Text style={{ fontSize: 15 }}>📐</Text>
               </Pressable>
               <Pressable onPress={() => router.push('/(merchant)/settings')}
                 hitSlop={10}
                 style={{
-                  width: 36, height: 36, borderRadius: 18,
+                  width: 38, height: 38, borderRadius: 19,
                   backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
                 }}>
-                <Text style={{ fontSize: 14 }}>⚙️</Text>
+                <Text style={{ fontSize: 15 }}>⚙️</Text>
               </Pressable>
             </View>
 
