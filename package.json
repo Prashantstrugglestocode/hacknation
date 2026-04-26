@@ -28,6 +28,7 @@
     "expo-notifications": "^55.0.20",
     "expo-router": "~6.0.23",
     "expo-sensors": "^55.0.13",
+    "expo-speech": "^55.0.13",
     "expo-status-bar": "~3.0.9",
     "i18n-js": "^4.5.3",
     "moti": "^0.30.0",

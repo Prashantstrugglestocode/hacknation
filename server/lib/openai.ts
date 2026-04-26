@@ -244,35 +244,19 @@ export async function generateOffer(params: {
   const m = params.merchant;
   const d = params.distance_m;
 
-  // Mistral first — reliable cloud, ~3-8s. Falls through if no key.
+  // Mistral primary — and now ONLY (per user instruction). Retry once
+  // before giving up so a transient network blip doesn't break the demo.
   if (mistralClient) {
-    try {
-      return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
-    } catch (e) {
-      console.warn(`[offer-engine] Mistral (${MISTRAL_MODEL}) failed:`, (e as Error).message);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
+      } catch (e) {
+        console.warn(`[offer-engine] Mistral attempt ${attempt} failed:`, (e as Error).message);
+      }
     }
   }
 
-  // Ollama second — local, free, but can wedge.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
-    } catch (e) {
-      console.warn(`[offer-engine] Ollama (${LOCAL_MODEL}) attempt ${attempt} failed:`, (e as Error).message);
-    }
-  }
-
-  // OpenAI third — only if key set.
-  if (openaiClient) {
-    try {
-      return await tryGenerate(openaiClient, 'gpt-4o-mini', userMessage, params.locale, m, d);
-    } catch (e) {
-      console.warn('[offer-engine] OpenAI gpt-4o-mini failed:', (e as Error).message);
-      return await tryGenerate(openaiClient, 'gpt-4o', userMessage, params.locale, m, d);
-    }
-  }
-
-  // Last-resort: synthesize a deterministic offer so demo never breaks
-  console.warn('[offer-engine] All AI backends failed, returning deterministic fallback');
+  // Last-resort deterministic offer so the customer always sees something.
+  console.warn('[offer-engine] Mistral failed, returning deterministic fallback');
   return fillDefaults({}, params.locale, m, d);
 }

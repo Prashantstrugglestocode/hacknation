@@ -8,6 +8,7 @@ import LangToggle from '../lib/components/LangToggle';
 import { forgetMe } from '../lib/privacy/intent-encoder';
 import { usePrefs } from '../lib/preferences';
 import { playChime } from '../lib/sounds';
+import { speak } from '../lib/tts';
 import { theme, space, radius, type } from '../lib/theme';
 
 interface Row {
@@ -18,7 +19,7 @@ interface Row {
 
 export default function Settings() {
   const [forgotDone, setForgotDone] = useState(false);
-  const { prefs, toggleSound, toggleHaptics, setRadius } = usePrefs();
+  const { prefs, toggleSound, toggleHaptics, toggleTts, setRadius } = usePrefs();
 
   const handleForgetMe = async () => {
     await forgetMe();
@@ -40,6 +41,12 @@ export default function Settings() {
     if (!prefs.haptics) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
+  };
+
+  const handleToggleTts = async () => {
+    await toggleTts();
+    // Demo the new state when turning ON.
+    if (!prefs.tts) speak('Vorlesen ist jetzt aktiv.', { force: true });
   };
 
   return (
@@ -83,6 +90,13 @@ export default function Settings() {
             sub="Vibration bei Tap und Erfolg"
             value={prefs.haptics}
             onToggle={handleToggleHaptics}
+          />
+          <ToggleRow
+            emoji="🗣"
+            label="Angebote vorlesen"
+            sub="Liest Headline + Subline laut vor (Barrierefreiheit)"
+            value={prefs.tts}
+            onToggle={handleToggleTts}
           />
           <View style={{ gap: 6, marginTop: space.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

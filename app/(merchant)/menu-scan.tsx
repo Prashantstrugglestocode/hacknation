@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { MotiView, AnimatePresence } from 'moti';
@@ -28,6 +29,7 @@ export default function MenuScan() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const [phase, setPhase] = useState<Phase>({ kind: 'capture' });
+  const insets = useSafeAreaInsets();
 
   const capture = async () => {
     if (!cameraRef.current || phase.kind === 'processing') return;
@@ -103,7 +105,7 @@ export default function MenuScan() {
       <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
 
       <View style={{
-        position: 'absolute', top: 16, left: 16, right: 16,
+        position: 'absolute', top: insets.top + 8, left: 16, right: 16,
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}

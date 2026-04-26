@@ -108,26 +108,29 @@ export default function MenuScreen() {
   };
 
   const load = useCallback(async () => {
-    // Always re-read the current merchant id from AsyncStorage so a picker
-    // switch is picked up on focus (params.id is frozen on mount).
     const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? params.id ?? null;
     if (!mid) { setLoading(false); return; }
     setMerchantId(mid);
+    // Menu items render immediately (fast DB query). Insights call an LLM
+    // in the background — should not block the item list visibility.
     try {
-      const [menuRes, insRes] = await Promise.all([
-        fetch(`${API}/api/merchant/${mid}/menu`),
-        fetch(`${API}/api/merchant/${mid}/insights`),
-      ]);
+      const menuRes = await fetch(`${API}/api/merchant/${mid}/menu`);
       const menuData = await menuRes.json();
-      const insData = await insRes.json();
       setItems(Array.isArray(menuData) ? menuData : []);
-      setPerf(insData.items_perf ?? []);
-      setInsights(insData.insights ?? []);
     } catch (e) {
       console.warn('menu load failed', e);
     } finally {
       setLoading(false);
     }
+    // Background — never blocks the UI.
+    fetch(`${API}/api/merchant/${mid}/insights`)
+      .then(r => r.ok ? r.json() : null)
+      .then(insData => {
+        if (!insData) return;
+        setPerf(insData.items_perf ?? []);
+        setInsights(insData.insights ?? []);
+      })
+      .catch(() => {});
   }, [params.id]);
 
   useEffect(() => { load(); }, [load]);

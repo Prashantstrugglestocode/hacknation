@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import CountdownRing from '../../../lib/components/CountdownRing';
 import { safeHex } from '../../../lib/colors';
-import { theme } from '../../../lib/theme';
+import { theme, space, radius, type as typo } from '../../../lib/theme';
 import i18n from '../../../lib/i18n';
 
 const { width } = Dimensions.get('window');
@@ -112,52 +112,69 @@ export default function RedeemScreen() {
     : '';
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.bg, paddingHorizontal: 14, paddingTop: 24, paddingBottom: 18 }}>
-      <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 12, alignSelf: 'flex-start' }}>
-        <Text style={{ color: palette.fg + 'CC', fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+    <View style={{ flex: 1, backgroundColor: palette.bg, paddingHorizontal: space.md, paddingTop: space['2xl'], paddingBottom: space.lg }}>
+      <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: space.md, alignSelf: 'flex-start' }}>
+        <Text style={{ color: palette.fg + 'CC', fontSize: typo.body, fontWeight: '700' }}>
+          ← {i18n.t('common.back')}
+        </Text>
       </TouchableOpacity>
 
-      {/* Brand band */}
+      {/* Brand band — gradient + identity */}
       <MotiView
-        from={{ opacity: 0, translateY: -16 }}
+        from={{ opacity: 0, translateY: -20 }}
         animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'spring', damping: 20, stiffness: 200 }}
-        style={{ borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }}
+        transition={{ type: 'spring', damping: 18, stiffness: 220 }}
+        style={{ borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, overflow: 'hidden' }}
       >
         <LinearGradient
           colors={[palette.bg, palette.accent] as any}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={{ padding: 20, gap: 4 }}
+          style={{ padding: space.xl, gap: space.xs }}
         >
-          <Text style={{ color: palette.fg + 'BB', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }}>
+          <Text style={{
+            color: palette.fg + 'BB', fontSize: typo.caption,
+            fontWeight: '800', letterSpacing: 1.6,
+          }}>
             CITY WALLET · ANGEBOT
           </Text>
-          <Text style={{ color: palette.fg, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }} numberOfLines={1}>
+          <Text style={{
+            color: palette.fg, fontSize: typo.display - 2,
+            fontWeight: '900', letterSpacing: -0.6,
+          }} numberOfLines={1}>
             {merchant?.name ?? '—'}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.xs }}>
             {distance ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={{ fontSize: 11 }}>📍</Text>
-                <Text style={{ color: palette.fg + 'DD', fontSize: 12, fontWeight: '700' }}>{distance}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                <Text style={{ fontSize: typo.caption }}>📍</Text>
+                <Text style={{ color: palette.fg + 'DD', fontSize: typo.small, fontWeight: '700' }}>
+                  {distance}
+                </Text>
               </View>
             ) : null}
             {discount ? (
-              <Text style={{ color: palette.fg, fontSize: 14, fontWeight: '900' }}>
+              <Text style={{ color: palette.fg, fontSize: typo.body, fontWeight: '900' }}>
                 {formatDiscount()}
               </Text>
             ) : null}
           </View>
           {pressure ? (
-            <View style={{
-              alignSelf: 'flex-start', marginTop: 8,
-              backgroundColor: palette.fg + '22', borderRadius: 8,
-              paddingHorizontal: 10, paddingVertical: 4,
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-            }}>
-              <Text style={{ fontSize: 11 }}>{pressure.kind === 'time' ? '⏱' : '📦'}</Text>
-              <Text style={{ color: palette.fg, fontSize: 11, fontWeight: '800' }}>{pressure.value}</Text>
-            </View>
+            <MotiView
+              from={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', delay: 220, damping: 14 }}
+              style={{
+                alignSelf: 'flex-start', marginTop: space.sm,
+                backgroundColor: palette.fg + '22', borderRadius: radius.sm,
+                paddingHorizontal: space.md, paddingVertical: space.xs,
+                flexDirection: 'row', alignItems: 'center', gap: space.xs,
+              }}
+            >
+              <Text style={{ fontSize: typo.caption }}>{pressure.kind === 'time' ? '⏱' : '📦'}</Text>
+              <Text style={{ color: palette.fg, fontSize: typo.caption, fontWeight: '800' }}>
+                {pressure.value}
+              </Text>
+            </MotiView>
           ) : null}
         </LinearGradient>
       </MotiView>

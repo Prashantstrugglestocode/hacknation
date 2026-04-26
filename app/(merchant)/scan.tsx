@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -18,6 +19,7 @@ export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [result, setResult] = useState<{ success: boolean; offer?: any; error?: string } | null>(null);
   const scanLock = useRef(false);
+  const insets = useSafeAreaInsets();
 
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
     if (scanLock.current || scanned) return;
@@ -129,7 +131,7 @@ export default function ScanScreen() {
             QR-Code des Kunden scannen
           </Text>
         </View>
-        <View style={{ padding: 24 }}>
+        <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 24, paddingTop: 24 }}>
           <TouchableOpacity onPress={() => router.back()} style={{ alignItems: 'center' }}>
             <Text style={{ color: '#ffffff88', fontSize: 15 }}>Abbrechen</Text>
           </TouchableOpacity>

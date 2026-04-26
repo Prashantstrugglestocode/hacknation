@@ -67,4 +67,7 @@ console.log(`City Wallet server starting on port ${port}`);
 export default {
   port,
   fetch: app.fetch,
+  // Default Bun.serve idleTimeout is 10s — too tight for LLM calls (Mistral
+  // ~3-8s typical, but cold starts hit 15-25s). 60s gives us breathing room.
+  idleTimeout: 60,
 };

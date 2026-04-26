@@ -3,13 +3,25 @@ import OpenAI from 'openai';
 const ollama = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
   apiKey: 'ollama',
+  timeout: 12000,
+  maxRetries: 0,
 });
+
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({
+      baseURL: 'https://api.mistral.ai/v1',
+      apiKey: process.env.MISTRAL_API_KEY,
+      timeout: 20000,
+      maxRetries: 0,
+    })
+  : null;
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 const TEXT_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
+const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-latest';
 
 interface ItemPerf {
   item_id: string;
@@ -84,12 +96,10 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
     }));
   };
 
-  try { return await tryRun(ollama, TEXT_MODEL); } catch (e) {
-    console.warn('[insights] Ollama failed:', (e as Error).message);
-  }
-  if (openaiClient) {
-    try { return await tryRun(openaiClient, 'gpt-4o-mini'); } catch (e) {
-      console.warn('[insights] OpenAI failed:', (e as Error).message);
+  // Mistral only (per user instruction — no Ollama fallback).
+  if (mistralClient) {
+    try { return await tryRun(mistralClient, MISTRAL_MODEL); } catch (e) {
+      console.warn('[insights] Mistral failed:', (e as Error).message);
     }
   }
   // Deterministic fallback — surface low performers + at least one never-featured.

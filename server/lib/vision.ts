@@ -4,13 +4,27 @@ import { z } from 'zod';
 const ollama = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
   apiKey: 'ollama',
+  timeout: 20000,
+  maxRetries: 0,
 });
+
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({
+      baseURL: 'https://api.mistral.ai/v1',
+      apiKey: process.env.MISTRAL_API_KEY,
+      timeout: 30000, // vision is slower than text
+      maxRetries: 0,
+    })
+  : null;
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava:7b';
+// Mistral vision-capable model. pixtral-12b is multimodal and roughly
+// matches gpt-4o-mini for menu OCR.
+const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-12b-2409';
 
 const MenuItem = z.object({
   name: z.string().min(1).max(80),
@@ -63,18 +77,12 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
 }
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
-  // Try local vision model first (llava via Ollama)
-  try {
-    return await tryVision(ollama, VISION_MODEL, dataUrl);
-  } catch (e) {
-    console.warn('[vision] Ollama vision failed:', (e as Error).message);
-  }
-  // Fallback OpenAI
-  if (openaiClient) {
+  // Mistral pixtral only (per user instruction — no Ollama fallback).
+  if (mistralClient) {
     try {
-      return await tryVision(openaiClient, 'gpt-4o-mini', dataUrl);
+      return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
     } catch (e) {
-      console.warn('[vision] OpenAI gpt-4o-mini failed:', (e as Error).message);
+      console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) failed:`, (e as Error).message);
     }
   }
   // Demo fallback — return a small canned menu so the flow never breaks

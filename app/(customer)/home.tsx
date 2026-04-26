@@ -16,6 +16,7 @@ import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
 import { playChime } from '../../lib/sounds';
 import { hapticSuccess } from '../../lib/haptics';
 import { safePalette } from '../../lib/colors';
+import { speak } from '../../lib/tts';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
@@ -145,6 +146,13 @@ export default function CustomerHome() {
     }
   }, [state.status, seeding, seedDemoMerchant]);
 
+  // Read out the offer when TTS preference is on (accessibility).
+  useEffect(() => {
+    if (state.status !== 'offer') return;
+    const s = state.offer.widget_spec;
+    speak(`${s.headline}. ${s.subline}. ${s.cta}.`);
+  }, [state.status === 'offer' ? state.offer.id : null]);
+
   // Auto-expire offer after validity_minutes
   useEffect(() => {
     if (state.status !== 'offer') return;
@@ -251,7 +259,9 @@ export default function CustomerHome() {
             style={{
               position: 'absolute',
               top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: morph.bg,
+              // morph.bg comes from URL-friendly paletteParams (no leading #).
+              // Re-add and normalize so RN's StyleSheet doesn't crash.
+              backgroundColor: safePalette({ bg: `#${morph.bg}`, fg: morph.fg, accent: morph.accent }).bg,
               zIndex: 999,
             }}
           />
