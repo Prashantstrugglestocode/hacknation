@@ -150,7 +150,7 @@ export default function MenuScan() {
               exit={{ opacity: 0 }}
               transition={{ type: 'spring' }}
             >
-              <LlmStatusPill verb="liest die Karte" model="llava:7b" />
+              <LlmStatusPill brand="KI liest die Karte" />
             </MotiView>
           ) : (
             <MotiView

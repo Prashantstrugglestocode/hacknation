@@ -107,6 +107,8 @@ export default function MerchantDashboard() {
   useFocusEffect(
     useCallback(() => {
       let unsub: (() => void) | undefined;
+      let pollTimer: ReturnType<typeof setInterval> | null = null;
+      let prevGen = 0;
       (async () => {
         const id = await AsyncStorage.getItem('merchant_id');
         if (!id) { router.replace('/(merchant)/setup'); return; }
@@ -131,9 +133,33 @@ export default function MerchantDashboard() {
           fetchStats(id);
           fetchMenuCount(id);
         });
+
+        // Fallback polling — if Realtime broadcast fails (Supabase quota,
+        // dropped websocket, REST-fallback gap), poll stats every 6s and
+        // surface any change as a toast so live activity always works.
+        pollTimer = setInterval(async () => {
+          try {
+            const r = await fetch(`${API}/api/merchant/${id}/stats`);
+            if (!r.ok) return;
+            const next = await r.json();
+            const gen = next.generated ?? 0;
+            if (gen > prevGen && prevGen > 0) {
+              setStats(next);
+              setPulseKey(k => k + 1);
+              const key = Date.now();
+              setEventToast({ key, type: 'offer.shown', cents: undefined });
+              if (toastTimer.current) clearTimeout(toastTimer.current);
+              toastTimer.current = setTimeout(() => setEventToast(null), 2000);
+            } else {
+              setStats(next);
+            }
+            prevGen = gen;
+          } catch {}
+        }, 6000);
       })();
       return () => {
         if (unsub) unsub();
+        if (pollTimer) clearInterval(pollTimer);
         if (toastTimer.current) clearTimeout(toastTimer.current);
       };
     }, [fetchStats, fetchMenuCount])

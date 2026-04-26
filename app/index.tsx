@@ -37,41 +37,67 @@ export default function Index() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
       <MotiView
-        from={{ opacity: 0, scale: 0.85 }}
+        from={{ opacity: 0, scale: 0.82 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', damping: 14, stiffness: 180 }}
-        style={{ alignItems: 'center', gap: 18 }}
+        transition={{ type: 'spring', damping: 13, stiffness: 180 }}
+        style={{ alignItems: 'center', gap: 22 }}
       >
+        {/* Logo mark */}
         <MotiView
-          from={{ scale: 1 }}
-          animate={{ scale: 1.06 }}
-          transition={{ type: 'timing', duration: 900, loop: true }}
+          from={{ scale: 1, rotate: '-2deg' }}
+          animate={{ scale: 1.04, rotate: '2deg' }}
+          transition={{ type: 'timing', duration: 1400, loop: true }}
           style={{
-            width: 92, height: 92, borderRadius: 26,
+            width: 104, height: 104, borderRadius: 30,
             backgroundColor: theme.primary,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: theme.primary, shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 10 },
+            shadowColor: theme.primary, shadowOpacity: 0.4, shadowRadius: 22, shadowOffset: { width: 0, height: 12 },
           }}
         >
-          <Text style={{ fontSize: 48 }}>💳</Text>
+          <Text style={{ fontSize: 52 }}>💳</Text>
         </MotiView>
-        <Text style={{ fontSize: 30, fontWeight: '900', color: theme.text, letterSpacing: -0.6 }}>
-          City Wallet
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+
+        {/* Wordmark */}
+        <View style={{ alignItems: 'center', gap: 6 }}>
+          <Text style={{
+            fontSize: 36, fontWeight: '900', color: theme.text,
+            letterSpacing: -1.2,
+          }}>
+            City Wallet
+          </Text>
+          <Text style={{
+            color: theme.textMuted, fontSize: 14, fontWeight: '700',
+            letterSpacing: 0.4, textAlign: 'center',
+          }}>
+            Hyperlokal · Echtzeit · KI-komponiert
+          </Text>
+        </View>
+
+        {/* Loading dots */}
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
           {[0, 1, 2].map(i => (
             <MotiView
               key={i}
-              from={{ opacity: 0.3, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1.15 }}
+              from={{ opacity: 0.25, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1.2 }}
               transition={{ type: 'timing', duration: 650, loop: true, delay: i * 180 }}
               style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: theme.primary }}
             />
           ))}
         </View>
       </MotiView>
+
+      {/* Footer brand line */}
+      <View style={{ position: 'absolute', bottom: 36, alignItems: 'center', gap: 4 }}>
+        <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1.4 }}>
+          POWERED BY
+        </Text>
+        <Text style={{ color: theme.text, fontSize: 13, fontWeight: '800' }}>
+          DSV Gruppe · Sparkassen
+        </Text>
+      </View>
     </View>
   );
 }
