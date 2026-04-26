@@ -325,8 +325,12 @@ offer.post('/feed', async (c) => {
 
   // Skip merchants whose menu was just deleted — the LLM falls back to
   // generic copy and the customer keeps seeing stale "offers" for a shop
-  // with nothing to sell. Pull merchant_id → has-menu in one query so we
-  // can filter the candidate pool before LLM round-trips.
+  // with nothing to sell. BUT a merchant with active flash deals or combos
+  // is still pitchable — those reference real items, even if no standalone
+  // active menu_items exist. Two-phone demo footgun: phone B sets up a
+  // merchant + adds a flash but hasn't toggled menu items active → phone A
+  // saw nothing because the strict menu filter excluded them. Now we keep
+  // any merchant with EITHER active menu items OR active flash/combo state.
   const merchantIds = merchantRows.map(m => m.id);
   const { data: menuMap } = await supabase
     .from('menu_items')
@@ -334,10 +338,13 @@ offer.post('/feed', async (c) => {
     .in('merchant_id', merchantIds)
     .eq('active', true);
   const merchantsWithMenu = new Set((menuMap ?? []).map(r => r.merchant_id));
-  const merchantsWithItems = merchantRows.filter(m => merchantsWithMenu.has(m.id));
-  // Don't fall back to merchants with no menu — show empty feed instead
-  // (better than ghost offers from a shop that was just emptied).
-  const usableMerchants = merchantsWithItems.length > 0 ? merchantsWithItems : [];
+  const merchantsWithLiveOffers = merchantRows.filter(m => {
+    if (merchantsWithMenu.has(m.id)) return true;
+    if (listFlash(m.id).length > 0) return true;
+    if (listCombos(m.id).length > 0) return true;
+    return false;
+  });
+  const usableMerchants = merchantsWithLiveOffers;
   if (usableMerchants.length === 0) {
     return c.json({ offers: [] });
   }
