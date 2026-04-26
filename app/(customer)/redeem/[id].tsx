@@ -123,6 +123,22 @@ export default function RedeemScreen() {
       if (event.type === 'offer.scan_pending') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
         notifyScanPending(event.merchant_name ?? null);
+        // Push the customer to the dedicated Payone payment sheet instead
+        // of swapping the QR card inline. The pay screen owns the slide-to-
+        // pay UX; this screen returns to either the redeem receipt (after
+        // /confirm-payment broadcasts offer.redeemed) or stays on QR if the
+        // user cancels out of pay.
+        router.push({
+          pathname: '/(customer)/pay/[id]',
+          params: {
+            id,
+            base: String(event.base_amount_cents ?? 0),
+            discount: String(event.discount_amount_cents ?? 0),
+            merchant: event.merchant_name ?? '',
+          },
+        });
+        // Mirror the local state so if the user dismisses the pay sheet
+        // without sliding, the QR screen still reflects "scan pending".
         setRedemption({
           phase: 'awaiting_confirm',
           baseCents: event.base_amount_cents ?? null,
