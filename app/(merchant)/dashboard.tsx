@@ -23,7 +23,13 @@ interface Stats {
   accepted: number;
   redeemed: number;
   accept_rate: number;
+  // Legacy alias = customer_savings_cents. Kept so older callers don't break.
   eur_moved: number;
+  // Sum of discounts on redeemed offers — what the customer saved.
+  customer_savings_cents?: number;
+  // Sum of (base − discount) on redeemed offers — what the merchant earned
+  // (the customer-paid amount attributable to the offer-driven visit).
+  revenue_cents?: number;
   weekly?: Array<{ day: string; generated: number; accepted: number; rate: number }>;
 }
 
@@ -31,6 +37,10 @@ interface FeedItem {
   type: MerchantEvent['type'];
   ts: string;
   discount_amount_cents?: number;
+  // Set on offer.redeemed events. Drives the live activity row showing
+  // positive merchant revenue (instead of the negative discount amount).
+  revenue_amount_cents?: number | null;
+  base_amount_cents?: number | null;
 }
 
 interface Merchant {
@@ -150,10 +160,17 @@ export default function MerchantDashboard() {
             type: event.type,
             ts: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
             discount_amount_cents: event.discount_amount_cents,
+            revenue_amount_cents: event.revenue_amount_cents,
+            base_amount_cents: event.base_amount_cents,
           }, ...prev].slice(0, 12));
           setPulseKey(k => k + 1);
           const key = Date.now();
-          setEventToast({ key, type: event.type, cents: event.discount_amount_cents });
+          // Toast surfaces revenue (positive merchant earning) on redeem;
+          // discount on other event types where revenue isn't applicable.
+          const toastCents = event.type === 'offer.redeemed' && event.revenue_amount_cents != null
+            ? event.revenue_amount_cents
+            : event.discount_amount_cents;
+          setEventToast({ key, type: event.type, cents: toastCents });
           if (toastTimer.current) clearTimeout(toastTimer.current);
           toastTimer.current = setTimeout(() => setEventToast(null), 2000);
           fetchStats(id);
@@ -253,7 +270,8 @@ export default function MerchantDashboard() {
               </Text>
               {eventToast.cents != null && eventToast.cents > 0 && (
                 <Text style={{ color: '#FFFFFF', fontSize: typeScale.body, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
-                  · {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(eventToast.cents / 100)}
+                  {eventToast.type === 'offer.redeemed' ? ' +' : ' · '}
+                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(eventToast.cents / 100)}
                 </Text>
               )}
             </View>
@@ -364,11 +382,16 @@ export default function MerchantDashboard() {
                   style={{ marginTop: space.xs }}
                 >
                   <AnimatedNumber
-                    value={stats.eur_moved / 100}
+                    value={(stats.revenue_cents ?? 0) / 100}
                     format={n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)}
                     style={{ color: '#fff', fontSize: typeScale.display - 4, fontWeight: '900', letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}
                   />
                 </MotiView>
+                {(stats.customer_savings_cents ?? 0) > 0 && (
+                  <Text style={{ color: '#FFFFFF99', fontSize: typeScale.micro, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+                    Kunden gespart {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format((stats.customer_savings_cents ?? 0) / 100)}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -588,12 +611,29 @@ export default function MerchantDashboard() {
                       <Text style={{ color: theme.text, fontSize: typeScale.body, fontWeight: '700' }}>
                         {eventLabel(item.type)}
                       </Text>
-                      {item.discount_amount_cents ? (
-                        <Text style={{ color: theme.success, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
-                          −{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
-                              .format(item.discount_amount_cents / 100)}
-                        </Text>
-                      ) : null}
+                      {(() => {
+                        // On redemption events, show the merchant's revenue
+                        // (positive — the customer-paid amount). Earlier-stage
+                        // events (shown/accepted) have no revenue yet, so we
+                        // fall back to the offer's discount as a hint of size.
+                        const isRedeemed = item.type === 'offer.redeemed';
+                        const revenue = item.revenue_amount_cents;
+                        if (isRedeemed && typeof revenue === 'number' && revenue > 0) {
+                          return (
+                            <Text style={{ color: theme.success, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                              +{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(revenue / 100)}
+                            </Text>
+                          );
+                        }
+                        if (!isRedeemed && item.discount_amount_cents) {
+                          return (
+                            <Text style={{ color: theme.textMuted, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                              {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(item.discount_amount_cents / 100)} Rabatt
+                            </Text>
+                          );
+                        }
+                        return null;
+                      })()}
                     </View>
                     <Text style={{ color: theme.textMuted, fontSize: typeScale.caption, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 1 }}>
                       {item.ts}

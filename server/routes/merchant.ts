@@ -155,7 +155,7 @@ merchant.get('/:id/stats', async (c) => {
 
   const { data: offers } = await supabase
     .from('offers')
-    .select('status, discount_amount_cents')
+    .select('status, discount_amount_cents, widget_spec')
     .eq('merchant_id', id)
     .gte('generated_at', today.toISOString());
 
@@ -165,9 +165,20 @@ merchant.get('/:id/stats', async (c) => {
   const redeemed = rows.filter(o => o.status === 'redeemed').length;
   const declined = rows.filter(o => o.status === 'declined').length;
   const accept_rate = generated > 0 ? accepted / generated : 0;
-  const eur_moved = rows
-    .filter(o => o.status === 'redeemed')
+  // Customer savings = sum of discounts on redeemed offers.
+  // Merchant revenue = sum of (base − discount) on redeemed offers — what
+  //   the customer actually paid, attributable to the offer driving the visit.
+  // Both ride alongside `eur_moved` (legacy = customer savings) for back-compat.
+  const redeemedRows = rows.filter(o => o.status === 'redeemed');
+  const customer_savings_cents = redeemedRows
     .reduce((sum, o) => sum + (o.discount_amount_cents ?? 0), 0);
+  const revenue_cents = redeemedRows.reduce((sum, o) => {
+    const spec = (o as any).widget_spec ?? {};
+    const base = typeof spec.base_amount_cents === 'number' ? spec.base_amount_cents : 0;
+    const discount = o.discount_amount_cents ?? 0;
+    return sum + Math.max(0, base - discount);
+  }, 0);
+  const eur_moved = customer_savings_cents; // legacy alias
 
   // 7-day daily breakdown for sparkline
   const sevenDays = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -195,7 +206,13 @@ merchant.get('/:id/stats', async (c) => {
     });
   }
 
-  return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved, weekly: buckets });
+  return c.json({
+    generated, accepted, redeemed, declined, accept_rate,
+    eur_moved, // legacy = customer savings
+    customer_savings_cents,
+    revenue_cents,
+    weekly: buckets,
+  });
 });
 
 // Top redeemed menu items for this merchant. Reads `offer_item_links` joined

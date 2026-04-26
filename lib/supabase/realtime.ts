@@ -4,6 +4,10 @@ export type MerchantEvent = {
   type: 'offer.shown' | 'offer.accepted' | 'offer.declined' | 'offer.redeemed';
   offer_id: string;
   discount_amount_cents?: number;
+  // Set on offer.redeemed broadcasts. Customer paid (base − discount); the
+  // merchant dashboard's live activity surfaces this as positive revenue.
+  base_amount_cents?: number | null;
+  revenue_amount_cents?: number | null;
   redemption_kind?: 'qr' | 'cashback';
   ts: string;
 };

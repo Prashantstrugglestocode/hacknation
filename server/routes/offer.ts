@@ -902,14 +902,21 @@ offer.post('/:id/confirm-payment', async (c) => {
     .from('offers')
     .update({ status: 'redeemed' })
     .eq('id', id)
-    .select('merchant_id, discount_amount_cents')
+    .select('merchant_id, discount_amount_cents, widget_spec')
     .single();
 
   if (offerData) {
+    const baseCents = (offerData.widget_spec as any)?.base_amount_cents ?? null;
+    const discountCents = offerData.discount_amount_cents ?? 0;
+    const revenueCents = typeof baseCents === 'number'
+      ? Math.max(0, baseCents - discountCents)
+      : null;
     const payload = {
       type: 'offer.redeemed' as const,
       offer_id: id,
-      discount_amount_cents: offerData.discount_amount_cents,
+      discount_amount_cents: discountCents,
+      base_amount_cents: baseCents,
+      revenue_amount_cents: revenueCents,
       redemption_kind: 'qr' as const,
       ts: new Date().toISOString(),
     };
@@ -972,14 +979,21 @@ offer.post('/:id/redeem-cashback', async (c) => {
     .from('offers')
     .update({ status: 'redeemed', redemption_kind: 'cashback' })
     .eq('id', id)
-    .select('merchant_id, discount_amount_cents')
+    .select('merchant_id, discount_amount_cents, widget_spec')
     .single();
 
   if (offerData) {
+    const baseCents = (offerData.widget_spec as any)?.base_amount_cents ?? null;
+    const discountCents = offerData.discount_amount_cents ?? 0;
+    const revenueCents = typeof baseCents === 'number'
+      ? Math.max(0, baseCents - discountCents)
+      : null;
     const payload = {
       type: 'offer.redeemed' as const,
       offer_id: id,
-      discount_amount_cents: offerData.discount_amount_cents,
+      discount_amount_cents: discountCents,
+      base_amount_cents: baseCents,
+      revenue_amount_cents: revenueCents,
       redemption_kind: 'cashback' as const,
       ts: new Date().toISOString(),
     };
