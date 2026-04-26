@@ -1,46 +1,100 @@
-import React, { useEffect } from 'react';
-import { View, Text, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Dimensions, PanResponder, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { theme } from '../lib/theme';
 
 const { height } = Dimensions.get('window');
+const SWIPE_THRESHOLD = 90;
 
 const ROLE_KEY = 'cw_preferred_role';
 const MERCHANT_KEY = 'merchant_id';
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
 // Anon-device-hash boot (no login wall — brief anti-pattern).
-// Routes:
+// The landing screen now stays until the user explicitly swipes up so the
+// brand moment isn't a 450ms blip. Routes after swipe:
 //   has merchant_id    → /(merchant)/dashboard
 //   role=customer      → /(customer)/home
 //   role=merchant      → /(merchant)/setup
 //   no choice yet      → /role
-export default function Index() {
-  useEffect(() => {
-    let cancelled = false;
-    // Fire-and-forget: get Ollama loaded before the customer reaches /home.
-    if (API) fetch(`${API}/api/warm`, { method: 'POST' }).catch(() => {});
+async function decideDestination(): Promise<string> {
+  const [merchantId, role] = await Promise.all([
+    AsyncStorage.getItem(MERCHANT_KEY),
+    AsyncStorage.getItem(ROLE_KEY),
+  ]);
+  if (merchantId) return '/(merchant)/dashboard';
+  if (role === 'customer') return '/(customer)/home';
+  if (role === 'merchant') return '/(merchant)/setup';
+  return '/role';
+}
 
-    const t = setTimeout(async () => {
-      const [merchantId, role] = await Promise.all([
-        AsyncStorage.getItem(MERCHANT_KEY),
-        AsyncStorage.getItem(ROLE_KEY),
-      ]);
-      if (cancelled) return;
-      if (merchantId) router.replace('/(merchant)/dashboard');
-      else if (role === 'customer') router.replace('/(customer)/home');
-      else if (role === 'merchant') router.replace('/(merchant)/setup');
-      else router.replace('/role');
-    }, 450);
-    return () => { cancelled = true; clearTimeout(t); };
+export default function Index() {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const [leaving, setLeaving] = useState(false);
+
+  // Fire-and-forget LLM warmup so by the time the user swipes up and
+  // reaches /home, the model has had a head start.
+  useEffect(() => {
+    if (API) fetch(`${API}/api/warm`, { method: 'POST' }).catch(() => {});
   }, []);
 
+  const exitTo = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    // Slide the whole screen up off the top edge as we route.
+    Animated.timing(translateY, {
+      toValue: -height,
+      duration: 320,
+      useNativeDriver: true,
+    }).start(async () => {
+      const dest = await decideDestination();
+      router.replace(dest as any);
+    });
+  };
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 6 || Math.abs(g.dx) > 6,
+      onPanResponderMove: (_e, g) => {
+        // Only follow upward drags; resist downward / side drags.
+        const dy = Math.min(0, g.dy);
+        translateY.setValue(dy);
+      },
+      onPanResponderRelease: (_e, g) => {
+        const tappedFlick = g.dy < -20 && g.vy < -0.5;
+        if (g.dy <= -SWIPE_THRESHOLD || tappedFlick) {
+          exitTo();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0, useNativeDriver: true, damping: 16, stiffness: 220,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
+  const hintOpacity = translateY.interpolate({
+    inputRange: [-SWIPE_THRESHOLD, 0],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+    <Animated.View
+      {...responder.panHandlers}
+      style={{
+        flex: 1, backgroundColor: theme.bg,
+        alignItems: 'center', justifyContent: 'center', padding: 32,
+        transform: [{ translateY }],
+      }}
+    >
       {/* Ambient brand glow */}
       <View pointerEvents="none" style={{
         position: 'absolute',
@@ -99,20 +153,30 @@ export default function Index() {
             The pulse of your city
           </Text>
         </View>
-
-        {/* Loading dots */}
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-          {[0, 1, 2].map(i => (
-            <MotiView
-              key={i}
-              from={{ opacity: 0.25, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1.2 }}
-              transition={{ type: 'timing', duration: 650, loop: true, delay: i * 180 }}
-              style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: theme.primary }}
-            />
-          ))}
-        </View>
       </MotiView>
+
+      {/* Swipe-up affordance — pulses to telegraph the gesture, fades while
+          the user is mid-drag so it doesn't compete with the motion. */}
+      <Animated.View style={{
+        position: 'absolute',
+        bottom: 96,
+        alignItems: 'center', gap: 8,
+        opacity: hintOpacity,
+      }}>
+        <MotiView
+          from={{ translateY: 0, opacity: 0.4 }}
+          animate={{ translateY: -8, opacity: 1 }}
+          transition={{ type: 'timing', duration: 1100, loop: true, repeatReverse: true }}
+        >
+          <Text style={{ color: theme.primary, fontSize: 26, fontWeight: '900' }}>↑</Text>
+        </MotiView>
+        <Text style={{
+          color: theme.textMuted, fontSize: 12, fontWeight: '800',
+          letterSpacing: 1.4,
+        }}>
+          SWIPE UP
+        </Text>
+      </Animated.View>
 
       {/* Footer brand line */}
       <View style={{ position: 'absolute', bottom: 36, alignItems: 'center', gap: 4 }}>
@@ -123,6 +187,6 @@ export default function Index() {
           DSV Gruppe · Sparkassen
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
