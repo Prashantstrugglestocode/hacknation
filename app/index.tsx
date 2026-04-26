@@ -1,10 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { theme } from '../lib/theme';
+
+const { height } = Dimensions.get('window');
 
 const ROLE_KEY = 'cw_preferred_role';
 const MERCHANT_KEY = 'merchant_id';
@@ -38,6 +41,22 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      {/* Ambient brand glow */}
+      <View pointerEvents="none" style={{
+        position: 'absolute',
+        top: -height * 0.18, left: -height * 0.12,
+        width: height * 0.55, height: height * 0.55,
+        borderRadius: height,
+        backgroundColor: theme.primary + '14',
+      }} />
+      <View pointerEvents="none" style={{
+        position: 'absolute',
+        bottom: -height * 0.18, right: -height * 0.16,
+        width: height * 0.55, height: height * 0.55,
+        borderRadius: height,
+        backgroundColor: theme.primary + '0A',
+      }} />
+
       <MotiView
         from={{ opacity: 0, scale: 0.82 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -50,13 +69,19 @@ export default function Index() {
           animate={{ scale: 1.04, rotate: '2deg' }}
           transition={{ type: 'timing', duration: 1400, loop: true }}
           style={{
-            width: 104, height: 104, borderRadius: 30,
-            backgroundColor: theme.primary,
+            width: 112, height: 112, borderRadius: 32,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: theme.primary, shadowOpacity: 0.4, shadowRadius: 22, shadowOffset: { width: 0, height: 12 },
+            overflow: 'hidden',
+            shadowColor: theme.primary, shadowOpacity: 0.45,
+            shadowRadius: 28, shadowOffset: { width: 0, height: 14 },
           }}
         >
-          <Text style={{ fontSize: 52 }}>💳</Text>
+          <LinearGradient
+            colors={[theme.primary, theme.primaryDark] as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+          <Text style={{ fontSize: 56 }}>💳</Text>
         </MotiView>
 
         {/* Wordmark */}
@@ -71,7 +96,7 @@ export default function Index() {
             color: theme.textMuted, fontSize: 14, fontWeight: '700',
             letterSpacing: 0.4, textAlign: 'center',
           }}>
-            Der Puls deiner Stadt · KI-komponiert
+            Der Puls deiner Stadt
           </Text>
         </View>
 

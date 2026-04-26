@@ -12,9 +12,8 @@ interface Props {
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'center';
 }
 
-// <Image> with a graceful onError fallback. loremflickr is occasionally slow
-// or 404s — without this the user sees an empty grey square. With it they
-// see a tinted block + emoji that still reads as "this is a product".
+// Pollinations / real images render normally; legacy loremflickr/placeholder
+// URIs are short-circuited to the brand fallback (tinted block + emoji).
 export default function FallbackImage({
   uri,
   style,
@@ -22,7 +21,8 @@ export default function FallbackImage({
   fallbackBg = theme.bgMuted,
   resizeMode = 'cover',
 }: Props) {
-  const [failed, setFailed] = useState(false);
+  const isLegacyPlaceholder = typeof uri === 'string' && /loremflickr|placekitten|placehold/.test(uri);
+  const [failed, setFailed] = useState(isLegacyPlaceholder);
 
   if (failed) {
     return (

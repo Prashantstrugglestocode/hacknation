@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Pressable, GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import * as Location from 'expo-location';
 import { MotiView } from 'moti';
@@ -14,6 +14,11 @@ export interface PickedLocation {
 interface Props {
   value: PickedLocation | null;
   onChange: (loc: PickedLocation) => void;
+  // When true, automatically calls device GPS on mount if `value` is null.
+  // Setup uses this (no shop yet → grab GPS for sensible default). Merchant
+  // settings sets this to false so a slow DB fetch doesn't get overwritten
+  // by GPS before the saved coords arrive as `value`.
+  autoFetchOnMount?: boolean;
 }
 
 // Slippy-tile coords for the OSM tile-server (much more reliable than the
@@ -69,7 +74,7 @@ async function forwardGeocode(address: string): Promise<{ lat: number; lng: numb
   } catch { return null; }
 }
 
-export default function LocationPicker({ value, onChange }: Props) {
+export default function LocationPicker({ value, onChange, autoFetchOnMount = true }: Props) {
   const [addressDraft, setAddressDraft] = useState(value?.address ?? '');
   const [loadingGps, setLoadingGps] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -77,19 +82,36 @@ export default function LocationPicker({ value, onChange }: Props) {
   const [tileState, setTileState] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [tileNonce, setTileNonce] = useState(0); // bump to force <Image> reload on retry
   const [tileSize, setTileSize] = useState({ w: 0, h: 0 });
+  // Monotonic request id to discard stale reverseGeocode responses — without
+  // this, two quick taps can resolve out-of-order and the FIRST tap's late
+  // response overwrites the SECOND tap's coords (the "random save" bug).
+  const tapSeqRef = useRef(0);
 
-  // Tap on the map → recenter the pin to that point. Reverse-geocodes for
-  // a clean address. Cheap "draggable" without needing a real map module.
-  const handleMapTap = async (e: GestureResponderEvent) => {
+  // Tap on the map → recenter the pin to that point.
+  // 1) Update lat/lng IMMEDIATELY so the pin can't be overwritten by an
+  //    earlier in-flight geocode response.
+  // 2) Reverse-geocode in the background and only patch the address if this
+  //    tap is still the latest one.
+  const handleMapTap = (e: GestureResponderEvent) => {
     if (!value || tileSize.w === 0 || tileSize.h === 0) return;
     const { locationX, locationY } = e.nativeEvent;
     const fracX = Math.max(0, Math.min(1, locationX / tileSize.w));
     const fracY = Math.max(0, Math.min(1, locationY / tileSize.h));
     const { x: tx, y: ty } = tileCoords(value.lat, value.lng, 16);
     const { lat, lng } = worldToLatLng(tx, ty, fracX, fracY, 16);
-    const address = await reverseGeocode(lat, lng);
-    onChange({ lat, lng, address: address || `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
-    setAddressDraft(address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    const fallbackAddress = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+    const seq = ++tapSeqRef.current;
+    onChange({ lat, lng, address: fallbackAddress });
+    setAddressDraft(fallbackAddress);
+
+    // Geocode in background; only apply if no newer tap has happened.
+    reverseGeocode(lat, lng).then((address) => {
+      if (seq !== tapSeqRef.current) return; // stale response — discard
+      if (!address) return;
+      onChange({ lat, lng, address });
+      setAddressDraft(address);
+    }).catch(() => {});
   };
 
   const useGps = useCallback(async () => {
@@ -112,9 +134,9 @@ export default function LocationPicker({ value, onChange }: Props) {
     } finally { setLoadingGps(false); }
   }, [onChange]);
 
-  // Auto-fill on mount if no value yet
+  // Auto-fill on mount if no value yet AND the parent hasn't opted out.
   useEffect(() => {
-    if (!value) useGps();
+    if (!value && autoFetchOnMount) useGps();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

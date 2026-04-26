@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Slider from '@react-native-community/slider';
@@ -9,6 +10,7 @@ import { forgetMe } from '../lib/privacy/intent-encoder';
 import { usePrefs } from '../lib/preferences';
 import { playChime } from '../lib/sounds';
 import { speak } from '../lib/tts';
+import i18n, { useLocaleVersion } from '../lib/i18n';
 import { theme, space, radius, type } from '../lib/theme';
 
 interface Row {
@@ -18,8 +20,10 @@ interface Row {
 }
 
 export default function Settings() {
+  useLocaleVersion(); // re-render section labels when language flips
   const [forgotDone, setForgotDone] = useState(false);
   const { prefs, toggleSound, toggleHaptics, toggleTts, setRadius } = usePrefs();
+  const insets = useSafeAreaInsets();
 
   const handleForgetMe = async () => {
     await forgetMe();
@@ -51,14 +55,22 @@ export default function Settings() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space['4xl'] }}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: type.body, fontWeight: '700' }}>← Zurück</Text>
+      <ScrollView contentContainerStyle={{
+        padding: space.lg, gap: space.md, paddingBottom: space['4xl'],
+        paddingTop: Math.max(insets.top + space.sm, space['2xl']),
+      }}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={16}
+          style={{
+            alignSelf: 'flex-start',
+            paddingVertical: space.sm, paddingHorizontal: space.md,
+            marginLeft: -space.md, marginBottom: space.xs,
+          }}>
+          <Text style={{ color: theme.primary, fontSize: type.bodyL, fontWeight: '800' }}>← {i18n.t('common.back')}</Text>
         </TouchableOpacity>
 
         <View>
           <Text style={{ color: theme.primary, fontSize: type.caption, fontWeight: '800', letterSpacing: 1.2 }}>
-            EINSTELLUNGEN
+            {i18n.t('settings.title').toUpperCase()}
           </Text>
           <Text style={{ color: theme.text, fontSize: type.display, fontWeight: '900', letterSpacing: -0.6 }}>
             ⚙️ App
@@ -66,35 +78,35 @@ export default function Settings() {
         </View>
 
         {/* Language */}
-        <Section title="SPRACHE">
+        <Section title={i18n.t('settings.language').toUpperCase()}>
           <View style={{ alignItems: 'flex-start' }}>
             <LangToggle variant="dark" />
           </View>
           <Text style={{ color: theme.textMuted, fontSize: type.small, marginTop: space.sm }}>
-            Bestimmt die Sprache für KI-Angebote, Beschreibungen und Hinweise.
+            {i18n.t('settings.language_hint')}
           </Text>
         </Section>
 
         {/* App-Verhalten */}
-        <Section title="APP-VERHALTEN">
+        <Section title={i18n.t('settings.behavior').toUpperCase()}>
           <ToggleRow
             emoji="🔊"
-            label="Sound bei Annahme"
-            sub="Chime wenn ein Angebot angenommen oder QR gescannt wird"
+            label={i18n.t('settings.sound_label')}
+            sub={i18n.t('settings.sound_sub')}
             value={prefs.sound}
             onToggle={handleToggleSound}
           />
           <ToggleRow
             emoji="📳"
-            label="Haptisches Feedback"
-            sub="Vibration bei Tap und Erfolg"
+            label={i18n.t('settings.haptics_label')}
+            sub={i18n.t('settings.haptics_sub')}
             value={prefs.haptics}
             onToggle={handleToggleHaptics}
           />
           <ToggleRow
             emoji="🗣"
-            label="Angebote vorlesen"
-            sub="Liest Headline + Subline laut vor (Barrierefreiheit)"
+            label="🗣  TTS"
+            sub="Read headlines aloud (accessibility)"
             value={prefs.tts}
             onToggle={handleToggleTts}
           />
@@ -113,7 +125,7 @@ export default function Settings() {
           <View style={{ gap: 6, marginTop: space.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ color: theme.text, fontSize: type.body, fontWeight: '700' }}>
-                🎯 Such-Radius
+                🎯 {i18n.t('settings.radius_label')}
               </Text>
               <Text style={{ color: theme.primary, fontSize: type.body, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
                 {prefs.radius_m < 1000 ? `${prefs.radius_m} m` : `${(prefs.radius_m / 1000).toFixed(1).replace('.', ',')} km`}
@@ -130,20 +142,25 @@ export default function Settings() {
               thumbTintColor={theme.primary}
             />
             <Text style={{ color: theme.textMuted, fontSize: type.small }}>
-              Wie weit die App nach Geschäften und Karte sucht.
+              {i18n.t('settings.radius_sub')}
             </Text>
           </View>
         </Section>
 
+        {/* GDPR transparency — what stays local vs what we send.
+            Visible to anyone who taps Settings; no need to hunt through a
+            policy doc. Built from i18n.t() so it flips with the language. */}
+        <GdprSection />
+
         {/* Privacy — single user action */}
-        <Section title="DATENSCHUTZ">
+        <Section title={i18n.t('settings.privacy').toUpperCase()}>
           {forgotDone ? (
             <View style={{
               backgroundColor: theme.success + '22', borderRadius: radius.md, padding: space.md,
               alignItems: 'center', borderWidth: 1, borderColor: theme.success + '66',
             }}>
               <Text style={{ color: theme.success, fontSize: type.body, fontWeight: '800' }}>
-                ✓ Verlauf gelöscht · Hash rotiert
+                {i18n.t('settings.forget_me_done')}
               </Text>
             </View>
           ) : (
@@ -154,13 +171,95 @@ export default function Settings() {
                 borderWidth: 1, borderColor: theme.danger + '44',
               }}>
               <Text style={{ color: theme.danger, fontSize: type.body, fontWeight: '800' }}>
-                🗑  Vergiss mich
+                {i18n.t('settings.forget_me_button')}
               </Text>
             </TouchableOpacity>
           )}
         </Section>
       </ScrollView>
     </View>
+  );
+}
+
+// GDPR transparency: pipe-separated lists in i18n become real chip rows here.
+// Two columns visualise the data-minimisation contract.
+function GdprSection() {
+  const local = i18n.t('settings.gdpr_local_items').split('|');
+  const sent = i18n.t('settings.gdpr_sent_items').split('|');
+  const principles = i18n.t('settings.gdpr_principles_items').split('|');
+  return (
+    <MotiView
+      from={{ opacity: 0, translateY: 6 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: 'timing', duration: 280 }}
+      style={{
+        backgroundColor: theme.surface, borderRadius: radius.lg,
+        padding: space.lg, gap: space.md,
+        borderWidth: 1, borderColor: theme.border,
+      }}
+    >
+      <View>
+        <Text style={{ color: theme.primary, fontSize: type.caption, fontWeight: '900', letterSpacing: 1 }}>
+          {i18n.t('settings.gdpr_title')}
+        </Text>
+        <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700', marginTop: 2 }}>
+          {i18n.t('settings.gdpr_subtitle')}
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        {/* On-device column */}
+        <View style={{
+          flex: 1, gap: 6,
+          backgroundColor: theme.success + '0E',
+          borderWidth: 1, borderColor: theme.success + '44',
+          borderRadius: radius.md, padding: space.sm + 2,
+        }}>
+          <Text style={{ color: theme.success, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
+            🔒 {i18n.t('settings.gdpr_local_title').toUpperCase()}
+          </Text>
+          {local.map((item, i) => (
+            <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
+              · {item.trim()}
+            </Text>
+          ))}
+        </View>
+        {/* Sent column */}
+        <View style={{
+          flex: 1, gap: 6,
+          backgroundColor: theme.warn + '0E',
+          borderWidth: 1, borderColor: theme.warn + '44',
+          borderRadius: radius.md, padding: space.sm + 2,
+        }}>
+          <Text style={{ color: theme.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
+            ☁️ {i18n.t('settings.gdpr_sent_title').toUpperCase()}
+          </Text>
+          {sent.map((item, i) => (
+            <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
+              · {item.trim()}
+            </Text>
+          ))}
+        </View>
+      </View>
+
+      <View style={{ gap: 4 }}>
+        <Text style={{ color: theme.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }}>
+          {i18n.t('settings.gdpr_principles_title').toUpperCase()}
+        </Text>
+        {principles.map((item, i) => (
+          <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
+            ✓ {item.trim()}
+          </Text>
+        ))}
+      </View>
+
+      <Text style={{
+        color: theme.textMuted, fontSize: 10, fontWeight: '700',
+        textAlign: 'center', fontStyle: 'italic',
+      }}>
+        {i18n.t('settings.gdpr_legal')}
+      </Text>
+    </MotiView>
   );
 }
 

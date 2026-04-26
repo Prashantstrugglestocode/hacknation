@@ -390,7 +390,7 @@ export default function MenuScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={{ fontSize: 14 }}>🧠</Text>
-            <Text style={{ color: theme.textOnPrimary, fontSize: 13, fontWeight: '800', letterSpacing: 1 }}>KI-INSIGHTS</Text>
+            <Text style={{ color: theme.textOnPrimary, fontSize: 13, fontWeight: '800', letterSpacing: 1 }}>INSIGHTS</Text>
           </View>
           {insights.map((i, idx) => {
             const item = items.find(x => x.id === i.item_id);

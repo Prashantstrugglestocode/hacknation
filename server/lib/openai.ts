@@ -39,7 +39,7 @@ GENERAL
 - Match mood to context (cold+quiet=cozy, sunny+event=energetic, closing-soon+stock=urgent, lunch+quiet café=discreet).
 - Layout: cozy/playful→hero or sticker; discreet/factual→compact; energetic→split; urgent→fullbleed.
 - If context.previous_layout is set, pick a DIFFERENT layout (so pull-to-refresh looks different).
-- Palette: 3 #RRGGBB colors harmonizing with mood; fg on bg must pass WCAG AA.
+- Palette: 3 #RRGGBB colors harmonizing with mood; fg on bg must pass WCAG AA. Default to the Sparkassen brand family (deep red bg #A00000–#E60000, white/cream fg #FFFFFF–#FFF5F5, soft red accent #FFE5E5–#FF4D4D); shift to other warm tones only when mood strongly demands it (e.g., calm blue for rainy/discreet, amber for sunset/energetic).
 - Copy: concrete, no marketing fluff, no emojis unless mood=playful. Headline <8 words. Subline <14 words. CTA <4 words.
 - discount.value must not exceed merchant.max_discount_pct.
 - validity_minutes: 15-90 (shorter for urgent, longer for cozy).
@@ -47,10 +47,18 @@ GENERAL
 - signal_chips: 2-4 short labels showing actual context signals (in user locale).
 - reasoning: one plain sentence why this offer at this moment.
 
-MENU ITEMS (context.menu_items, when provided)
+MENU ITEMS (context.menu_items, when provided — REQUIRED to use)
 - Array of { id, name, price_cents, category, tags } from the merchant's real menu.
-- Strongly prefer naming a specific real item in the headline. Pick an item suited to the time-of-day rules.
-- featured_item_ids MUST be UUIDs from context.menu_items (never invented). Usually 1, max 3.
+- You MUST name one specific real item from this list in the headline. No generic "Kaffee & Kuchen" — use the actual item name.
+- featured_item_ids MUST contain at least one UUID from context.menu_items (never invented). Usually 1, max 3.
+- If multiple items fit the time-of-day, prefer the one with the most distinctive name (it builds trust that the AI used the real menu).
+
+COMBOS (context.combos — second-highest priority after flash_sale)
+- Array of merchant-defined bundles { id, name, items[], combo_price_cents, base_total_cents, savings_cents }.
+- If a combo fits the time-of-day + weather + customer context, PREFER pitching it over a single item — it's the merchant's best-margin play.
+- Headline names the combo (e.g. "Frühstücks-Set: Cappuccino + Croissant"). Subline mentions the savings vs individual prices.
+- Use discount.kind="eur" with value = savings_cents/100. featured_item_ids = combo.items[].id.
+- signal_chips include the word "Combo" or "Set".
 
 FLASH-SALE OVERRIDE (highest priority — context.flash_sale)
 - Build the offer around flash_sale.items[0]: headline names it.
@@ -69,10 +77,14 @@ TIME-OF-DAY (context.hour) — wrong-time items break the demo
 - 23-06 night: bar/restaurant only or skip.
 - Bakery >19h → take-home items, not fresh pastries. Café >20h → tea/decaf, not espresso.
 
-WEATHER
-- Cold/rain → hot drinks, soup, indoor warmth.
-- Hot/sunny → iced drinks, salads, terrace.
-- Snow → hot chocolate, indoor.
+WEATHER REASONING (use judgment, not a lookup table)
+- You are given context.weather.temp_c and context.weather.condition. Reason about what a real customer in that weather actually wants right now, then pick a featured item from menu_items that fits — and frame the headline around that fit.
+- Examples of the kind of reasoning you should do (NOT exhaustive rules):
+  - 28 °C and sunny → people want cold, refreshing, light. Avoid pitching a hot espresso as the headline. If only hot items exist, lean on shaded/indoor framing instead of the drink itself.
+  - 5 °C and rainy → people want warm, dry, comforting. Avoid pitching ice cream as the headline.
+  - Borderline (15-21 °C, mixed cloud) → either direction works, lean on whatever menu item is most distinctive or fits the time of day.
+- The headline should make a customer feel "yes, that's exactly what I want right now". If the offer reads as fighting the weather, you picked wrong.
+- Never invent an item that isn't in menu_items. If the only available items genuinely don't fit the weather, pick the closest fit and reframe (don't lie about ice in the cup).
 
 Return ONLY this JSON (no prose, no markdown):
 {"layout":"hero|compact|split|fullbleed|sticker","palette":{"bg":"#RRGGBB","fg":"#RRGGBB","accent":"#RRGGBB"},"mood":"cozy|energetic|urgent|playful|discreet","hero":{"type":"icon|gradient|pattern","value":"<string>"},"headline":"<string>","subline":"<string>","cta":"<string>","signal_chips":["<string>",...],"pressure":null|{"kind":"time|stock","value":"<string>"},"reasoning":"<string>","merchant":{"id":"<id>","name":"<name>","distance_m":<number>},"discount":{"kind":"pct|eur|item","value":<number>,"constraint":null|"<string>"},"validity_minutes":<integer>,"locale":"de|en","featured_item_ids":["<uuid>",...]}`;
@@ -121,9 +133,11 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
     : 'gradient';
   if (!p.hero.value) p.hero.value = '☕';
   p.palette = p.palette ?? {};
-  p.palette.bg = normalizeHex(p.palette.bg, '#1A1A2E');
+  // Sparkassen brand defaults — used when the LLM omits a palette or returns
+  // unparseable hex strings. Keep this in sync with `lib/theme.ts`.
+  p.palette.bg = normalizeHex(p.palette.bg, '#E60000');
   p.palette.fg = normalizeHex(p.palette.fg, '#FFFFFF');
-  p.palette.accent = normalizeHex(p.palette.accent, '#E11D48');
+  p.palette.accent = normalizeHex(p.palette.accent, '#FFE5E5');
   // Merchant-specific fallbacks so a deterministic offer (when LLM is down)
   // still names the shop and reads as plausibly real.
   const isEN = locale === 'en';
@@ -162,13 +176,38 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
     typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
   );
 
-  // Auto-fill a hero image URL by querying loremflickr with merchant tags
+  // base_amount_cents: what the customer "pays" before discount. Drives the
+  // slide-to-pay amount + the savings tile math. Use the featured menu item's
+  // price when we have one (most accurate); fall back to a merchant-type-aware
+  // baseline so the numbers don't look toy-sized.
+  // Note: menu_items aren't in scope here — caller patches a real price below
+  // when it knows one. These defaults ensure the field is always present.
+  if (typeof p.base_amount_cents !== 'number' || p.base_amount_cents <= 0) {
+    const TYPE_BASELINE: Record<string, number> = {
+      café: 480, bakery: 350, bookstore: 1800, restaurant: 1900,
+      bar: 850, retail: 2400, services: 3500, other: 1200,
+    };
+    p.base_amount_cents = TYPE_BASELINE[(merchant.type ?? 'other').toLowerCase()] ?? 1200;
+  }
+
+  // Auto-fill a hero image URL via Pollinations (free text-to-image, no key).
+  // Prompt grounds in the actual headline + merchant type so the picture
+  // matches the offer copy. URL is deterministic for caching; FallbackImage
+  // on the client renders a tinted block + emoji if the load fails.
   if (!p.hero_image_url) {
-    const tags = (merchant.inventory_tags ?? []) as string[];
-    const tag = (tags[0] ?? merchant.type ?? 'cafe').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    const type = (merchant.type ?? 'cafe').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    // Loremflickr: free, key-less, supports comma-tagged queries, deterministic by lock
-    p.hero_image_url = `https://loremflickr.com/800/480/${tag},${type}/all?lock=${(merchant.id ?? '').slice(0, 6)}`;
+    const head = String(p.headline ?? merchant.name ?? 'offer').slice(0, 90);
+    const mtype = (merchant.type ?? 'café').toLowerCase();
+    const prompt = `${head}, ${mtype}, lifestyle photography, atmospheric, soft warm light, shallow depth of field`;
+    let seed = 0;
+    const seedKey = `hero:${head}`;
+    for (let i = 0; i < seedKey.length; i++) seed = (seed * 31 + seedKey.charCodeAt(i)) | 0;
+    seed = Math.abs(seed) % 1_000_000;
+    const params = new URLSearchParams({
+      width: '800', height: '480',
+      seed: String(seed),
+      nologo: 'true', enhance: 'true', model: 'flux',
+    });
+    p.hero_image_url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`;
   }
   return p;
 }
@@ -267,4 +306,77 @@ export async function generateOffer(params: {
   // Tier 3: deterministic offer so the customer always sees something.
   console.warn('[offer-engine] All AI backends failed, returning deterministic fallback');
   return fillDefaults({}, params.locale, m, d);
+}
+
+// One-line natural-language explanation for which offer in a feed is the best
+// deal mathematically, and why. Uses Mistral (already configured for this
+// project). Falls back to a deterministic German/English string if the cloud
+// call fails — never blocks the UI.
+export async function explainBestOffer(params: {
+  locale: string;
+  offers: Array<{
+    headline: string;
+    merchant_name: string;
+    base_amount_cents: number;
+    discount_amount_cents: number;
+    pct?: number | null;
+  }>;
+  winnerIndex: number;
+}): Promise<string> {
+  const { locale, offers, winnerIndex } = params;
+  const isEN = locale === 'en';
+  const winner = offers[winnerIndex];
+  const others = offers.filter((_, i) => i !== winnerIndex);
+  if (!winner || others.length === 0) {
+    return isEN ? 'Best deal in this feed.' : 'Bestes Angebot in dieser Liste.';
+  }
+
+  const fmtEur = (c: number) => new Intl.NumberFormat(isEN ? 'en-US' : 'de-DE',
+    { style: 'currency', currency: 'EUR' }).format(c / 100);
+
+  // Compact summary the LLM can chew on. Keep it tight to keep latency low.
+  const summary = offers.map((o, i) => ({
+    label: `${i + 1}`,
+    is_winner: i === winnerIndex,
+    merchant: o.merchant_name,
+    headline: o.headline,
+    base: fmtEur(o.base_amount_cents),
+    saves: fmtEur(o.discount_amount_cents),
+    pct: o.pct ?? null,
+  }));
+
+  const sys = isEN
+    ? `You write a single sentence in plain English (max 22 words) explaining to a customer why offer "${winner.merchant_name}" saves them more than the alternatives in a list of nearby cafe/shop offers. Be concrete about the EUR amount and the reason (higher percentage, smaller base, named item). No emojis. No quotes. Output ONLY the sentence.`
+    : `Du schreibst genau einen klaren deutschen Satz (max. 22 Wörter), der einem Kunden erklärt, warum das Angebot "${winner.merchant_name}" mehr spart als die anderen in einer Liste lokaler Café-/Shop-Angebote. Sei konkret mit dem EUR-Betrag und dem Grund (höherer Prozentsatz, kleinerer Grundpreis, benanntes Produkt). Keine Emojis. Keine Anführungszeichen. Nur den Satz ausgeben.`;
+
+  const user = JSON.stringify(summary);
+
+  // Mistral is the configured cloud model for this app. If it's unavailable,
+  // return a deterministic fallback rather than blocking.
+  if (!mistralClient) {
+    const gap = winner.discount_amount_cents - others[0].discount_amount_cents;
+    return isEN
+      ? `Best pick: ${winner.merchant_name} saves ${fmtEur(gap)} more than the next-best deal nearby.`
+      : `Beste Wahl: ${winner.merchant_name} spart ${fmtEur(gap)} mehr als das nächstbeste Angebot.`;
+  }
+
+  try {
+    const res = await mistralClient.chat.completions.create({
+      model: MISTRAL_MODEL,
+      temperature: 0.4,
+      max_tokens: 90,
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: user },
+      ],
+    });
+    const text = (res.choices[0]?.message?.content ?? '').trim();
+    if (text && text.length > 5) return text;
+  } catch (e) {
+    console.warn('[advisor] Mistral explain failed:', (e as Error).message);
+  }
+  const gap = winner.discount_amount_cents - others[0].discount_amount_cents;
+  return isEN
+    ? `Best pick: ${winner.merchant_name} saves ${fmtEur(gap)} more than the next-best deal nearby.`
+    : `Beste Wahl: ${winner.merchant_name} spart ${fmtEur(gap)} mehr als das nächstbeste Angebot.`;
 }

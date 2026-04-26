@@ -12,6 +12,7 @@ interface TriggerWhen {
   movement?: string;
   minutes_to_close_max?: number;
   has_inventory_tags?: boolean;
+  foot_traffic?: 'low' | 'medium' | 'high';
 }
 
 interface Trigger {
@@ -43,7 +44,19 @@ export interface ContextInput {
   hour: number;
   events: Array<{ distance_m: number; starts_in_minutes: number }>;
   payone_density: 'low' | 'medium' | 'high';
+  // Coarse OSM-derived foot traffic for the geohash cell. Brief calls this
+  // out as a "footfall signal / route density" the system should react to.
+  foot_traffic?: 'low' | 'medium' | 'high';
   intent: { browsing: boolean };
+}
+
+// Map raw OSM POI count → 3-bucket footfall density.
+// Tuned for German old-town neighbourhoods: ≤3 POIs in 500m = quiet
+// residential, ~4-12 = active street, 12+ = pedestrian zone.
+export function footTrafficFromPOI(totalPOIs: number): 'low' | 'medium' | 'high' {
+  if (totalPOIs <= 3) return 'low';
+  if (totalPOIs >= 13) return 'high';
+  return 'medium';
 }
 
 export function firedTriggers(ctx: ContextInput, merchantType: string, inventoryTags: string[]): string[] {
@@ -69,6 +82,7 @@ export function firedTriggers(ctx: ContextInput, merchantType: string, inventory
       if (!soonEvent) match = false;
     }
     if (w.has_inventory_tags && inventoryTags.length === 0) match = false;
+    if (w.foot_traffic && ctx.foot_traffic !== w.foot_traffic) match = false;
 
     if (match) fired.push(t.id);
   }
@@ -92,6 +106,12 @@ export function scoreMerchant(params: {
     freshnessPenalty
   );
 }
+
+// Weather-appropriateness is decided by the LLM at offer-generation time
+// (see SYSTEM_PROMPT "WEATHER REASONING" section). The previous
+// keyword/regex-based weatherFitPenalty was deleted — we trust the model
+// to reason about what fits the current temp + condition rather than
+// matching against a hardcoded vocabulary.
 
 export function getScoringConfig() {
   return getConfig().scoring;

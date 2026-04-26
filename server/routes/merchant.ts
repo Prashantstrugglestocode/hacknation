@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import ngeohash from 'ngeohash';
 import { generateOffer } from '../lib/openai.ts';
 import { getWeather } from '../lib/weather.ts';
-import { getPayoneDensity } from '../lib/payone-mock.ts';
+import { getPayoneDensity, getMerchantPayoneSignal } from '../lib/payone-mock.ts';
 import { setFlash, getFlash, clearFlash } from '../lib/flash.ts';
+import { listCombos, addCombo, deleteCombo } from '../lib/combos.ts';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -84,10 +85,15 @@ merchant.get('/:id', async (c) => {
 
 merchant.patch('/:id', async (c) => {
   const body = await c.req.json();
-  const allowed = ['goal', 'max_discount_pct', 'time_windows', 'inventory_tags'];
+  const allowed = ['goal', 'max_discount_pct', 'time_windows', 'inventory_tags', 'name', 'lat', 'lng'];
   const update: Record<string, any> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
+  }
+  // Recompute geohash6 when lat/lng change so the merchant remains findable
+  // by the customer's nearby-search after relocation.
+  if (typeof update.lat === 'number' && typeof update.lng === 'number') {
+    update.geohash6 = ngeohash.encode(update.lat, update.lng, 6);
   }
 
   const { data, error } = await supabase
@@ -191,6 +197,60 @@ merchant.get('/:id/stats', async (c) => {
   return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved, weekly: buckets });
 });
 
+// Top redeemed menu items for this merchant. Reads `offer_item_links` joined
+// with `offers` (status='redeemed') and aggregates by menu_item. Powers the
+// "Top Item" tile on the merchant dashboard so the merchant sees what's
+// actually moving — a real DB-driven insight, not a stat tile.
+merchant.get('/:id/top-items', async (c) => {
+  const id = c.req.param('id');
+  const limit = Math.max(1, Math.min(10, parseInt(c.req.query('limit') ?? '3', 10)));
+
+  // Pull all offer_item_links for redeemed offers from this merchant.
+  // Supabase JS doesn't do GROUP BY natively; we aggregate in JS.
+  const { data: links } = await supabase
+    .from('offer_item_links')
+    .select('menu_item_id, offers!inner(merchant_id, status), menu_items!inner(id, name, price_cents, category)')
+    .eq('offers.merchant_id', id)
+    .eq('offers.status', 'redeemed');
+
+  if (!links || links.length === 0) return c.json({ items: [] });
+
+  const counts = new Map<string, { name: string; price_cents: number | null; category: string | null; redemptions: number }>();
+  for (const row of links as any[]) {
+    const item = row.menu_items;
+    if (!item) continue;
+    const existing = counts.get(item.id);
+    if (existing) {
+      existing.redemptions += 1;
+    } else {
+      counts.set(item.id, {
+        name: item.name,
+        price_cents: item.price_cents,
+        category: item.category,
+        redemptions: 1,
+      });
+    }
+  }
+
+  const items = [...counts.entries()]
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.redemptions - a.redemptions)
+    .slice(0, limit);
+
+  return c.json({ items });
+});
+
+// Per-merchant Payone density signal — the DSV "core asset" called out in
+// the brief. Used by the merchant dashboard to show "you're quiet right now,
+// good moment for a flash" and by the why-screen on the customer side.
+merchant.get('/:id/payone', async (c) => {
+  const id = c.req.param('id');
+  const { data: m } = await supabase
+    .from('merchants').select('id, type').eq('id', id).single();
+  if (!m) return c.json({ error: 'merchant not found' }, 404);
+  return c.json(getMerchantPayoneSignal(m.id, m.type));
+});
+
 // Flash-sale: merchant-managed boost on specific menu_items.
 // Read by /api/offer/generate so the LLM prioritizes the flagged items.
 merchant.get('/:id/flash', async (c) => {
@@ -284,6 +344,46 @@ merchant.get('s/nearby', async (c) => {
 
   if (error) return c.json({ error: error.message }, 500);
   return c.json(data ?? []);
+});
+
+// Combos: bundle 2-4 menu items at a fixed price below the sum of their
+// individual prices. The offer engine reads active combos and the LLM is
+// told to prefer pitching one when it fits the customer context.
+merchant.get('/:id/combos', async (c) => {
+  const id = c.req.param('id');
+  const combos = listCombos(id);
+
+  // Enrich each combo with the actual menu item rows so the client can show
+  // names + prices without a second roundtrip.
+  if (combos.length === 0) return c.json({ combos: [] });
+  const allIds = [...new Set(combos.flatMap(co => co.menu_item_ids))];
+  const { data: items } = await supabase
+    .from('menu_items')
+    .select('id, name, price_cents, category')
+    .in('id', allIds);
+  const itemMap = new Map((items ?? []).map(i => [i.id, i]));
+
+  const enriched = combos.map(co => {
+    const resolved = co.menu_item_ids.map(iid => itemMap.get(iid)).filter(Boolean) as any[];
+    const baseSum = resolved.reduce((s, it) => s + (it.price_cents ?? 0), 0);
+    const savings = Math.max(0, baseSum - co.combo_price_cents);
+    return { ...co, items: resolved, base_total_cents: baseSum, savings_cents: savings };
+  });
+  return c.json({ combos: enriched });
+});
+
+merchant.post('/:id/combos', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json() as { name: string; menu_item_ids: string[]; combo_price_cents: number };
+  const combo = addCombo(id, body);
+  if (!combo) return c.json({ error: 'Need at least 2 items + valid price' }, 400);
+  return c.json(combo, 201);
+});
+
+merchant.delete('/:id/combos/:comboId', async (c) => {
+  const ok = deleteCombo(c.req.param('id'), c.req.param('comboId'));
+  if (!ok) return c.json({ error: 'Not found' }, 404);
+  return c.json({ ok: true });
 });
 
 export default merchant;

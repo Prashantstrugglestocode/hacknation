@@ -5,7 +5,9 @@
     { "id": "LATE_AFTERNOON_BROWSE",  "when": { "hour_in": [15,16,17], "movement": "browsing" } },
     { "id": "CLOSING_SOON_INVENTORY", "when": { "minutes_to_close_max": 30, "has_inventory_tags": true } },
     { "id": "BAD_WEATHER_INDOOR",     "when": { "condition_in": ["rain","snow"], "merchant_types": ["café","restaurant","bar","bookstore"] } },
-    { "id": "LUNCHTIME_QUIET",        "when": { "hour_in": [11,12,13], "merchant_types": ["café","restaurant"], "merchant_quiet": true } }
+    { "id": "LUNCHTIME_QUIET",        "when": { "hour_in": [11,12,13], "merchant_types": ["café","restaurant"], "merchant_quiet": true } },
+    { "id": "HIGH_FOOT_TRAFFIC",      "when": { "foot_traffic": "high" } },
+    { "id": "BROWSE_DISTRICT",        "when": { "foot_traffic": "high", "movement": "browsing" } }
   ],
   "scoring": {
     "distance_weight": 0.5,

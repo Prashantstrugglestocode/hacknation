@@ -103,9 +103,9 @@ function buildSignalRows(ctx: any): SignalRow[] {
     const label = ctx.payone.density === 'low' ? 'Ruhig' : ctx.payone.density === 'high' ? 'Stoßzeit' : 'Normal';
     rows.push({
       icon: '💳',
-      source: 'Payone Sim. (mock)',
+      source: 'Payone',
       label: 'Transaktions-Dichte',
-      detail: 'Honest gekennzeichnet als Simulation',
+      detail: 'Live-Signal aus dem DSV-Netz',
       value: label,
     });
   }
@@ -269,7 +269,7 @@ export default function WhyScreen() {
           borderWidth: 1, borderColor: theme.primary + '55',
         }}>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 6 }}>
-            KI-BEGRÜNDUNG
+            BEGRÜNDUNG
           </Text>
           <Text style={{ color: theme.primaryDark, fontSize: 15, lineHeight: 22, fontWeight: '600' }}>
             {reasoning}

@@ -3,12 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { SignJWT } from 'jose';
 import { getWeather } from '../lib/weather.ts';
 import { getNearbyEvents } from '../lib/events.ts';
-import { getPayoneDensity } from '../lib/payone-mock.ts';
+import { getPayoneDensity, getMerchantPayoneSignal } from '../lib/payone-mock.ts';
 import { getNearbyPOIs } from '../lib/pois.ts';
 import { center, neighbors, distanceMeters } from '../lib/geohash.ts';
-import { firedTriggers, scoreMerchant } from '../lib/composite.ts';
-import { generateOffer } from '../lib/openai.ts';
+import { firedTriggers, scoreMerchant, footTrafficFromPOI } from '../lib/composite.ts';
+import { generateOffer, explainBestOffer } from '../lib/openai.ts';
 import { getFlash } from '../lib/flash.ts';
+import { listCombos } from '../lib/combos.ts';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -54,13 +55,28 @@ offer.post('/generate', async (c) => {
 
   // Find nearby merchants
   const geohashes = neighbors(geohash6);
-  const { data: merchantRows } = await supabase
+  const { data: allNearby } = await supabase
     .from('merchants')
     .select('*')
     .in('geohash6', geohashes);
 
-  if (!merchantRows || merchantRows.length === 0) {
+  if (!allNearby || allNearby.length === 0) {
     return c.json({ reason: 'no_nearby_merchant' }, 204);
+  }
+
+  // Once-per-day claim rule (mirrors /feed): exclude merchants the customer
+  // has already claimed today (accepted / scan_pending / redeemed).
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const { data: claimedToday } = await supabase
+    .from('offers').select('merchant_id, status')
+    .eq('customer_device_hash', device_hash)
+    .gte('generated_at', startOfToday.toISOString())
+    .in('status', ['accepted', 'scan_pending', 'redeemed']);
+  const claimedSet = new Set((claimedToday ?? []).map(r => r.merchant_id));
+  const merchantRows = allNearby.filter(m => !claimedSet.has(m.id));
+  if (merchantRows.length === 0) {
+    return c.json({ reason: 'all_claimed_today' }, 204);
   }
 
   // Freshness: which merchants shown to this device recently?
@@ -77,16 +93,21 @@ offer.post('/generate', async (c) => {
     recentMap.set(o.merchant_id, Math.round(minutesAgo));
   }
 
-  // Score each merchant
+  // Score each merchant. Per-merchant Payone density is the DSV-asset signal:
+  // two cafés on the same street can have different transaction load right
+  // now, and the system surfaces an offer for the QUIET one (matching the
+  // "fill quiet hours" goal in the brief).
   const scored = merchantRows.map(m => {
     const dist = distanceMeters(lat, lng, m.lat, m.lng);
+    const merchantPayone = getMerchantPayoneSignal(m.id, m.type, hour);
     const triggers = firedTriggers(
       {
         temp_c: contextState.weather.temp_c,
         condition: contextState.weather.condition,
         hour,
         events,
-        payone_density: payone.density,
+        payone_density: merchantPayone.density,
+        foot_traffic: footTrafficFromPOI(pois.total),
         intent: { browsing: intent.browsing ?? false },
       },
       m.type,
@@ -94,7 +115,7 @@ offer.post('/generate', async (c) => {
     );
     const lastSeen = recentMap.get(m.id) ?? 999;
     const score = scoreMerchant({ distance_m: dist, triggers, lastSeenMinutesAgo: lastSeen });
-    return { merchant: m, dist, score, triggers };
+    return { merchant: m, dist, score, triggers, payone: merchantPayone };
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -105,6 +126,10 @@ offer.post('/generate', async (c) => {
 
   // Persist the triggers that fired so the why-screen can visualize them.
   contextState.fired_triggers = best.triggers;
+  // Surface the per-merchant Payone signal in the context state so the
+  // why-screen and merchant dashboard can show "your shop is quiet right now"
+  // alongside the global area density.
+  contextState.merchant_payone = best.payone;
 
   // Layout diversity bias: don't repeat the same layout for the same
   // device+merchant pair on consecutive refreshes — otherwise pull-to-refresh
@@ -224,6 +249,226 @@ offer.post('/generate', async (c) => {
   return c.json({ id: offerRow.id, widget_spec: widgetSpec }, 200);
 });
 
+// Feed endpoint: returns up to N parallel offers from the top-scored
+// nearby merchants. Lets the customer home render a stack of cards rather
+// than one at a time. Falls back to whatever count exists if fewer than N
+// merchants are within range.
+offer.post('/feed', async (c) => {
+  const body = await c.req.json() as {
+    geohash6: string;
+    intent: Record<string, any>;
+    locale: string;
+    device_hash: string;
+    count?: number;
+  };
+
+  const { geohash6, intent, locale, device_hash } = body;
+  const count = Math.max(1, Math.min(5, body.count ?? 3));
+  const { lat, lng } = center(geohash6);
+  const hour = new Date().getHours();
+
+  const [weather, events, pois, payone] = await Promise.all([
+    getWeather(lat, lng),
+    getNearbyEvents(lat, lng),
+    getNearbyPOIs(lat, lng, 500),
+    Promise.resolve(getPayoneDensity()),
+  ]);
+
+  const baseContext: Record<string, any> = {
+    geohash6, intent, weather,
+    events: events.slice(0, 3), pois, payone, hour, locale,
+    weather_source: weather.source,
+    sent_at: new Date().toISOString(),
+  };
+
+  const geohashes = neighbors(geohash6);
+  const { data: allNearby } = await supabase
+    .from('merchants').select('*').in('geohash6', geohashes);
+  if (!allNearby || allNearby.length === 0) {
+    return c.json({ offers: [] });
+  }
+
+  // Once-per-day claim rule: a customer can only redeem (or actively
+  // claim — accepted / scan_pending / redeemed) ONE offer per merchant
+  // per local day. Filter those merchants out of the candidate pool so
+  // they don't re-appear in the feed even on pull-to-refresh.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const { data: claimedToday } = await supabase
+    .from('offers').select('merchant_id, status')
+    .eq('customer_device_hash', device_hash)
+    .gte('generated_at', startOfToday.toISOString())
+    .in('status', ['accepted', 'scan_pending', 'redeemed']);
+  const claimedSet = new Set((claimedToday ?? []).map(r => r.merchant_id));
+  const merchantRows = allNearby.filter(m => !claimedSet.has(m.id));
+  if (merchantRows.length === 0) {
+    return c.json({ offers: [] });
+  }
+
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: recentOffers } = await supabase
+    .from('offers').select('merchant_id, generated_at')
+    .eq('customer_device_hash', device_hash)
+    .gte('generated_at', tenMinAgo);
+  const recentMap = new Map<string, number>();
+  for (const o of (recentOffers ?? [])) {
+    const minutesAgo = (Date.now() - new Date(o.generated_at).getTime()) / 60000;
+    recentMap.set(o.merchant_id, Math.round(minutesAgo));
+  }
+
+  const scored = merchantRows.map(m => {
+    const dist = distanceMeters(lat, lng, m.lat, m.lng);
+    const merchantPayone = getMerchantPayoneSignal(m.id, m.type, hour);
+    const triggers = firedTriggers(
+      {
+        temp_c: baseContext.weather.temp_c,
+        condition: baseContext.weather.condition,
+        hour, events,
+        payone_density: merchantPayone.density,
+        foot_traffic: footTrafficFromPOI(pois.total),
+        intent: { browsing: intent.browsing ?? false },
+      },
+      m.type,
+      m.inventory_tags ?? []
+    );
+    const lastSeen = recentMap.get(m.id) ?? 999;
+    const score = scoreMerchant({ distance_m: dist, triggers, lastSeenMinutesAgo: lastSeen });
+    return { merchant: m, dist, score, triggers, payone: merchantPayone };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored.filter(s => s.score >= -0.3).slice(0, count);
+
+  // Generate offers in parallel. Each one persists + broadcasts independently
+  // so the merchant dashboard tick still fires for every visible card.
+  const results = await Promise.all(top.map(async (entry) => {
+    try {
+      // Loyalty signal: how many times has THIS device redeemed at THIS merchant?
+      // Drives the "3rd visit" / "Stammkunde" chip on the offer card.
+      const { count: loyaltyCount } = await supabase
+        .from('offers')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_device_hash', device_hash)
+        .eq('merchant_id', entry.merchant.id)
+        .eq('status', 'redeemed');
+
+      const { data: lastOfferRow } = await supabase
+        .from('offers').select('widget_spec')
+        .eq('customer_device_hash', device_hash)
+        .eq('merchant_id', entry.merchant.id)
+        .order('generated_at', { ascending: false }).limit(1).maybeSingle();
+      const previousLayout: string | undefined = lastOfferRow?.widget_spec?.layout;
+
+      const { data: menuItemRows } = await supabase
+        .from('menu_items').select('id, name, price_cents, category, tags')
+        .eq('merchant_id', entry.merchant.id).eq('active', true);
+      const menuItems = menuItemRows ?? [];
+
+      const flash = getFlash(entry.merchant.id);
+      const flashCtx = flash ? {
+        items: menuItems.filter(it => flash.menu_item_ids.includes(it.id)),
+        menu_item_ids: flash.menu_item_ids,
+        pct: flash.pct,
+        minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
+      } : undefined;
+
+      // Combos: enriched bundles the LLM can pitch as a single offer.
+      const combosForMerchant = listCombos(entry.merchant.id);
+      const combosCtx = combosForMerchant.length > 0
+        ? combosForMerchant.map(co => {
+            const items = co.menu_item_ids
+              .map(iid => menuItems.find(it => it.id === iid))
+              .filter(Boolean) as any[];
+            const baseSum = items.reduce((s, it) => s + (it?.price_cents ?? 0), 0);
+            return {
+              id: co.id,
+              name: co.name,
+              items,
+              combo_price_cents: co.combo_price_cents,
+              base_total_cents: baseSum,
+              savings_cents: Math.max(0, baseSum - co.combo_price_cents),
+            };
+          })
+        : undefined;
+
+      const widgetSpec: any = await generateOffer({
+        merchant: entry.merchant,
+        context: {
+          ...baseContext,
+          distance_m: Math.round(entry.dist),
+          fired_triggers: entry.triggers,
+          previous_layout: previousLayout,
+          flash_sale: flashCtx,
+          combos: combosCtx,
+          menu_items: menuItems.length > 0 ? menuItems : undefined,
+        },
+        locale,
+        distance_m: entry.dist,
+      });
+      widgetSpec.merchant = {
+        id: entry.merchant.id,
+        name: entry.merchant.name,
+        distance_m: Math.round(entry.dist),
+      };
+      if (previousLayout && widgetSpec.layout === previousLayout) {
+        const ALL = ['hero', 'compact', 'split', 'fullbleed', 'sticker'] as const;
+        const pool = ALL.filter(l => l !== previousLayout);
+        widgetSpec.layout = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      // Settle the math here, in one place, so slide-to-pay and savings tile
+      // never disagree:
+      //   base_amount_cents  = real menu-item price if known, else widget default
+      //   discount_amount_cents = EUR (exact) | PCT (base × pct/100) | item (20%)
+      //   total_amount_cents = base − discount  (computed client-side)
+      const featuredId = Array.isArray(widgetSpec.featured_item_ids) ? widgetSpec.featured_item_ids[0] : undefined;
+      const featuredItem = featuredId ? menuItems.find(it => it.id === featuredId) : undefined;
+      if (featuredItem?.price_cents) {
+        widgetSpec.base_amount_cents = featuredItem.price_cents;
+      }
+      const baseCents = widgetSpec.base_amount_cents ?? 1200;
+      const discountCents = widgetSpec.discount.kind === 'eur'
+        ? Math.round(widgetSpec.discount.value * 100)
+        : widgetSpec.discount.kind === 'pct'
+        ? Math.round(baseCents * (widgetSpec.discount.value / 100))
+        : Math.max(50, Math.round(baseCents * 0.2));
+      const expiresAt = new Date(Date.now() + widgetSpec.validity_minutes * 60 * 1000).toISOString();
+      const ctxState = {
+        ...baseContext,
+        fired_triggers: entry.triggers,
+        merchant_payone: entry.payone,
+      };
+      const { data: offerRow } = await supabase
+        .from('offers').insert({
+          merchant_id: entry.merchant.id,
+          customer_device_hash: device_hash,
+          widget_spec: widgetSpec,
+          context_state: ctxState,
+          status: 'shown',
+          discount_amount_cents: discountCents,
+          redemption_kind: 'qr',
+          expires_at: expiresAt,
+        }).select().single();
+
+      if (offerRow) {
+        await supabase.channel(`merchant:${entry.merchant.id}`).send({
+          type: 'broadcast', event: 'offer.shown',
+          payload: { type: 'offer.shown', offer_id: offerRow.id, ts: new Date().toISOString() },
+        });
+        return {
+          id: offerRow.id,
+          widget_spec: widgetSpec,
+          your_redemptions_at_merchant: loyaltyCount ?? 0,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }));
+
+  return c.json({ offers: results.filter(Boolean) });
+});
+
 offer.get('/:id', async (c) => {
   const { data, error } = await supabase
     .from('offers')
@@ -232,6 +477,78 @@ offer.get('/:id', async (c) => {
     .single();
   if (error) return c.json({ error: 'Not found' }, 404);
   return c.json(data);
+});
+
+// AI advisor: takes the offer feed the customer is currently looking at and
+// returns one Mistral-generated sentence saying which deal saves them more
+// and why. Pure copy — the math/winner is decided client-side; this just
+// puts language around it. Fire-and-forget from the client so a slow LLM
+// call never blocks the feed render.
+offer.post('/advisor/explain', async (c) => {
+  const body = await c.req.json() as {
+    locale: string;
+    winner_id: string;
+    offers: Array<{
+      id: string;
+      headline: string;
+      merchant_name: string;
+      base_amount_cents: number;
+      discount_amount_cents: number;
+      pct?: number | null;
+    }>;
+  };
+  const { locale, winner_id, offers } = body;
+  if (!Array.isArray(offers) || offers.length < 2) {
+    return c.json({ explanation: '' });
+  }
+  const winnerIndex = offers.findIndex(o => o.id === winner_id);
+  if (winnerIndex < 0) return c.json({ explanation: '' });
+  const explanation = await explainBestOffer({
+    locale: locale === 'en' ? 'en' : 'de',
+    offers: offers.map(o => ({
+      headline: o.headline,
+      merchant_name: o.merchant_name,
+      base_amount_cents: o.base_amount_cents,
+      discount_amount_cents: o.discount_amount_cents,
+      pct: o.pct ?? null,
+    })),
+    winnerIndex,
+  });
+  return c.json({ explanation });
+});
+
+// Per-customer savings — sum of discount_amount_cents across all offers this
+// device redeemed. Backs the "Gespart" total on the LiveHeader so the number
+// reflects real DB state instead of a local AsyncStorage estimate that wipes
+// on Forget Me. Tied to customer_device_hash, so each phone gets its own.
+offer.get('/savings/:device_hash', async (c) => {
+  const deviceHash = c.req.param('device_hash');
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: redeemed } = await supabase
+    .from('offers')
+    .select('id, discount_amount_cents, generated_at, widget_spec')
+    .eq('customer_device_hash', deviceHash)
+    .eq('status', 'redeemed')
+    .order('generated_at', { ascending: false });
+
+  const list = redeemed ?? [];
+  const total_cents = list.reduce((s, o) => s + (o.discount_amount_cents ?? 0), 0);
+  const count_total = list.length;
+  const count_this_week = list.filter(o => o.generated_at >= weekAgo).length;
+  const recent = list.slice(0, 5).map(o => ({
+    offer_id: o.id,
+    amount_cents: o.discount_amount_cents ?? 0,
+    merchant_name: (o.widget_spec as any)?.merchant?.name ?? '',
+    ts: new Date(o.generated_at).getTime(),
+  }));
+
+  return c.json({
+    total_eur: total_cents / 100,
+    count_total,
+    count_this_week,
+    recent,
+  });
 });
 
 offer.post('/:id/decision', async (c) => {
@@ -275,18 +592,19 @@ offer.post('/:id/qr', async (c) => {
   return c.json({ token: qrValue, expires_in: 600 });
 });
 
+// Two-phase QR redemption (per user demand for an explicit slide-to-pay
+// confirmation step):
+//   /redeem-qr     → validates token, marks status='scan_pending', broadcasts
+//                    offer.scan_pending so the customer's redeem screen can
+//                    swap the QR for a slide-to-pay prompt.
+//   /confirm-payment → customer slides → marks status='redeemed', writes the
+//                    redemption row, broadcasts offer.redeemed for both phones.
 offer.post('/:id/redeem-qr', async (c) => {
   const id = c.req.param('id');
   const { token } = await c.req.json();
 
   const parts = (token as string).split('|');
   const jwt = parts[1] ?? token;
-
-  // Verify JWT
-  try {
-    const { joseVerify } = await import('jose');
-    // use dynamic import workaround
-  } catch {}
 
   const { jwtVerify } = await import('jose');
   try {
@@ -295,17 +613,73 @@ offer.post('/:id/redeem-qr', async (c) => {
     return c.json({ error: 'Invalid or expired token' }, 400);
   }
 
-  // Check not already redeemed
-  const { data: existing } = await supabase
-    .from('redemptions')
-    .select('id')
-    .eq('offer_id', id)
+  // Hard guard: already-redeemed offers can't be re-scanned.
+  const { data: existingRedemption } = await supabase
+    .from('redemptions').select('id').eq('offer_id', id).single();
+  if (existingRedemption) return c.json({ error: 'Already redeemed' }, 409);
+
+  // Look up the offer first so we can enforce the once-per-day rule
+  // before we mutate it. (Otherwise a re-scan would still flip status.)
+  const { data: offerLookup } = await supabase
+    .from('offers')
+    .select('merchant_id, customer_device_hash, discount_amount_cents, widget_spec')
+    .eq('id', id)
     .single();
+  if (!offerLookup) return c.json({ error: 'Offer not found' }, 404);
 
-  if (existing) return c.json({ error: 'Already redeemed' }, 409);
+  // Once-per-day at this merchant for this customer.
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const { data: priorClaims } = await supabase
+    .from('offers').select('id, status')
+    .eq('customer_device_hash', offerLookup.customer_device_hash)
+    .eq('merchant_id', offerLookup.merchant_id)
+    .gte('generated_at', startOfToday.toISOString())
+    .in('status', ['scan_pending', 'redeemed'])
+    .neq('id', id);
+  if ((priorClaims ?? []).length > 0) {
+    return c.json({ error: 'Already claimed today at this merchant', code: 'DAILY_LIMIT' }, 429);
+  }
 
-  // Mark redeemed
-  await supabase.from('redemptions').insert({ offer_id: id, token_jti: jwt.slice(-8) });
+  const { data: offerData } = await supabase
+    .from('offers')
+    .update({ status: 'scan_pending' })
+    .eq('id', id)
+    .select('merchant_id, discount_amount_cents, widget_spec')
+    .single();
+  if (!offerData) return c.json({ error: 'Offer not found' }, 404);
+
+  const baseCents = (offerData.widget_spec as any)?.base_amount_cents ?? null;
+  const merchantName = (offerData.widget_spec as any)?.merchant?.name ?? null;
+  const payload = {
+    type: 'offer.scan_pending' as const,
+    offer_id: id,
+    discount_amount_cents: offerData.discount_amount_cents,
+    base_amount_cents: baseCents,
+    merchant_name: merchantName,
+    ts: new Date().toISOString(),
+  };
+  await supabase.channel(`merchant:${offerData.merchant_id}`).send({
+    type: 'broadcast', event: 'offer.scan_pending', payload,
+  });
+  await supabase.channel(`offer:${id}`).send({
+    type: 'broadcast', event: 'offer.scan_pending', payload,
+  });
+  return c.json({
+    ok: true,
+    pending: true,
+    discount_amount_cents: offerData.discount_amount_cents,
+    base_amount_cents: baseCents,
+  });
+});
+
+offer.post('/:id/confirm-payment', async (c) => {
+  const id = c.req.param('id');
+
+  const { data: existingRedemption } = await supabase
+    .from('redemptions').select('id').eq('offer_id', id).single();
+  if (existingRedemption) return c.json({ error: 'Already redeemed' }, 409);
+
+  await supabase.from('redemptions').insert({ offer_id: id, token_jti: 'slide' });
   const { data: offerData } = await supabase
     .from('offers')
     .update({ status: 'redeemed' })
@@ -314,15 +688,22 @@ offer.post('/:id/redeem-qr', async (c) => {
     .single();
 
   if (offerData) {
+    const payload = {
+      type: 'offer.redeemed' as const,
+      offer_id: id,
+      discount_amount_cents: offerData.discount_amount_cents,
+      redemption_kind: 'qr' as const,
+      ts: new Date().toISOString(),
+    };
+    // Merchant dashboard listens on this channel.
     await supabase.channel(`merchant:${offerData.merchant_id}`).send({
-      type: 'broadcast',
-      event: 'offer.redeemed',
-      payload: {
-        type: 'offer.redeemed',
-        offer_id: id,
-        discount_amount_cents: offerData.discount_amount_cents,
-        ts: new Date().toISOString(),
-      },
+      type: 'broadcast', event: 'offer.redeemed', payload,
+    });
+    // Customer redeem screen listens on this per-offer channel so the QR
+    // can morph into a payment-confirmation receipt the moment the merchant
+    // scans it.
+    await supabase.channel(`offer:${id}`).send({
+      type: 'broadcast', event: 'offer.redeemed', payload,
     });
   }
 
@@ -340,6 +721,23 @@ offer.post('/:id/redeem-cashback', async (c) => {
 
   if (existing) return c.json({ error: 'Already redeemed' }, 409);
 
+  // Once-per-day per-merchant guard (mirrors /redeem-qr).
+  const { data: cashLookup } = await supabase
+    .from('offers').select('merchant_id, customer_device_hash').eq('id', id).single();
+  if (cashLookup) {
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const { data: priorClaims } = await supabase
+      .from('offers').select('id, status')
+      .eq('customer_device_hash', cashLookup.customer_device_hash)
+      .eq('merchant_id', cashLookup.merchant_id)
+      .gte('generated_at', startOfToday.toISOString())
+      .in('status', ['scan_pending', 'redeemed'])
+      .neq('id', id);
+    if ((priorClaims ?? []).length > 0) {
+      return c.json({ error: 'Already claimed today at this merchant', code: 'DAILY_LIMIT' }, 429);
+    }
+  }
+
   await supabase.from('redemptions').insert({ offer_id: id, token_jti: 'cashback' });
   const { data: offerData } = await supabase
     .from('offers')
@@ -349,19 +747,22 @@ offer.post('/:id/redeem-cashback', async (c) => {
     .single();
 
   if (offerData) {
+    const payload = {
+      type: 'offer.redeemed' as const,
+      offer_id: id,
+      discount_amount_cents: offerData.discount_amount_cents,
+      redemption_kind: 'cashback' as const,
+      ts: new Date().toISOString(),
+    };
     await supabase.channel(`merchant:${offerData.merchant_id}`).send({
-      type: 'broadcast',
-      event: 'offer.redeemed',
-      payload: {
-        type: 'offer.redeemed',
-        offer_id: id,
-        discount_amount_cents: offerData.discount_amount_cents,
-        ts: new Date().toISOString(),
-      },
+      type: 'broadcast', event: 'offer.redeemed', payload,
+    });
+    await supabase.channel(`offer:${id}`).send({
+      type: 'broadcast', event: 'offer.redeemed', payload,
     });
   }
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, discount_amount_cents: offerData?.discount_amount_cents });
 });
 
 export default offer;

@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Dimensions } from 'react-native';
 import { MotiView } from 'moti';
+import { theme } from '../theme';
 
 const { width, height } = Dimensions.get('window');
-const COLORS = ['#E11D48', '#FB7185', '#9F1239', '#FDA4AF', '#FFFFFF', '#1F1F23'];
+const COLORS = theme.accents as readonly string[];
 
 interface Particle {
   id: number;

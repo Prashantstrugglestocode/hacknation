@@ -35,6 +35,10 @@ export const WidgetSpec = z.object({
   locale: z.enum(['de', 'en']),
   hero_image_url: z.string().url().optional().nullable(),
   featured_item_ids: z.array(z.string()).optional(),
+  // Server-side baseline of what the customer is "spending" on this offer.
+  // Powers the slide-to-pay amount and the savings math. Falls back to a
+  // merchant-type-aware default in fillDefaults() when no featured item.
+  base_amount_cents: z.number().int().positive().optional(),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;

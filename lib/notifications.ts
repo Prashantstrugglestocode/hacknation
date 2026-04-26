@@ -52,3 +52,36 @@ export async function showOfferNotification(headline: string, merchantName: stri
     trigger: null, // trigger immediately
   });
 }
+
+// Fired the moment the merchant scans the customer's QR. Default OS sound
+// (iOS tri-tone) draws attention to the slide-to-pay confirmation prompt.
+export async function notifyScanPending(merchantName: string | null) {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '💳 Zahlung bestätigen',
+      body: merchantName
+        ? `${merchantName} hat dich gescannt. Schiebe zum Bezahlen.`
+        : 'Schiebe zum Bezahlen, um die Zahlung freizugeben.',
+      sound: 'default',
+    },
+    trigger: null,
+  }).catch(() => {});
+}
+
+// Fired once the redemption commits (slide-to-pay or cashback). Same default
+// system sound — short positive ping.
+export async function notifyRedeemed(merchantName: string | null, cents: number | null) {
+  const eur = cents != null && cents > 0
+    ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+    : null;
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '✅ Eingelöst',
+      body: merchantName && eur ? `${merchantName} · gespart: ${eur}`
+        : merchantName ? `Bei ${merchantName} eingelöst`
+        : 'Angebot eingelöst',
+      sound: 'default',
+    },
+    trigger: null,
+  }).catch(() => {});
+}

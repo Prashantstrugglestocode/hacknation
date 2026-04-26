@@ -37,6 +37,9 @@ export const WidgetSpec = z.object({
   // Menu item UUIDs the offer copy references — used to write offer_item_links
   // so insights can attribute performance back to specific items.
   featured_item_ids: z.array(z.string().uuid()).optional().default([]),
+  // Server-set baseline of what the customer pays for this offer (before
+  // discount). Drives the slide-to-pay amount and the savings math.
+  base_amount_cents: z.number().int().positive().optional(),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;

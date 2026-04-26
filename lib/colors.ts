@@ -39,8 +39,10 @@ export function withAlpha(c: any, alpha01: number, fallback: string = SAFE_DEFAU
 
 // Normalize a palette object in one shot.
 export interface SafePalette { bg: string; fg: string; accent: string }
+// Default palette is the Sparkassen brand (mirrors `lib/theme.ts`).
+// Keep this in sync with the server-side `fillDefaults` in `server/lib/openai.ts`.
 export function safePalette(p: any, fallback: SafePalette = {
-  bg: '#1A1A2E', fg: '#FFFFFF', accent: '#E11D48',
+  bg: '#E60000', fg: '#FFFFFF', accent: '#FFE5E5',
 }): SafePalette {
   return {
     bg: safeHex(p?.bg, fallback.bg),

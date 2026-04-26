@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, TouchableOpacity, Alert
+  View, Text, TextInput, ScrollView, TouchableOpacity, Alert,
+  KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
@@ -82,7 +83,9 @@ export default function MerchantSetup() {
         goal,
         max_discount_pct: maxDiscount,
         time_windows: encodedWindows,
-        inventory_tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        // inventory_tags removed from setup — merchants add real menu items
+        // via the dashboard "Speisekarte verwalten" flow instead.
+        inventory_tags: [],
         locale: getLocale(),
       };
 
@@ -118,7 +121,18 @@ export default function MerchantSetup() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 20, gap: 22, paddingBottom: 40 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      contentContainerStyle={{ padding: 20, gap: 22, paddingBottom: 200 }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <TouchableOpacity onPress={() => router.replace('/role')} hitSlop={10} style={{ alignSelf: 'flex-start' }}>
         <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
       </TouchableOpacity>
@@ -285,16 +299,9 @@ export default function MerchantSetup() {
         )}
       </View>
 
-      <View style={{ gap: 8 }}>
-        <Text style={labelStyle}>{i18n.t('merchant.inventory_tags').toUpperCase()}</Text>
-        <TextInput
-          value={tags}
-          onChangeText={setTags}
-          placeholder="coffee, sandwich, cake"
-          placeholderTextColor={theme.textMuted}
-          style={{ ...inputStyle, fontSize: 15 }}
-        />
-      </View>
+      {/* "Produkte (kommagetrennt)" field removed — merchants add real menu
+          items via dashboard "Speisekarte verwalten" instead. The LLM uses
+          those for grounded headlines. */}
 
       <TouchableOpacity
         onPress={handleSubmit}
@@ -306,9 +313,11 @@ export default function MerchantSetup() {
         }}
       >
         <Text style={{ color: theme.textOnPrimary, fontSize: 17, fontWeight: '800', letterSpacing: 0.3 }}>
-          {submitting ? 'Wird gespeichert…' : i18n.t('merchant.submit')}
+          {submitting ? 'Wird gespeichert...' : i18n.t('merchant.submit')}
         </Text>
       </TouchableOpacity>
     </ScrollView>
+    </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }

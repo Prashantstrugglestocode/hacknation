@@ -20,24 +20,60 @@ import { speak } from '../../lib/tts';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
+import { subscribeOfferChannel } from '../../lib/supabase/realtime';
 import RoleSwitch from '../../lib/components/RoleSwitch';
 import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
 import LlmStatusPill from '../../lib/components/LlmStatusPill';
 import FreshnessChip from '../../lib/components/FreshnessChip';
 import Confetti from '../../lib/components/Confetti';
-import { theme, space } from '../../lib/theme';
-import i18n from '../../lib/i18n';
+import { theme, space, radius, type } from '../../lib/theme';
+import i18n, { useLocaleVersion } from '../../lib/i18n';
 
 const { height } = Dimensions.get('window');
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
+interface OfferEntry {
+  id: string;
+  widget_spec: WidgetSpecType & { base_amount_cents?: number };
+  // Server-side loyalty count: how many times this device redeemed at this
+  // merchant. Drives the "Stammkunde / Nth visit" chip on the offer card.
+  your_redemptions_at_merchant?: number;
+  // Server-computed savings amount in cents (from offers.discount_amount_cents).
+  discount_amount_cents?: number | null;
+}
+interface AdvisorState { winnerId: string | null; explanation: string }
+
+// Pure math: how many cents this offer saves the customer if they redeem it.
+// Falls back to discount.value × widget base when the server hasn't set a
+// concrete cents amount yet.
+function offerSavingsCents(o: OfferEntry): number {
+  const direct = o.discount_amount_cents;
+  if (typeof direct === 'number' && direct > 0) return direct;
+  const spec = o.widget_spec;
+  const base = spec.base_amount_cents ?? 1200;
+  if (spec.discount.kind === 'eur') return Math.round(spec.discount.value * 100);
+  if (spec.discount.kind === 'pct') return Math.round(base * (spec.discount.value / 100));
+  return Math.round(base * 0.2);
+}
+
+// Sort the feed by absolute savings desc, return the winner + the rest.
+// Used to promote the mathematically best deal to the primary card slot
+// without LLM round-tripping (deterministic, fast, demoable).
+function pickBestDeal(offers: OfferEntry[]): { winner: OfferEntry; rest: OfferEntry[]; gapCents: number } {
+  const ranked = [...offers].sort((a, b) => offerSavingsCents(b) - offerSavingsCents(a));
+  const winner = ranked[0];
+  const rest = ranked.slice(1);
+  const runnerUp = rest[0];
+  const gapCents = runnerUp ? Math.max(0, offerSavingsCents(winner) - offerSavingsCents(runnerUp)) : 0;
+  return { winner, rest, gapCents };
+}
 type State =
   | { status: 'idle' }
   | { status: 'location_denied' }
   | { status: 'loading' }
   | { status: 'no_merchant'; lastLat: number; lastLng: number }
-  | { status: 'offer'; offer: { id: string; widget_spec: WidgetSpecType }; payload: object; generatedAt: number }
+  | { status: 'offer'; offer: OfferEntry; extras: OfferEntry[]; payload: object; generatedAt: number }
   | { status: 'declined' }
   | { status: 'expired' }
   | { status: 'error'; message: string };
@@ -45,6 +81,7 @@ type State =
 const EMPTY_STATS: SavingsStats = { total_eur: 0, count_total: 0, count_this_week: 0, recent: [] };
 
 export default function CustomerHome() {
+  useLocaleVersion(); // re-render on language change
   const [state, setState] = useState<State>({ status: 'idle' });
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<SavingsStats>(EMPTY_STATS);
@@ -52,11 +89,31 @@ export default function CustomerHome() {
   const [seeding, setSeeding] = useState(false);
   const [milestone, setMilestone] = useState<number | null>(null);
   const [morph, setMorph] = useState<{ bg: string; fg: string; accent: string } | null>(null);
+  const [advisor, setAdvisor] = useState<AdvisorState>({ winnerId: null, explanation: '' });
   // Capture the navigation that the morph timer or the milestone-modal
   // close handler should perform — whichever fires first claims it.
   const pendingNav = useRef<{ id: string; palette: { bg: string; fg: string; accent: string } } | null>(null);
 
+  // Server-driven savings — sums discount_amount_cents from offers where
+  // status='redeemed' for this device. Falls back to local AsyncStorage if
+  // the server is unreachable. The server number is the source of truth and
+  // refreshes on the offer.redeemed realtime event below.
   const refreshStats = useCallback(async () => {
+    try {
+      const deviceHash = await getDeviceHash();
+      const r = await fetch(`${API}/api/offer/savings/${deviceHash}`);
+      if (r.ok) {
+        const server = await r.json();
+        setStats({
+          total_eur: server.total_eur ?? 0,
+          count_total: server.count_total ?? 0,
+          count_this_week: server.count_this_week ?? 0,
+          recent: server.recent ?? [],
+        });
+        return;
+      }
+    } catch {}
+    // Fallback: local AsyncStorage (used when offline / before first redeem).
     setStats(await getStats());
   }, []);
 
@@ -87,17 +144,54 @@ export default function CustomerHome() {
         movement,
       });
 
-      const res = await fetch(`${API}/api/offer/generate`, {
+      // Fetch up to 3 offers from top-scored nearby merchants — judges get
+      // a richer view than a single card, and the rotation/freshness logic
+      // applies to whichever the user accepts first.
+      const res = await fetch(`${API}/api/offer/feed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, count: 3 }),
       });
 
-      if (res.status === 204) { setState({ status: 'no_merchant', lastLat: lat, lastLng: lng }); return; }
       if (!res.ok) { setState({ status: 'error', message: i18n.t('errors.generation_failed') }); return; }
-
       const data = await res.json();
-      setState({ status: 'offer', offer: data, payload, generatedAt: Date.now() });
+      const offers: OfferEntry[] = Array.isArray(data?.offers) ? data.offers : [];
+      if (offers.length === 0) { setState({ status: 'no_merchant', lastLat: lat, lastLng: lng }); return; }
+      // Promote the mathematically best-saving offer to the primary slot —
+      // the customer-side AI advisor: no LLM call, just deterministic math
+      // against discount_amount_cents (or base × pct fallback).
+      const { winner, rest } = pickBestDeal(offers);
+      setState({ status: 'offer', offer: winner, extras: rest, payload, generatedAt: Date.now() });
+      // Fire-and-forget Mistral advisor explanation. Never blocks the feed.
+      if (rest.length > 0) {
+        setAdvisor({ winnerId: winner.id, explanation: '' });
+        const summarizedOffers = [winner, ...rest].map(o => ({
+          id: o.id,
+          headline: o.widget_spec.headline,
+          merchant_name: o.widget_spec.merchant.name,
+          base_amount_cents: o.widget_spec.base_amount_cents ?? 1200,
+          discount_amount_cents: offerSavingsCents(o),
+          pct: o.widget_spec.discount.kind === 'pct' ? o.widget_spec.discount.value : null,
+        }));
+        fetch(`${API}/api/offer/advisor/explain`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locale: i18n.locale,
+            winner_id: winner.id,
+            offers: summarizedOffers,
+          }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data?.explanation) {
+              setAdvisor(a => a.winnerId === winner.id ? { winnerId: winner.id, explanation: data.explanation } : a);
+            }
+          })
+          .catch(() => {});
+      } else {
+        setAdvisor({ winnerId: null, explanation: '' });
+      }
     } catch (e) {
       setState({ status: 'error', message: i18n.t('errors.generation_failed') });
     }
@@ -135,16 +229,12 @@ export default function CustomerHome() {
 
   useEffect(() => { refreshStats(); generate(); }, []);
 
-  // First-time UX: if there's no merchant near the customer, seed one
-  // automatically once so the demo loop works without the user discovering
-  // the "Demo-Café hier erstellen" button.
+  // Auto-seed of a fake demo merchant disabled — judges should see only
+  // the real merchant the teammate sets up. The "no_merchant" empty state
+  // surfaces the manual "Demo-Café hier erstellen" affordance instead.
   const autoSeededRef = useRef(false);
-  useEffect(() => {
-    if (state.status === 'no_merchant' && !autoSeededRef.current && !seeding) {
-      autoSeededRef.current = true;
-      seedDemoMerchant();
-    }
-  }, [state.status, seeding, seedDemoMerchant]);
+  // (Intentionally no auto-seed effect.) seedDemoMerchant() is still wired
+  // to the explicit button in the no_merchant view for solo testing.
 
   // Read out the offer when TTS preference is on (accessibility).
   useEffect(() => {
@@ -153,16 +243,23 @@ export default function CustomerHome() {
     speak(`${s.headline}. ${s.subline}. ${s.cta}.`);
   }, [state.status === 'offer' ? state.offer.id : null]);
 
-  // Auto-expire offer after validity_minutes
+  // Auto-rotation removed — offers stay until the user pulls to refresh or
+  // acts on them. (User feedback: auto-cycling without user input felt fake.)
+
+  // Live-lock: when the merchant scans this offer's QR (or the user takes
+  // cashback elsewhere), the server broadcasts on offer:{id}. The home
+  // screen drops the now-redeemed card, refreshes the savings stats from
+  // the server (so "Gespart" ticks immediately), and pulls the next offer.
   useEffect(() => {
     if (state.status !== 'offer') return;
-    const ttlMs = state.offer.widget_spec.validity_minutes * 60 * 1000;
-    const elapsed = Date.now() - state.generatedAt;
-    const remaining = ttlMs - elapsed;
-    if (remaining <= 0) { setState({ status: 'expired' }); return; }
-    const t = setTimeout(() => setState({ status: 'expired' }), remaining);
-    return () => clearTimeout(t);
-  }, [state]);
+    const offerId = state.offer.id;
+    const unsub = subscribeOfferChannel(offerId, (event) => {
+      if (event.type !== 'offer.redeemed' || event.offer_id !== offerId) return;
+      refreshStats();
+      generate();
+    });
+    return unsub;
+  }, [state, generate, refreshStats]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -303,7 +400,7 @@ export default function CustomerHome() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
         }
       >
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', marginBottom: space.xs }}>
           <RoleSwitch active="customer" />
         </View>
         <LiveHeader stats={stats} />
@@ -330,8 +427,50 @@ export default function CustomerHome() {
               from={{ opacity: 0, translateY: 12, scale: 0.98 }}
               animate={{ opacity: 1, translateY: 0, scale: 1 }}
               transition={{ type: 'spring', damping: 18, stiffness: 180 }}
-              style={{ flex: 1, gap: 8 }}
+              style={{ flex: 1, gap: space.sm }}
             >
+              {/* AI-advisor "Best deal" badge — shown when there's at least
+                  one other offer to compare against AND this primary actually
+                  saves more than the runner-up. Pure math, no LLM. */}
+              {state.extras.length > 0 && (() => {
+                const winnerCents = offerSavingsCents(state.offer);
+                const runnerCents = offerSavingsCents(state.extras[0]);
+                const gap = winnerCents - runnerCents;
+                if (gap <= 0) return null;
+                return <BestDealBadge gapCents={gap} />;
+              })()}
+              {/* Mistral-generated one-liner explaining the win. Streamed in
+                  asynchronously so the feed renders instantly; this slides in
+                  when ready. Falls back to a deterministic sentence if the
+                  cloud call fails. */}
+              {advisor.winnerId === state.offer.id && advisor.explanation.length > 0 && (
+                <MotiView
+                  from={{ opacity: 0, translateY: -2 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 280 }}
+                  style={{
+                    backgroundColor: theme.primaryWash,
+                    borderRadius: radius.md,
+                    paddingVertical: space.md, paddingHorizontal: space.md,
+                    borderWidth: 1, borderColor: theme.primary + '1A',
+                    flexDirection: 'row', gap: space.sm,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Text style={{ fontSize: type.body, lineHeight: type.bodyL + 2 }}>💡</Text>
+                  <Text
+                    style={{ color: theme.text, fontSize: type.small, lineHeight: 18, fontWeight: '600', flex: 1 }}
+                    numberOfLines={3}
+                  >
+                    {advisor.explanation}
+                  </Text>
+                </MotiView>
+              )}
+              {/* Loyalty chip — only shows after first redemption at this
+                  merchant. Reads count from /api/offer/feed response. */}
+              {(state.offer.your_redemptions_at_merchant ?? 0) > 0 && (
+                <LoyaltyChip count={state.offer.your_redemptions_at_merchant!} />
+              )}
               <View style={{ flex: 1, minHeight: height * 0.58 }}>
                 <WidgetRenderer
                   spec={state.offer.widget_spec}
@@ -340,16 +479,34 @@ export default function CustomerHome() {
                   onDecline={handleDecline}
                 />
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <TouchableOpacity
-                  onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
-                  hitSlop={12}
-                >
-                  <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
-                    {i18n.t('common.why_short')}  ›
+              {/* "Why?" link removed — judges should focus on the offer + accept,
+                  not a sub-screen explaining context signals. */}
+
+              {/* Secondary feed: any extra nearby offers as compact rows.
+                  Tapping one swaps it into the primary slot so the user can
+                  use the same accept flow. */}
+              {state.extras.length > 0 && (
+                <View style={{ marginTop: space.lg, gap: space.sm }}>
+                  <Text style={{
+                    color: theme.textMuted, fontSize: type.caption, fontWeight: '800',
+                    letterSpacing: 1.4, marginLeft: space.xs,
+                  }}>
+                    MEHR IN DER NÄHE · {state.extras.length}
                   </Text>
-                </TouchableOpacity>
-              </View>
+                  {state.extras.map(extra => (
+                    <ExtraOfferRow
+                      key={extra.id}
+                      entry={extra}
+                      onSelect={() => setState({
+                        ...state,
+                        offer: extra,
+                        extras: [state.offer, ...state.extras.filter(e => e.id !== extra.id)],
+                        generatedAt: Date.now(),
+                      })}
+                    />
+                  ))}
+                </View>
+              )}
             </MotiView>
           ) : null}
         </View>
@@ -359,13 +516,25 @@ export default function CustomerHome() {
 }
 
 function AnimatedEmoji({ emoji, delay = 0 }: { emoji: string; delay?: number }) {
+  // Two-layer animation: outer spring entrance (scale + rotate),
+  // inner perpetual breathe so the empty-state emoji never feels frozen.
   return (
     <MotiView
       from={{ scale: 0.6, rotate: '-12deg', opacity: 0 }}
       animate={{ scale: 1, rotate: '0deg', opacity: 1 }}
       transition={{ type: 'spring', damping: 10, stiffness: 140, delay }}
     >
-      <Text style={{ fontSize: 64 }}>{emoji}</Text>
+      <MotiView
+        from={{ translateY: 0 }}
+        animate={{ translateY: -6 }}
+        transition={{
+          type: 'timing', duration: 1400,
+          loop: true, repeatReverse: true,
+          delay: delay + 600,
+        }}
+      >
+        <Text style={{ fontSize: 64 }}>{emoji}</Text>
+      </MotiView>
     </MotiView>
   );
 }
@@ -405,72 +574,192 @@ function GhostButton({ onPress, label }: { onPress: () => void; label: string })
 
 function LocationDeniedState({ onRetry }: { onRetry: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 24 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space['2xl'], gap: space['2xl'] }}>
       <AnimatedEmoji emoji="📍" />
-      <View style={{ gap: 8 }}>
-        <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
-          Standort gebraucht
+      <View style={{ gap: space.sm }}>
+        <Text style={{ color: theme.text, fontSize: type.title, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
+          {i18n.t('customer.location_needed')}
         </Text>
-        <Text style={{ color: theme.textMuted, fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 280 }}>
+        <Text style={{ color: theme.textMuted, fontSize: type.body, lineHeight: 21, textAlign: 'center', maxWidth: 280 }}>
           {i18n.t('customer.no_location')}
         </Text>
       </View>
       <PrimaryButton onPress={onRetry} label={i18n.t('customer.grant_location')} />
       <TouchableOpacity onPress={() => Linking.openSettings()} hitSlop={12}>
-        <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
-          Schon abgelehnt? In Einstellungen öffnen ›
+        <Text style={{ color: theme.primary, fontSize: type.small, fontWeight: '700' }}>
+          {i18n.t('customer.open_settings')}
         </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-function NoMerchantState({ onSeed, seeding }: { onSeed: () => void; seeding: boolean }) {
+function NoMerchantState({ onSeed: _onSeed, seeding: _seeding }: { onSeed: () => void; seeding: boolean }) {
+  // Demo-merchant seed button intentionally hidden — judges should see only
+  // real merchants set up on a second phone. Empty state guides toward the
+  // 2-phone flow instead of a synthetic shop.
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 22 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space['2xl'], gap: space['2xl'] }}>
       <AnimatedEmoji emoji="🗺️" />
-      <View style={{ gap: 8 }}>
-        <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
-          Niemand in der Nähe
+      <View style={{ gap: space.sm }}>
+        <Text style={{ color: theme.text, fontSize: type.title, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 }}>
+          {i18n.t('customer.no_one_nearby')}
         </Text>
-        <Text style={{ color: theme.textMuted, fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 300 }}>
-          {i18n.t('customer.no_merchant')}
+        <Text style={{ color: theme.textMuted, fontSize: type.body, lineHeight: 21, textAlign: 'center', maxWidth: 300 }}>
+          {i18n.t('customer.no_one_nearby_help')}
         </Text>
       </View>
-      <PrimaryButton onPress={onSeed} disabled={seeding} label={seeding ? 'Wird erstellt…' : '✨ Demo-Café hier erstellen'} />
-      <GhostButton onPress={() => router.replace('/(merchant)/setup')} label={`${i18n.t('customer.become_merchant')}  ›`} />
+      <GhostButton onPress={() => router.replace('/(merchant)/setup')} label={i18n.t('customer.open_merchant_role')} />
     </View>
   );
 }
 
 function DeclinedState({ onRefresh }: { onRefresh: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl }}>
       <AnimatedEmoji emoji="👌" />
-      <Text style={{ color: theme.textMuted, fontSize: 18, fontWeight: '600' }}>Verstanden</Text>
-      <GhostButton onPress={onRefresh} label="Anderes Angebot anzeigen" />
+      <Text style={{ color: theme.textMuted, fontSize: type.bodyL, fontWeight: '600' }}>{i18n.t('customer.decline')}</Text>
+      <GhostButton onPress={onRefresh} label={i18n.t('customer.another_offer')} />
     </View>
   );
 }
 
 function ExpiredState({ onRefresh }: { onRefresh: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl }}>
       <AnimatedEmoji emoji="⌛" />
-      <Text style={{ color: theme.textMuted, fontSize: 18, fontWeight: '600', textAlign: 'center', maxWidth: 280 }}>
+      <Text style={{ color: theme.textMuted, fontSize: type.bodyL, fontWeight: '600', textAlign: 'center', maxWidth: 280 }}>
         {i18n.t('customer.expired')}
       </Text>
-      <GhostButton onPress={onRefresh} label="Neues Angebot laden" />
+      <GhostButton onPress={onRefresh} label={i18n.t('customer.load_new_offer')} />
     </View>
   );
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.lg }}>
       <AnimatedEmoji emoji="⚠️" />
-      <Text style={{ color: theme.danger, fontSize: 16, textAlign: 'center', maxWidth: 280 }}>{message}</Text>
-      <GhostButton onPress={onRetry} label="Erneut versuchen" />
+      <Text style={{ color: theme.danger, fontSize: type.bodyL, textAlign: 'center', maxWidth: 280 }}>{message}</Text>
+      <GhostButton onPress={onRetry} label={i18n.t('customer.try_again')} />
     </View>
+  );
+}
+
+// AI-advisor badge: tells the customer their primary card is the best deal
+// in the current feed and by how much (in EUR). Computed from
+// offerSavingsCents() — deterministic math, runs locally.
+function BestDealBadge({ gapCents }: { gapCents: number }) {
+  const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+    .format(gapCents / 100);
+  return (
+    <MotiView
+      from={{ opacity: 0, scale: 0.9, translateY: -4 }}
+      animate={{ opacity: 1, scale: 1, translateY: 0 }}
+      transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+      style={{
+        alignSelf: 'flex-start',
+        flexDirection: 'row', alignItems: 'center', gap: space.xs,
+        backgroundColor: theme.success + '14',
+        borderWidth: 1, borderColor: theme.success + '55',
+        borderRadius: radius.pill,
+        paddingHorizontal: space.md, paddingVertical: space.xs + 1,
+      }}
+    >
+      <Text style={{ color: theme.success, fontSize: type.small, fontWeight: '900', letterSpacing: 0.4 }}>
+        {i18n.t('customer.best_deal')} · {i18n.t('customer.saves_more', { eur })}
+      </Text>
+    </MotiView>
+  );
+}
+
+// Loyalty chip: shown above the primary offer card when the device has
+// redeemed at this merchant before. Personalisation signal that demonstrates
+// real DB usage (counts come from the offers/redemptions tables).
+function LoyaltyChip({ count }: { count: number }) {
+  const label = count >= 5
+    ? i18n.t('customer.regular')
+    : i18n.t('customer.nth_visit', {
+        n: count + 1,
+        th: ((c) => c === 1 ? 'st' : c === 2 ? 'nd' : c === 3 ? 'rd' : 'th')(count + 1),
+      });
+  return (
+    <MotiView
+      from={{ opacity: 0, scale: 0.85, translateY: -4 }}
+      animate={{ opacity: 1, scale: 1, translateY: 0 }}
+      transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+      style={{
+        alignSelf: 'flex-start',
+        flexDirection: 'row', alignItems: 'center', gap: space.xs,
+        backgroundColor: theme.primary + '14',
+        borderWidth: 1, borderColor: theme.primary + '44',
+        borderRadius: radius.pill,
+        paddingHorizontal: space.md, paddingVertical: space.xs + 1,
+      }}
+    >
+      <Text style={{ color: theme.primary, fontSize: type.small, fontWeight: '900', letterSpacing: 0.4 }}>
+        {label}
+      </Text>
+    </MotiView>
+  );
+}
+
+// Compact teaser row for the secondary feed below the primary offer card.
+// Tap promotes the row into the primary slot (uses existing accept flow).
+function ExtraOfferRow({ entry, onSelect }: { entry: OfferEntry; onSelect: () => void }) {
+  const spec = entry.widget_spec;
+  const palette = safePalette(spec.palette);
+  const distance = spec.merchant.distance_m < 1000
+    ? `${Math.round(spec.merchant.distance_m)} m`
+    : `${(spec.merchant.distance_m / 1000).toFixed(1).replace('.', ',')} km`;
+  const formattedDiscount =
+    spec.discount.kind === 'pct' ? `−${spec.discount.value}%` :
+    spec.discount.kind === 'eur' ? `−${spec.discount.value.toFixed(2).replace('.', ',')} €` :
+    spec.discount.constraint ?? '';
+  return (
+    <MotiView
+      from={{ opacity: 0, translateY: 6 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: 'timing', duration: 260 }}
+    >
+      <TouchableOpacity
+        onPress={onSelect}
+        activeOpacity={0.92}
+        style={{
+          flexDirection: 'row', alignItems: 'center', gap: space.md,
+          backgroundColor: theme.surface,
+          borderRadius: radius.md, padding: space.md,
+          borderWidth: 1, borderColor: theme.primary + '14',
+          // Soft tinted shadow keyed to the offer's accent (per skill).
+          shadowColor: palette.accent, shadowOpacity: 0.14,
+          shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+        }}
+      >
+        <View style={{
+          width: 48, height: 48, borderRadius: radius.md,
+          backgroundColor: palette.bg,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Text style={{ fontSize: type.title + 2 }}>{spec.hero.value || '🛍'}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: theme.text, fontSize: type.body, fontWeight: '900', letterSpacing: -0.2 }} numberOfLines={1}>
+            {spec.headline}
+          </Text>
+          <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '600' }} numberOfLines={1}>
+            {spec.merchant.name} · {distance}
+          </Text>
+        </View>
+        <View style={{
+          backgroundColor: palette.accent,
+          borderRadius: radius.sm + 2,
+          paddingHorizontal: space.md, paddingVertical: space.xs + 2,
+        }}>
+          <Text style={{ color: palette.bg, fontSize: type.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+            {formattedDiscount}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </MotiView>
   );
 }

@@ -2,11 +2,15 @@
   "role_picker": {
     "title": "Stadtpuls",
     "subtitle": "The pulse of your city.",
+    "who_are_you": "Who are you today?",
     "customer": "Customer",
-    "merchant": "Merchant"
+    "customer_sub": "Discover offers",
+    "merchant": "Merchant",
+    "merchant_sub": "Set up shop · 30 sec",
+    "anon_hint": "🔒 Anonymous device · no sign-in needed"
   },
   "customer": {
-    "loading": "Finding nearby offers…",
+    "loading": "Finding nearby offers...",
     "no_merchant": "No participating shops within 500 m. Move around and pull down, or become a merchant in 30 seconds.",
     "become_merchant": "Become a merchant now",
     "no_location": "City Wallet needs your approximate location to find local offers. We only send a coarse 1.2 km cell.",
@@ -21,7 +25,29 @@
     "cashback_redeemed": "Cashback redeemed",
     "forget_me": "Delete history",
     "what_we_sent": "What we sent",
-    "reasoning_title": "Why now?"
+    "reasoning_title": "Why now?",
+    "another_offer": "Show another offer",
+    "load_new_offer": "Load new offer",
+    "try_again": "Try again",
+    "create_demo": "✨ Create demo café here",
+    "creating_demo": "Creating...",
+    "redeemed_by_merchant": "Redeemed by merchant",
+    "payment_portal": "SPARKASSEN PAYMENT PORTAL",
+    "discount_booked": "Discount booked",
+    "location_needed": "Location needed",
+    "open_settings": "Already denied? Open settings ›",
+    "no_one_nearby": "No one nearby",
+    "no_one_nearby_help": "Have a second person open the app, set up as merchant, and stand near you. Then pull down to refresh.",
+    "open_merchant_role": "Set up as merchant yourself ›",
+    "first_visit": "1st visit",
+    "nth_visit": "{{n}}{{th}} visit",
+    "regular": "🎯 Regular",
+    "context_signals": "Why now",
+    "slide_to_pay": "Slide to pay",
+    "processing_payment": "Processing...",
+    "payment_confirmed": "Paid",
+    "best_deal": "💡 Best deal",
+    "saves_more": "{{eur}} more saved than the others"
   },
   "merchant": {
     "setup_title": "Set up your shop",
@@ -49,7 +75,26 @@
     "scan_qr": "Scan customer QR",
     "scan_success": "Redeemed",
     "rules_title": "Edit rules",
-    "save_rules": "Save rules"
+    "save_rules": "Save rules",
+    "your_shop": "Your shop",
+    "today": "TODAY",
+    "revenue": "REVENUE",
+    "preview": "Preview",
+    "preview_sub": "Live sample",
+    "flash": "Flash",
+    "flash_sub": "Instant deal",
+    "menu_tile": "Menu",
+    "accept_short": "Accept",
+    "weekly_rate": "Accept rate last 7 days",
+    "no_data_yet": "No data yet · waiting for first offer",
+    "merchant_settings_title": "SHOP SETTINGS",
+    "location_section": "LOCATION",
+    "save_location": "✓ Save new location",
+    "saving_location": "Saving...",
+    "location_saved": "Location saved",
+    "hours_section": "OPENING HOURS",
+    "save_hours": "✓ Save opening hours",
+    "open": "Open"
   },
   "errors": {
     "generation_failed": "Could not load offer. Please try again.",
@@ -61,8 +106,8 @@
     "back": "Back",
     "close": "Close",
     "cancel": "Cancel",
-    "loading": "Loading…",
-    "saving": "Saving…",
+    "loading": "Loading...",
+    "saving": "Saving...",
     "ok": "OK",
     "retry": "Retry",
     "settings": "Settings",
@@ -71,7 +116,9 @@
     "menu": "Menu",
     "items": "Items",
     "why_short": "Why?",
-    "live": "LIVE"
+    "live": "LIVE",
+    "done": "Done",
+    "save": "Save"
   },
   "settings": {
     "title": "Settings",
@@ -86,6 +133,15 @@
     "radius_sub": "How far the app looks for shops on the map.",
     "privacy": "Privacy",
     "forget_me_button": "🗑  Forget me",
-    "forget_me_done": "✓ History wiped · hash rotated"
+    "forget_me_done": "✓ History wiped · hash rotated",
+    "gdpr_title": "🇪🇺 Privacy · GDPR",
+    "gdpr_subtitle": "What stays local · what we send",
+    "gdpr_local_title": "Stays on your device",
+    "gdpr_local_items": "Precise location (GPS)|Movement patterns|Saved offers history|Sound·haptics·language·radius",
+    "gdpr_sent_title": "Sent abstracted",
+    "gdpr_sent_items": "Geohash cell (≈ 1.2 km)|Anonymous device hash (rotatable)|Language (de/en)|Movement class (browsing/walking)",
+    "gdpr_principles_title": "Principles",
+    "gdpr_principles_items": "No sign-in · no email · no name|EU data residency (Supabase Frankfurt)|Mistral as cloud failover · abstract intent only|\"Forget me\" rotates hash + wipes history",
+    "gdpr_legal": "Processing under Art. 6(1)(f) GDPR · legitimate interest"
   }
 }

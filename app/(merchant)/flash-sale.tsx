@@ -160,7 +160,7 @@ export default function FlashSale() {
               style={{ borderRadius: 18, overflow: 'hidden' }}
             >
               <LinearGradient
-                colors={['#F97316', '#E11D48'] as any}
+                colors={[theme.primary, theme.primaryDark] as any}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={{ padding: 16, gap: 10 }}
               >
@@ -198,7 +198,7 @@ export default function FlashSale() {
                     backgroundColor: '#FFFFFF', borderRadius: 12,
                     paddingVertical: 10, alignItems: 'center', marginTop: 4,
                   }}>
-                  <Text style={{ color: '#E11D48', fontSize: 13, fontWeight: '900' }}>
+                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '900' }}>
                     Flash beenden
                   </Text>
                 </TouchableOpacity>

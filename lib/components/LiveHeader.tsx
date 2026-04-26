@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import { encodeGeohash6 } from '../context/geohash';
 import { SavingsStats } from '../savings';
 import AnimatedNumber from './AnimatedNumber';
-import LangToggle from './LangToggle';
-import i18n from '../i18n';
+import i18n, { useLocaleVersion } from '../i18n';
 import { theme, space, radius, type } from '../theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -42,6 +40,7 @@ function conditionEmoji(c: string): string {
 export default function LiveHeader({ stats }: Props) {
   const [live, setLive] = useState<LiveCtx | null>(null);
   const showStreak = stats.count_this_week > 0;
+  useLocaleVersion(); // Re-render on language change so i18n.t() refreshes
 
   useEffect(() => {
     let mounted = true;
@@ -67,88 +66,111 @@ export default function LiveHeader({ stats }: Props) {
 
   return (
     <View style={{
-      borderRadius: radius.lg, overflow: 'hidden', marginBottom: space.md,
-      borderWidth: 1, borderColor: theme.border,
-      backgroundColor: theme.surface,
+      borderRadius: radius.lg, marginBottom: space.md,
+      borderWidth: 1, borderColor: theme.primary + '1A',
+      backgroundColor: theme.primaryWash,
+      paddingVertical: space.lg, paddingHorizontal: space.lg,
+      gap: space.md,
+      // Soft tinted shadow — primary, not gray (per skill).
+      shadowColor: theme.primary,
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     }}>
-      <BlurView intensity={30} tint="light" style={{ paddingVertical: space.md, paddingHorizontal: space.lg, gap: space.md }}>
+      {/* Row 1 — small live ticker (lang toggle moved to settings only) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <MotiView
+          from={{ scale: 0.9, opacity: 0.5 }}
+          animate={{ scale: 1.4, opacity: 1 }}
+          transition={{ type: 'timing', duration: 1100, loop: true }}
+          style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
+        />
+        <Text
+          style={{ color: theme.primary, fontSize: type.micro, fontWeight: '800', letterSpacing: 1.4, flex: 1 }}
+          numberOfLines={1}
+        >
+          {live
+            ? `${i18n.t('common.live')} · ${live.city ?? '·'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
+            : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
+        </Text>
+      </View>
 
-        {/* Row 1 — small live ticker (lang toggle moved to settings only) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
-          <MotiView
-            from={{ scale: 0.9, opacity: 0.5 }}
-            animate={{ scale: 1.4, opacity: 1 }}
-            transition={{ type: 'timing', duration: 1100, loop: true }}
-            style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
-          />
-          <Text
-            style={{ color: theme.primary, fontSize: type.micro, fontWeight: '800', letterSpacing: 1.4, flex: 1 }}
-            numberOfLines={1}
-          >
-            {live
-              ? `${i18n.t('common.live')} · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
-              : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
+      {/* Row 2 — savings number stack (left) + streak + heart (right).
+          alignItems flex-end keeps the display number's baseline tied to the
+          bottom of the 44pt icon row — don't switch to center. */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <View style={{ gap: space.xs }}>
+          <Text style={{
+            color: theme.textMuted, fontSize: type.caption, fontWeight: '700',
+            letterSpacing: 1, textTransform: 'uppercase',
+          }}>
+            {i18n.t('common.saved_label')}
           </Text>
+          <AnimatedNumber
+            value={stats.total_eur}
+            format={fmtEur}
+            style={{
+              color: theme.text, fontSize: type.display, fontWeight: '900',
+              letterSpacing: -0.8, lineHeight: type.display + 4,
+              fontVariant: ['tabular-nums'],
+            }}
+          />
         </View>
 
-        {/* Row 2 — savings number stack (left) + streak + heart (right) */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <View>
-            <Text style={{ color: theme.textMuted, fontSize: type.caption, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>
-              {i18n.t('common.saved_label')}
-            </Text>
-            <AnimatedNumber
-              value={stats.total_eur}
-              format={fmtEur}
-              style={{ color: theme.text, fontSize: type.display, fontWeight: '900', letterSpacing: -0.6, lineHeight: type.display + 4 }}
-            />
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            {showStreak && (
-              <MotiView
-                from={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', damping: 14 }}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: space.xs,
-                  backgroundColor: theme.primary, borderRadius: radius.pill,
-                  paddingHorizontal: space.md, paddingVertical: space.xs,
-                }}
-              >
-                <Text style={{ fontSize: type.body }}>🔥</Text>
-                <Text style={{ color: theme.textOnPrimary, fontSize: type.small, fontWeight: '900' }}>
-                  {stats.count_this_week}
-                </Text>
-              </MotiView>
-            )}
-            <Pressable
-              onPress={() => router.push('/(customer)/saved')}
-              hitSlop={10}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          {showStreak && (
+            <MotiView
+              from={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 14 }}
               style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: theme.primaryWash,
-                borderWidth: 1, borderColor: theme.primary + '44',
-                alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'row', alignItems: 'center', gap: space.xs,
+                backgroundColor: theme.primary, borderRadius: radius.pill,
+                paddingHorizontal: space.md, paddingVertical: space.xs,
+                shadowColor: theme.primary, shadowOpacity: 0.28,
+                shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
               }}
             >
-              <Text style={{ fontSize: 16 }}>❤️</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/settings' as any)}
-              hitSlop={10}
-              style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: theme.surface,
-                borderWidth: 1, borderColor: theme.border,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>⚙️</Text>
-            </Pressable>
-          </View>
+              <Text style={{ fontSize: type.body }}>🔥</Text>
+              <Text style={{
+                color: theme.textOnPrimary, fontSize: type.small, fontWeight: '900',
+                fontVariant: ['tabular-nums'],
+              }}>
+                {stats.count_this_week}
+              </Text>
+            </MotiView>
+          )}
+          <Pressable
+            onPress={() => router.push('/(customer)/saved')}
+            hitSlop={12}
+            style={{
+              width: 44, height: 44, borderRadius: 22,
+              backgroundColor: theme.surface,
+              borderWidth: 1, borderColor: theme.primary + '22',
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: theme.primary, shadowOpacity: 0.06,
+              shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+            }}
+          >
+            <Text style={{ fontSize: type.bodyL }}>❤️</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/settings' as any)}
+            hitSlop={12}
+            style={{
+              width: 44, height: 44, borderRadius: 22,
+              backgroundColor: theme.surface,
+              borderWidth: 1, borderColor: theme.primary + '22',
+              alignItems: 'center', justifyContent: 'center',
+              shadowColor: theme.primary, shadowOpacity: 0.06,
+              shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+            }}
+          >
+            <Text style={{ fontSize: type.bodyL }}>⚙️</Text>
+          </Pressable>
         </View>
-      </BlurView>
+      </View>
     </View>
   );
 }

@@ -1,136 +1,214 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { theme } from '../lib/theme';
-import i18n, { setLocale, getLocale } from '../lib/i18n';
+import { theme, space, radius, type as typo } from '../lib/theme';
+import i18n, { setLocale, getLocale, useLocaleVersion } from '../lib/i18n';
 
 const ROLE_KEY = 'cw_preferred_role';
+const { height } = Dimensions.get('window');
 
 export default function RolePicker() {
+  useLocaleVersion();
+  const insets = useSafeAreaInsets();
   const [locale, setLocaleState] = useState<'de' | 'en'>(getLocale());
 
   const switchLocale = async (l: 'de' | 'en') => {
+    if (l === locale) return;
     await setLocale(l);
     setLocaleState(l);
-    Haptics.selectionAsync();
+    Haptics.selectionAsync().catch(() => {});
   };
 
   const goCustomer = async () => {
     await AsyncStorage.setItem(ROLE_KEY, 'customer');
-    Haptics.selectionAsync();
+    Haptics.selectionAsync().catch(() => {});
     router.replace('/(customer)/home');
   };
   const goMerchant = async () => {
     await AsyncStorage.setItem(ROLE_KEY, 'merchant');
-    Haptics.selectionAsync();
+    Haptics.selectionAsync().catch(() => {});
     const existing = await AsyncStorage.getItem('merchant_id');
     router.replace(existing ? '/(merchant)/dashboard' : '/(merchant)/setup');
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, paddingHorizontal: 28, justifyContent: 'space-between', paddingTop: 24, paddingBottom: 36 }}>
+    <View style={{
+      flex: 1, backgroundColor: theme.bg,
+      paddingHorizontal: space['2xl'],
+      paddingTop: insets.top + space.md,
+      paddingBottom: Math.max(insets.bottom + space.md, space['3xl']),
+      justifyContent: 'space-between',
+    }}>
+      {/* Ambient glow blob — soft brand-tinted depth, no harsh edges */}
+      <View pointerEvents="none" style={{
+        position: 'absolute',
+        top: -height * 0.18, left: -height * 0.12,
+        width: height * 0.55, height: height * 0.55,
+        borderRadius: height,
+        backgroundColor: theme.primary + '12',
+      }} />
+      <View pointerEvents="none" style={{
+        position: 'absolute',
+        bottom: -height * 0.18, right: -height * 0.16,
+        width: height * 0.55, height: height * 0.55,
+        borderRadius: height,
+        backgroundColor: theme.primary + '08',
+      }} />
+
       {/* Header */}
       <MotiView
         from={{ opacity: 0, translateY: -16 }}
         animate={{ opacity: 1, translateY: 0 }}
         transition={{ type: 'timing', duration: 600 }}
-        style={{ alignItems: 'center', marginTop: 32 }}
+        style={{ alignItems: 'center', marginTop: space['2xl'], gap: space.sm }}
       >
         <View style={{
-          width: 76, height: 76, borderRadius: 22,
-          backgroundColor: theme.primary,
+          width: 88, height: 88, borderRadius: 26,
           alignItems: 'center', justifyContent: 'center',
-          marginBottom: 16,
-          shadowColor: theme.primary, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 },
+          marginBottom: space.sm,
+          shadowColor: theme.primary, shadowOpacity: 0.4,
+          shadowRadius: 24, shadowOffset: { width: 0, height: 12 },
         }}>
-          <Text style={{ fontSize: 40 }}>💳</Text>
+          <LinearGradient
+            colors={[theme.primary, theme.primaryDark] as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              borderRadius: 26,
+            }}
+          />
+          <Text style={{ fontSize: 44 }}>💳</Text>
         </View>
-        <Text style={{ fontSize: 32, fontWeight: '900', color: theme.text, letterSpacing: -0.8 }}>
+        <Text style={{
+          fontSize: 38, fontWeight: '900', color: theme.text,
+          letterSpacing: -1.0,
+        }}>
           {i18n.t('role_picker.title')}
         </Text>
-        <Text style={{ fontSize: 15, color: theme.textMuted, marginTop: 4, fontWeight: '500' }}>
-          Wer bist du heute?
+        <Text style={{
+          fontSize: typo.body, color: theme.textMuted,
+          fontWeight: '600', textAlign: 'center',
+        }}>
+          {i18n.t('role_picker.subtitle')}
+        </Text>
+        <Text style={{
+          fontSize: typo.small, color: theme.textMuted,
+          fontWeight: '700', letterSpacing: 0.4,
+          marginTop: space.xs,
+        }}>
+          {i18n.t('role_picker.who_are_you')}
         </Text>
       </MotiView>
 
-      {/* Role buttons (centered) */}
+      {/* Role buttons — primary CTA first (60/30/10: red is the 10% accent
+          drawing the eye to the recommended path). */}
       <MotiView
         from={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: 'spring', delay: 180, stiffness: 180, damping: 20 }}
-        style={{ gap: 14 }}
+        style={{ gap: space.md }}
       >
         <TouchableOpacity
           onPress={goCustomer}
+          activeOpacity={0.92}
           style={{
-            backgroundColor: theme.primary,
-            borderRadius: 18, paddingVertical: 22, alignItems: 'center',
-            shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 14, shadowOffset: { width: 0, height: 6 },
+            borderRadius: radius.xl,
+            overflow: 'hidden',
+            shadowColor: theme.primary, shadowOpacity: 0.32,
+            shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
           }}
         >
-          <Text style={{ fontSize: 28, marginBottom: 4 }}>🛍️</Text>
-          <Text style={{ color: theme.textOnPrimary, fontSize: 20, fontWeight: '800', letterSpacing: 0.3 }}>
-            {i18n.t('role_picker.customer')}
-          </Text>
-          <Text style={{ color: '#FFFFFFCC', fontSize: 13, marginTop: 3, fontWeight: '600' }}>
-            Angebote entdecken
-          </Text>
+          <LinearGradient
+            colors={[theme.primary, theme.primaryDark] as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ paddingVertical: space.xl + 4, alignItems: 'center', gap: 4 }}
+          >
+            <Text style={{ fontSize: 32, marginBottom: 2 }}>🛍️</Text>
+            <Text style={{
+              color: theme.textOnPrimary, fontSize: typo.title,
+              fontWeight: '900', letterSpacing: 0.3,
+            }}>
+              {i18n.t('role_picker.customer')}
+            </Text>
+            <Text style={{
+              color: '#FFFFFFCC', fontSize: typo.small,
+              fontWeight: '700',
+            }}>
+              {i18n.t('role_picker.customer_sub')}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={goMerchant}
+          activeOpacity={0.92}
           style={{
             backgroundColor: theme.surface,
-            borderRadius: 18, paddingVertical: 22, alignItems: 'center',
-            borderWidth: 2, borderColor: theme.primary,
+            borderRadius: radius.xl, paddingVertical: space.xl + 4,
+            alignItems: 'center', gap: 4,
+            borderWidth: 1.5, borderColor: theme.primary + '55',
           }}
         >
-          <Text style={{ fontSize: 28, marginBottom: 4 }}>🏪</Text>
-          <Text style={{ color: theme.primary, fontSize: 20, fontWeight: '800', letterSpacing: 0.3 }}>
+          <Text style={{ fontSize: 32, marginBottom: 2 }}>🏪</Text>
+          <Text style={{
+            color: theme.primary, fontSize: typo.title,
+            fontWeight: '900', letterSpacing: 0.3,
+          }}>
             {i18n.t('role_picker.merchant')}
           </Text>
-          <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 3, fontWeight: '600' }}>
-            Geschäft einrichten · 30 Sek.
+          <Text style={{
+            color: theme.textMuted, fontSize: typo.small,
+            fontWeight: '700',
+          }}>
+            {i18n.t('role_picker.merchant_sub')}
           </Text>
         </TouchableOpacity>
       </MotiView>
 
-      {/* Language switcher */}
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: theme.bgMuted, borderRadius: 14, padding: 4,
-        borderWidth: 1, borderColor: theme.border,
-        alignSelf: 'center',
-      }}>
-        {(['de', 'en'] as const).map(l => {
-          const active = locale === l;
-          return (
-            <TouchableOpacity
-              key={l}
-              onPress={() => switchLocale(l)}
-              style={{
-                paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10,
-                backgroundColor: active ? theme.primary : 'transparent',
-              }}
-            >
-              <Text style={{
-                color: active ? theme.textOnPrimary : theme.text,
-                fontSize: 13, fontWeight: '800', letterSpacing: 0.4,
-              }}>
-                {l === 'de' ? '🇩🇪 Deutsch' : '🇬🇧 English'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Footer: language + privacy hint */}
+      <View style={{ alignItems: 'center', gap: space.md }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 4,
+          backgroundColor: theme.bgMuted, borderRadius: radius.pill, padding: 4,
+          borderWidth: 1, borderColor: theme.border,
+        }}>
+          {(['de', 'en'] as const).map(l => {
+            const active = locale === l;
+            return (
+              <TouchableOpacity
+                key={l}
+                onPress={() => switchLocale(l)}
+                hitSlop={4}
+                style={{
+                  paddingHorizontal: space.lg, paddingVertical: space.sm,
+                  borderRadius: radius.pill,
+                  backgroundColor: active ? theme.primary : 'transparent',
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>{l === 'de' ? '🇩🇪' : '🇬🇧'}</Text>
+                <Text style={{
+                  color: active ? theme.textOnPrimary : theme.text,
+                  fontSize: typo.small, fontWeight: '900', letterSpacing: 0.4,
+                }}>
+                  {l === 'de' ? 'Deutsch' : 'English'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={{
+          color: theme.textMuted, fontSize: typo.small,
+          textAlign: 'center', fontWeight: '600',
+        }}>
+          {i18n.t('role_picker.anon_hint')}
+        </Text>
       </View>
-
-      {/* Anonymity hint replaces sign-out card */}
-      <Text style={{ color: theme.textMuted, fontSize: 12, textAlign: 'center', fontWeight: '600' }}>
-        🔒 Anonymes Gerät · keine Anmeldung nötig
-      </Text>
     </View>
   );
 }
