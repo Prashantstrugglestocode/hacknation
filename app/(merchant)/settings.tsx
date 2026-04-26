@@ -71,7 +71,13 @@ export default function MerchantSettings() {
       const r = await fetch(`${API}/api/merchant/${merchantId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: location.lat, lng: location.lng }),
+        body: JSON.stringify({
+          lat: location.lat,
+          lng: location.lng,
+          // Persist the human-readable address too so the merchant doesn't see
+          // it revert to "lat, lng" after every save. Requires migration 004.
+          address: location.address,
+        }),
       });
       if (!r.ok) {
         Alert.alert('Fehler', 'Standort konnte nicht gespeichert werden.');

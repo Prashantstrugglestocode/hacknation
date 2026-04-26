@@ -25,6 +25,7 @@ merchant.post('/', async (c) => {
       type: body.type,
       lat: body.lat,
       lng: body.lng,
+      address: body.address ?? null,
       geohash6,
       goal: body.goal,
       max_discount_pct: body.max_discount_pct,
@@ -85,7 +86,7 @@ merchant.get('/:id', async (c) => {
 
 merchant.patch('/:id', async (c) => {
   const body = await c.req.json();
-  const allowed = ['goal', 'max_discount_pct', 'time_windows', 'inventory_tags', 'name', 'lat', 'lng'];
+  const allowed = ['goal', 'max_discount_pct', 'time_windows', 'inventory_tags', 'name', 'lat', 'lng', 'address'];
   const update: Record<string, any> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];

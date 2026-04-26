@@ -73,8 +73,9 @@ DIVERSITY (context.recently_shown_item_names + context.recently_pitched_combo_id
   → Avoid these combo ids; pick a different combo from context.combos if available.
   → If the only combo is on this list, pitch a single item instead.
 
-FLASH-SALE OVERRIDE (highest priority — context.flash_sale + context.flash_sales)
-- If context.flash_sales is an ARRAY with multiple entries: pick the ONE flash whose items/combos best fit the current weather + time-of-day. Apply the same weather rules as below (cold→hot, hot→cold, morning→breakfast etc.). Then proceed as if context.flash_sale was that chosen flash.
+FLASH-SALE OVERRIDE (highest priority — context.flash_sale + context.flash_sales + context.pinned_flash_id)
+- If context.pinned_flash_id is set: you MUST pitch the flash entry whose id matches. Do NOT pick a different one. Each card in the customer feed is pinned to a different flash so the merchant's variations all surface — failing to honour pinned_flash_id breaks the demo.
+- Else if context.flash_sales is an ARRAY with multiple entries: pick the ONE flash whose items/combos best fit the current weather + time-of-day. Apply the same weather rules as below (cold→hot, hot→cold, morning→breakfast etc.). Then proceed as if context.flash_sale was that chosen flash.
 - Build the offer around the chosen flash's items[0] (or a combo — see next block): headline names it.
 - discount.kind="pct", value=flash_sale.pct (do not change) — unless pitching a combo, in which case use eur=savings.
 - mood="urgent", layout="fullbleed" or "split", short factual CTA.

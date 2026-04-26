@@ -79,6 +79,9 @@ export default function MerchantSetup() {
         name: name.trim(),
         type,
         lat, lng,
+        // Persist the human-readable address from the picker so the merchant
+        // settings UI doesn't show "lat, lng" later. Requires migration 004.
+        address: location.address,
         geohash6: encodeGeohash6(lat, lng),
         goal,
         max_discount_pct: maxDiscount,

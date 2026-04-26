@@ -334,10 +334,10 @@ offer.post('/feed', async (c) => {
     .in('merchant_id', merchantIds)
     .eq('active', true);
   const merchantsWithMenu = new Set((menuMap ?? []).map(r => r.merchant_id));
-  const candidates = merchantRows.filter(m => merchantsWithMenu.has(m.id));
+  const merchantsWithItems = merchantRows.filter(m => merchantsWithMenu.has(m.id));
   // Don't fall back to merchants with no menu — show empty feed instead
   // (better than ghost offers from a shop that was just emptied).
-  const usableMerchants = candidates.length > 0 ? candidates : [];
+  const usableMerchants = merchantsWithItems.length > 0 ? merchantsWithItems : [];
   if (usableMerchants.length === 0) {
     return c.json({ offers: [] });
   }
@@ -373,7 +373,32 @@ offer.post('/feed', async (c) => {
     return { merchant: m, dist, score, triggers, payone: merchantPayone };
   });
   scored.sort((a, b) => b.score - a.score);
-  const top = scored.filter(s => s.score >= -0.3).slice(0, count);
+  const viable = scored.filter(s => s.score >= -0.3);
+
+  // Per-merchant flash expansion: each active flash deal becomes its own
+  // candidate card. A merchant with 3 flashes shows 3 cards, each pitched
+  // around a different flash via pinned_flash_id (LLM is forced to pitch
+  // that specific flash, see openai.ts prompt). Merchants with no active
+  // flashes still produce 1 generic card. Hard cap: 3 flash cards per
+  // merchant in a single feed so a single shop can't drown out the rest.
+  const FLASH_CARDS_PER_MERCHANT = 3;
+  type Candidate = typeof viable[number] & { pinnedFlashId?: string };
+  const candidates: Candidate[] = [];
+  for (const entry of viable) {
+    const flashes = listFlash(entry.merchant.id).slice(0, FLASH_CARDS_PER_MERCHANT);
+    if (flashes.length === 0) {
+      candidates.push(entry);
+    } else {
+      for (const f of flashes) {
+        candidates.push({ ...entry, pinnedFlashId: f.id });
+      }
+    }
+  }
+  // Effective count: bump the requested count if the top merchant has
+  // multiple flashes — judges expect to see all the flash variants the
+  // merchant just configured, not just one.
+  const effectiveCount = Math.max(count, Math.min(5, candidates.length));
+  const top = candidates.slice(0, effectiveCount);
 
   // Diversity bias: collect items + combos this device saw in the last 30 min
   // so the LLM avoids re-pitching the same things on pull-to-refresh. The
@@ -431,8 +456,13 @@ offer.post('/feed', async (c) => {
 
       // Multi-flash: gather every active flash for this merchant. Each is
       // enriched with its menu_items + combos so the LLM has enough context
-      // to pick the weather/time-best fit.
-      const allFlashes = listFlash(entry.merchant.id);
+      // to pick the weather/time-best fit. When this card is pinned to a
+      // specific flash (entry.pinnedFlashId set), we filter down to JUST
+      // that flash so the prompt has only one option to pitch.
+      const allFlashesRaw = listFlash(entry.merchant.id);
+      const allFlashes = entry.pinnedFlashId
+        ? allFlashesRaw.filter(f => f.id === entry.pinnedFlashId)
+        : allFlashesRaw;
       const enrichedFlashes = allFlashes.map(f => {
         const flashCombos = f.combo_ids.length > 0
           ? listCombos(entry.merchant.id)
@@ -499,6 +529,7 @@ offer.post('/feed', async (c) => {
           previous_layout: previousLayout,
           flash_sale: flashCtx,
           flash_sales: enrichedFlashes.length > 0 ? enrichedFlashes : undefined,
+          pinned_flash_id: entry.pinnedFlashId,
           combos: combosCtx,
           menu_items: menuItems.length > 0 ? menuItems : undefined,
           // Diversity hints — see comment block above the Promise.all().
