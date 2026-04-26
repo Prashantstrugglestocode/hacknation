@@ -55,5 +55,37 @@
     "generation_failed": "Could not load offer. Please try again.",
     "redemption_failed": "Redemption failed.",
     "invalid_qr": "Invalid or expired QR code."
+  },
+  "common": {
+    "saved_label": "Saved",
+    "back": "Back",
+    "close": "Close",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "ok": "OK",
+    "retry": "Retry",
+    "settings": "Settings",
+    "map": "Map",
+    "history": "History",
+    "menu": "Menu",
+    "items": "Items",
+    "why_short": "Why?",
+    "live": "LIVE"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "language_hint": "Sets the language for AI offers, descriptions, and hints.",
+    "behavior": "App behaviour",
+    "sound_label": "Sound on accept",
+    "sound_sub": "Chime when an offer is accepted or QR is scanned",
+    "haptics_label": "Haptic feedback",
+    "haptics_sub": "Vibration on tap and success",
+    "radius_label": "Search radius",
+    "radius_sub": "How far the app looks for shops on the map.",
+    "privacy": "Privacy",
+    "forget_me_button": "🗑  Forget me",
+    "forget_me_done": "✓ History wiped · hash rotated"
   }
 }

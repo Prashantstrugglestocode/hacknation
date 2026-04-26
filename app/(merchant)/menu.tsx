@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import FallbackImage from '../../lib/components/FallbackImage';
 import { itemImageUrl } from '../../lib/images';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -64,7 +64,9 @@ export default function MenuScreen() {
 
   const submitNew = async () => {
     setAddError(null);
-    if (!merchantId) {
+    // Always read the live merchant id — never trust possibly-stale state.
+    const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? merchantId;
+    if (!mid) {
       setAddError('Kein Geschäft eingerichtet.');
       return;
     }
@@ -74,23 +76,30 @@ export default function MenuScreen() {
     }
     setAdding(true);
     const name = newName.trim();
+    const priceCents = newPrice ? Math.round(parseFloat(newPrice.replace(',', '.')) * 100) : null;
+    const cat = newCategory;
     try {
-      const priceCents = newPrice ? Math.round(parseFloat(newPrice.replace(',', '.')) * 100) : null;
-      const res = await fetch(`${API}/api/merchant/${merchantId}/menu`, {
+      const res = await fetch(`${API}/api/merchant/${mid}/menu`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, price_cents: priceCents, category: newCategory }),
+        body: JSON.stringify({ name, price_cents: priceCents, category: cat }),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
         setAddError(`HTTP ${res.status}${msg ? ' · ' + msg.slice(0, 80) : ''}`);
         return;
       }
+      const created = await res.json().catch(() => null);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setNewName(''); setNewPrice('');
       setJustAdded(name);
       setTimeout(() => setJustAdded(null), 2200);
-      await load();
+      // Optimistic insert — show the item at the top immediately.
+      if (created?.id) {
+        setItems(prev => [created as MenuItem, ...prev]);
+      }
+      // Background re-sync so we pick up server-side normalization.
+      load();
     } catch (e: any) {
       setAddError(`Netzwerk: ${e?.message ?? 'Verbindung fehlgeschlagen'}`);
     } finally {
@@ -99,12 +108,11 @@ export default function MenuScreen() {
   };
 
   const load = useCallback(async () => {
-    let mid = merchantId;
-    if (!mid) {
-      mid = await AsyncStorage.getItem(MERCHANT_ID_KEY);
-      if (!mid) { setLoading(false); return; }
-      setMerchantId(mid);
-    }
+    // Always re-read the current merchant id from AsyncStorage so a picker
+    // switch is picked up on focus (params.id is frozen on mount).
+    const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? params.id ?? null;
+    if (!mid) { setLoading(false); return; }
+    setMerchantId(mid);
     try {
       const [menuRes, insRes] = await Promise.all([
         fetch(`${API}/api/merchant/${mid}/menu`),
@@ -120,9 +128,12 @@ export default function MenuScreen() {
     } finally {
       setLoading(false);
     }
-  }, [merchantId]);
+  }, [params.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Re-fetch on focus so a merchant switch (via picker) shows the right list.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onDelete = async (item: MenuItem) => {
     Alert.alert('Löschen?', item.name, [

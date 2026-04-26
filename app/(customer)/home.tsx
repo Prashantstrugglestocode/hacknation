@@ -15,6 +15,7 @@ import { WidgetSpecType } from '../../lib/generative/widget-spec';
 import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
 import { playChime } from '../../lib/sounds';
 import { hapticSuccess } from '../../lib/haptics';
+import { safePalette } from '../../lib/colors';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
@@ -171,12 +172,14 @@ export default function CustomerHome() {
     const offerId = state.offer.id;
 
     // Kick off the card→QR morph immediately; redeem screen will open with
-    // the same palette so the colors flow continuously.
+    // the same palette so the colors flow continuously. Normalize first so
+    // a malformed value never reaches RN's StyleSheet ("invalid colour value").
+    const safe = safePalette(spec.palette);
     const stripHash = (h: string) => h.replace(/^#/, '');
     const paletteParams = {
-      bg: stripHash(spec.palette.bg),
-      fg: stripHash(spec.palette.fg),
-      accent: stripHash(spec.palette.accent),
+      bg: stripHash(safe.bg),
+      fg: stripHash(safe.fg),
+      accent: stripHash(safe.accent),
     };
     setMorph(paletteParams);
     pendingNav.current = { id: offerId, palette: paletteParams };
@@ -317,26 +320,15 @@ export default function CustomerHome() {
                   onDecline={handleDecline}
                 />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <FreshnessChip generatedAt={state.generatedAt} />
-                <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/(customer)/menu/${state.offer.widget_spec.merchant.id}`)}
-                    hitSlop={12}
-                  >
-                    <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '700' }}>
-                      📋 Speisekarte
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
-                    hitSlop={12}
-                  >
-                    <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
-                      {i18n.t('customer.why')}  ›
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <TouchableOpacity
+                  onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
+                  hitSlop={12}
+                >
+                  <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+                    {i18n.t('common.why_short')}  ›
+                  </Text>
+                </TouchableOpacity>
               </View>
             </MotiView>
           ) : null}

@@ -7,6 +7,7 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import CountdownRing from '../../../lib/components/CountdownRing';
+import { safeHex } from '../../../lib/colors';
 import { theme } from '../../../lib/theme';
 import i18n from '../../../lib/i18n';
 
@@ -79,9 +80,9 @@ export default function RedeemScreen() {
   };
 
   const palette = useMemo(() => ({
-    bg: bg ? `#${bg}` : (offer?.widget_spec?.palette?.bg ?? theme.primary),
-    fg: fg ? `#${fg}` : (offer?.widget_spec?.palette?.fg ?? '#FFFFFF'),
-    accent: accent ? `#${accent}` : (offer?.widget_spec?.palette?.accent ?? theme.primary),
+    bg: safeHex(bg ? `#${bg}` : offer?.widget_spec?.palette?.bg, theme.primary),
+    fg: safeHex(fg ? `#${fg}` : offer?.widget_spec?.palette?.fg, '#FFFFFF'),
+    accent: safeHex(accent ? `#${accent}` : offer?.widget_spec?.palette?.accent, theme.primary),
   }), [bg, fg, accent, offer]);
 
   const handleCashback = async () => {

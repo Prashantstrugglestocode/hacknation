@@ -9,6 +9,7 @@ import { encodeGeohash6 } from '../context/geohash';
 import { SavingsStats } from '../savings';
 import AnimatedNumber from './AnimatedNumber';
 import LangToggle from './LangToggle';
+import i18n from '../i18n';
 import { theme, space, radius, type } from '../theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -86,22 +87,24 @@ export default function LiveHeader({ stats }: Props) {
               numberOfLines={1}
             >
               {live
-                ? `LIVE · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
-                : 'LIVE · wird geladen…'}
+                ? `${i18n.t('common.live')} · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
+                : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
             </Text>
           </View>
           <LangToggle variant="dark" />
         </View>
 
-        {/* Row 2 — savings number (left) + streak + heart (right) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.xs }}>
+        {/* Row 2 — savings number stack (left) + streak + heart (right) */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={{ color: theme.textMuted, fontSize: type.caption, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' }}>
+              {i18n.t('common.saved_label')}
+            </Text>
             <AnimatedNumber
               value={stats.total_eur}
               format={fmtEur}
-              style={{ color: theme.text, fontSize: type.display, fontWeight: '900', letterSpacing: -0.6 }}
+              style={{ color: theme.text, fontSize: type.display, fontWeight: '900', letterSpacing: -0.6, lineHeight: type.display + 4 }}
             />
-            <Text style={{ color: theme.textMuted, fontSize: type.body, fontWeight: '600' }}>gespart</Text>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -126,34 +129,27 @@ export default function LiveHeader({ stats }: Props) {
               onPress={() => router.push('/(customer)/saved')}
               hitSlop={10}
               style={{
-                width: 44, height: 44, borderRadius: 22,
+                width: 40, height: 40, borderRadius: 20,
                 backgroundColor: theme.primaryWash,
                 borderWidth: 1, borderColor: theme.primary + '44',
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 18 }}>❤️</Text>
+              <Text style={{ fontSize: 16 }}>❤️</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/settings' as any)}
+              hitSlop={10}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: theme.surface,
+                borderWidth: 1, borderColor: theme.border,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>⚙️</Text>
             </Pressable>
           </View>
-        </View>
-
-        {/* Row 3 — secondary navigation as text links (less visual weight) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xl }}>
-          <Pressable onPress={() => router.push('/(customer)/map')} hitSlop={8}>
-            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
-              🗺  Karte
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/(customer)/history')} hitSlop={8}>
-            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
-              🕐  Verlauf
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/settings' as any)} hitSlop={8}>
-            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
-              ⚙️  Einstellungen
-            </Text>
-          </Pressable>
         </View>
       </BlurView>
     </View>

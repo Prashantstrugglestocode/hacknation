@@ -4,6 +4,7 @@ import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WidgetSpecType } from '../widget-spec';
 import { entryTransition } from '../mood';
+import i18n from '../../i18n';
 
 interface Props {
   spec: WidgetSpecType;
@@ -91,7 +92,7 @@ export default function SplitLayout({ spec, onAccept, onDecline }: Props) {
             <Text style={{ color: palette.bg, fontSize: 15, fontWeight: '700' }}>{cta}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={onDecline} style={{ alignItems: 'center', marginTop: 8 }}>
-            <Text style={{ color: palette.fg + '55', fontSize: 12 }}>Verstanden</Text>
+            <Text style={{ color: palette.fg + '55', fontSize: 12 }}>{i18n.t('customer.decline')}</Text>
           </TouchableOpacity>
         </View>
       </View>

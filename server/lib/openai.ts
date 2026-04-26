@@ -1,19 +1,37 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { WidgetSpec } from './widget-spec.ts';
+import { scrubPII } from './pii-scrubber.ts';
 
 // Ollama runs locally on port 11434 with an OpenAI-compatible API
 // Falls back to OpenAI API if OPENAI_API_KEY is set and Ollama fails
+// Per-request timeout — Ollama can wedge silently and previously hung
+// the offer-generate endpoint indefinitely. After timeout the next
+// retry kicks in, then Mistral fallback (if key set), then OpenAI,
+// then the deterministic fillDefaults() so the customer always sees
+// an offer.
 const ollamaClient = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
   apiKey: 'ollama', // required by SDK but ignored by Ollama
+  timeout: 12000,
+  maxRetries: 0,
 });
+
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({
+      baseURL: 'https://api.mistral.ai/v1',
+      apiKey: process.env.MISTRAL_API_KEY,
+      timeout: 20000,
+      maxRetries: 0,
+    })
+  : null;
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 const LOCAL_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
+const MISTRAL_MODEL = process.env.MISTRAL_MODEL ?? 'mistral-small-latest';
 
 const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator. Produce ONE JSON offer.
 
@@ -106,14 +124,28 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
   p.palette.bg = normalizeHex(p.palette.bg, '#1A1A2E');
   p.palette.fg = normalizeHex(p.palette.fg, '#FFFFFF');
   p.palette.accent = normalizeHex(p.palette.accent, '#E11D48');
-  p.headline = p.headline ?? 'Angebot in der Nähe';
-  p.subline = p.subline ?? 'Schau vorbei.';
-  p.cta = p.cta ?? 'Akzeptieren';
+  // Merchant-specific fallbacks so a deterministic offer (when LLM is down)
+  // still names the shop and reads as plausibly real.
+  const isEN = locale === 'en';
+  const distM = Math.round(distance_m);
+  const merchantName = merchant.name ?? (isEN ? 'a nearby shop' : 'in deiner Nähe');
+  const tag = (merchant.inventory_tags ?? [])[0];
+  const fallbackHeadline = tag
+    ? (isEN ? `${tag} at ${merchantName}` : `${tag} bei ${merchantName}`)
+    : (isEN ? `Visit ${merchantName}` : `Schau bei ${merchantName} vorbei`);
+  const fallbackSubline = isEN
+    ? `${distM} m away · ${Math.min(15, merchant.max_discount_pct ?? 15)} % off today`
+    : `${distM} m entfernt · ${Math.min(15, merchant.max_discount_pct ?? 15)} % Rabatt heute`;
+  p.headline = p.headline ?? fallbackHeadline;
+  p.subline = p.subline ?? fallbackSubline;
+  p.cta = p.cta ?? (isEN ? 'Take it' : 'Akzeptieren');
   if (!Array.isArray(p.signal_chips) || p.signal_chips.length < 2) {
-    p.signal_chips = ['Live', `${Math.round(distance_m)} m`];
+    p.signal_chips = ['Live', `${distM} m`];
   }
   p.pressure = p.pressure ?? null;
-  p.reasoning = p.reasoning ?? 'Passend zu deinem aktuellen Kontext.';
+  p.reasoning = p.reasoning ?? (isEN
+    ? 'Local shop near you with an active offer.'
+    : 'Geschäft in deiner Nähe mit einem aktiven Angebot.');
   p.merchant = p.merchant ?? {};
   p.merchant.id = p.merchant.id ?? merchant.id;
   p.merchant.name = p.merchant.name ?? merchant.name;
@@ -190,7 +222,11 @@ export async function generateOffer(params: {
   locale: string;
   distance_m: number;
 }): Promise<any> {
-  const userMessage = JSON.stringify({
+  // PII-scrub the user message before it leaves our process. Strips emails,
+  // phones, IBANs, IPs from anything that ends up in inventory_tags or
+  // free-text context. Defense-in-depth alongside the client-side intent
+  // encoder which already abstracts location to a 1.2km geohash.
+  const userMessage = scrubPII(JSON.stringify({
     merchant: {
       id: params.merchant.id,
       name: params.merchant.name,
@@ -203,12 +239,21 @@ export async function generateOffer(params: {
     context: params.context,
     locale: params.locale,
     distance_m: Math.round(params.distance_m),
-  });
+  }));
 
   const m = params.merchant;
   const d = params.distance_m;
 
-  // Try Ollama (gemma3:4b) first — retry up to 2x because small models occasionally under-fill JSON
+  // Mistral first — reliable cloud, ~3-8s. Falls through if no key.
+  if (mistralClient) {
+    try {
+      return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
+    } catch (e) {
+      console.warn(`[offer-engine] Mistral (${MISTRAL_MODEL}) failed:`, (e as Error).message);
+    }
+  }
+
+  // Ollama second — local, free, but can wedge.
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
@@ -217,7 +262,7 @@ export async function generateOffer(params: {
     }
   }
 
-  // Fallback: OpenAI API if key is set
+  // OpenAI third — only if key set.
   if (openaiClient) {
     try {
       return await tryGenerate(openaiClient, 'gpt-4o-mini', userMessage, params.locale, m, d);

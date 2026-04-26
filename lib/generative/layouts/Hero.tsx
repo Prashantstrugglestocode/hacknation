@@ -5,6 +5,7 @@ import { WidgetSpecType } from '../widget-spec';
 import { entryTransition, chipDelay, pressTransition, ctaPulseConfig } from '../mood';
 import HeroVisual from './HeroVisual';
 import SaveHeart from '../../components/SaveHeart';
+import i18n from '../../i18n';
 
 interface Props {
   spec: WidgetSpecType;
@@ -131,7 +132,7 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
           </MotiView>
 
           <Pressable onPress={onDecline} style={{ alignItems: 'center', marginTop: 10 }}>
-            <Text style={{ color: palette.fg + '66', fontSize: 13, fontWeight: '600' }}>Verstanden</Text>
+            <Text style={{ color: palette.fg + '66', fontSize: 13, fontWeight: '600' }}>{i18n.t('customer.decline')}</Text>
           </Pressable>
         </View>
       </View>

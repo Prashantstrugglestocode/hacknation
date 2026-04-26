@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Dimensions, Pressable } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { MotiView, AnimatePresence } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -102,41 +102,58 @@ export default function MerchantDashboard() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      const id = await AsyncStorage.getItem('merchant_id');
-      if (!id) { router.replace('/(merchant)/setup'); return; }
-      try {
-        const r = await fetch(`${API}/api/merchant/${id}`);
-        if (r.ok) setMerchant(await r.json());
-      } catch {}
-      fetchStats(id);
-      fetchMenuCount(id);
-
-      const unsub = subscribeMerchantChannel(id, (event) => {
-        setFeed(prev => [{
-          type: event.type,
-          ts: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-          discount_amount_cents: event.discount_amount_cents,
-        }, ...prev].slice(0, 12));
-        setPulseKey(k => k + 1);
-        const key = Date.now();
-        setEventToast({ key, type: event.type, cents: event.discount_amount_cents });
-        if (toastTimer.current) clearTimeout(toastTimer.current);
-        toastTimer.current = setTimeout(() => setEventToast(null), 2000);
+  // Re-fetch on every focus — picks up merchant switches via picker, new
+  // shop creation from setup, and any background data updates.
+  useFocusEffect(
+    useCallback(() => {
+      let unsub: (() => void) | undefined;
+      (async () => {
+        const id = await AsyncStorage.getItem('merchant_id');
+        if (!id) { router.replace('/(merchant)/setup'); return; }
+        try {
+          const r = await fetch(`${API}/api/merchant/${id}`);
+          if (r.ok) setMerchant(await r.json());
+        } catch {}
         fetchStats(id);
-      });
+        fetchMenuCount(id);
+
+        unsub = subscribeMerchantChannel(id, (event) => {
+          setFeed(prev => [{
+            type: event.type,
+            ts: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+            discount_amount_cents: event.discount_amount_cents,
+          }, ...prev].slice(0, 12));
+          setPulseKey(k => k + 1);
+          const key = Date.now();
+          setEventToast({ key, type: event.type, cents: event.discount_amount_cents });
+          if (toastTimer.current) clearTimeout(toastTimer.current);
+          toastTimer.current = setTimeout(() => setEventToast(null), 2000);
+          fetchStats(id);
+          fetchMenuCount(id);
+        });
+      })();
       return () => {
-        unsub();
+        if (unsub) unsub();
         if (toastTimer.current) clearTimeout(toastTimer.current);
       };
-    })();
-  }, []);
+    }, [fetchStats, fetchMenuCount])
+  );
 
   const greeting = greetingFor(new Date().getHours());
   const lastWeek = stats.weekly?.[stats.weekly.length - 1];
   const acceptPct = Math.round(stats.accept_rate * 100);
   const redemptionPct = stats.accepted > 0 ? Math.round((stats.redeemed / stats.accepted) * 100) : 0;
+
+  // Tile-tap helpers — read merchant.id but fall back to AsyncStorage so a
+  // tap during the brief "merchant fetching" window doesn't silently no-op.
+  const goToMenu = async () => {
+    const id = merchant?.id ?? await AsyncStorage.getItem('merchant_id');
+    if (id) router.push(`/(merchant)/menu?id=${id}`);
+  };
+  const goToPreview = async () => {
+    const id = merchant?.id ?? await AsyncStorage.getItem('merchant_id');
+    if (id) router.push(`/(merchant)/preview?id=${id}`);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -313,7 +330,7 @@ export default function MerchantDashboard() {
         {/* QUICK ACTIONS — 3-up tile row, varied tile shapes */}
         <View style={{ flexDirection: 'row', paddingHorizontal: 14, marginTop: 22, gap: 10 }}>
           <ActionTile
-            onPress={() => merchant && router.push(`/(merchant)/preview?id=${merchant.id}`)}
+            onPress={goToPreview}
             emoji="👁"
             title="Vorschau"
             sub="Live-Beispiel"
@@ -326,7 +343,7 @@ export default function MerchantDashboard() {
             sub="Sofort-Aktion"
           />
           <ActionTile
-            onPress={() => merchant && router.push(`/(merchant)/menu?id=${merchant.id}`)}
+            onPress={goToMenu}
             emoji="📋"
             title="Karte"
             sub={menuCount != null ? `${menuCount} Posten` : 'Posten & KI'}

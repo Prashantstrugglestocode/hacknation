@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
 import { WidgetSpecType } from '../widget-spec';
+import i18n from '../../i18n';
 
 interface Props {
   spec: WidgetSpecType;
@@ -93,7 +94,7 @@ export default function StickerLayout({ spec, onAccept, onDecline }: Props) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onDecline} style={{ alignItems: 'center', marginTop: 8 }}>
-          <Text style={{ color: palette.fg + '55', fontSize: 13 }}>Verstanden</Text>
+          <Text style={{ color: palette.fg + '55', fontSize: 13 }}>{i18n.t('customer.decline')}</Text>
         </TouchableOpacity>
       </MotiView>
     </View>

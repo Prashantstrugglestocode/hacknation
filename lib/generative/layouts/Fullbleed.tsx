@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { MotiView } from 'moti';
 import { WidgetSpecType } from '../widget-spec';
 import { entryTransition, ctaPulseConfig } from '../mood';
+import i18n from '../../i18n';
 
 interface Props {
   spec: WidgetSpecType;
@@ -93,7 +94,7 @@ export default function FullbleedLayout({ spec, onAccept, onDecline }: Props) {
           </TouchableOpacity>
         </MotiView>
         <TouchableOpacity onPress={onDecline} style={{ alignItems: 'center', marginTop: 12 }}>
-          <Text style={{ color: palette.fg + '66', fontSize: 14 }}>Verstanden</Text>
+          <Text style={{ color: palette.fg + '66', fontSize: 14 }}>{i18n.t('customer.decline')}</Text>
         </TouchableOpacity>
       </View>
     </MotiView>

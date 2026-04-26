@@ -16,15 +16,6 @@ interface Row {
   value: string;
 }
 
-const SOURCES: Row[] = [
-  { emoji: '🌧', label: 'Wetterdaten', value: 'DWD Brightsky' },
-  { emoji: '🗺', label: 'Standorte (POIs)', value: 'OpenStreetMap · Overpass' },
-  { emoji: '🎫', label: 'Events', value: 'Ticketmaster Discovery' },
-  { emoji: '💳', label: 'Transaktions-Dichte', value: 'Payone (simuliert)' },
-  { emoji: '🤖', label: 'Angebots-KI', value: 'Ollama gemma3:4b lokal' },
-  { emoji: '👁', label: 'Karten-Vision-KI', value: 'Ollama llava:7b lokal' },
-];
-
 export default function Settings() {
   const [forgotDone, setForgotDone] = useState(false);
   const { prefs, toggleSound, toggleHaptics, setRadius } = usePrefs();
@@ -118,19 +109,12 @@ export default function Settings() {
           </View>
         </Section>
 
-        {/* Privacy */}
+        {/* Privacy — single user action */}
         <Section title="DATENSCHUTZ">
-          <Row
-            emoji="📍"
-            label="Standort-Genauigkeit"
-            value="Geohash 6 (~1,2 km Zelle)"
-          />
-          <Row emoji="🆔" label="Geräte-Hash" value="Anonym, rotierbar" />
-          <Row emoji="💾" label="Verlauf" value="Nur lokal gespeichert" />
           {forgotDone ? (
             <View style={{
               backgroundColor: theme.success + '22', borderRadius: radius.md, padding: space.md,
-              alignItems: 'center', borderWidth: 1, borderColor: theme.success + '66', marginTop: space.sm,
+              alignItems: 'center', borderWidth: 1, borderColor: theme.success + '66',
             }}>
               <Text style={{ color: theme.success, fontSize: type.body, fontWeight: '800' }}>
                 ✓ Verlauf gelöscht · Hash rotiert
@@ -140,28 +124,14 @@ export default function Settings() {
             <TouchableOpacity onPress={handleForgetMe}
               style={{
                 backgroundColor: theme.danger + '11', borderRadius: radius.md,
-                paddingVertical: space.md, alignItems: 'center', marginTop: space.sm,
+                paddingVertical: space.md, alignItems: 'center',
                 borderWidth: 1, borderColor: theme.danger + '44',
               }}>
               <Text style={{ color: theme.danger, fontSize: type.body, fontWeight: '800' }}>
-                🗑  Vergiss mich (löscht Verlauf, rotiert Hash)
+                🗑  Vergiss mich
               </Text>
             </TouchableOpacity>
           )}
-        </Section>
-
-        {/* Datenquellen */}
-        <Section title="ECHTE DATENQUELLEN">
-          {SOURCES.map(s => (
-            <Row key={s.label} emoji={s.emoji} label={s.label} value={s.value} />
-          ))}
-        </Section>
-
-        {/* About */}
-        <Section title="ÜBER">
-          <Row emoji="🏷" label="Version" value="1.0.0 · Hackathon" />
-          <Row emoji="🏛" label="Brief" value="DSV Gruppe / MIT Club" />
-          <Row emoji="💳" label="Stack" value="Expo · Hono · Supabase · Ollama" />
         </Section>
       </ScrollView>
     </View>

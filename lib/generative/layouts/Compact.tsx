@@ -4,6 +4,7 @@ import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WidgetSpecType } from '../widget-spec';
 import { entryTransition, pressTransition } from '../mood';
+import i18n from '../../i18n';
 
 interface Props {
   spec: WidgetSpecType;
@@ -125,7 +126,7 @@ export default function CompactLayout({ spec, onAccept, onDecline }: Props) {
       </MotiView>
 
       <Pressable onPress={onDecline} style={{ alignSelf: 'center', marginTop: 12 }} hitSlop={10}>
-        <Text style={{ color: palette.fg + '55', fontSize: 13, fontWeight: '600' }}>Verstanden</Text>
+        <Text style={{ color: palette.fg + '55', fontSize: 13, fontWeight: '600' }}>{i18n.t('customer.decline')}</Text>
       </Pressable>
     </View>
   );

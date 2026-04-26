@@ -55,5 +55,37 @@
     "generation_failed": "Angebot konnte nicht geladen werden. Bitte erneut versuchen.",
     "redemption_failed": "Einlösung fehlgeschlagen.",
     "invalid_qr": "Ungültiger oder abgelaufener QR-Code."
+  },
+  "common": {
+    "saved_label": "Gespart",
+    "back": "Zurück",
+    "close": "Schließen",
+    "cancel": "Abbrechen",
+    "loading": "Lädt…",
+    "saving": "Wird gespeichert…",
+    "ok": "OK",
+    "retry": "Erneut versuchen",
+    "settings": "Einstellungen",
+    "map": "Karte",
+    "history": "Verlauf",
+    "menu": "Speisekarte",
+    "items": "Posten",
+    "why_short": "Warum?",
+    "live": "LIVE"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "language_hint": "Bestimmt die Sprache für KI-Angebote, Beschreibungen und Hinweise.",
+    "behavior": "App-Verhalten",
+    "sound_label": "Sound bei Annahme",
+    "sound_sub": "Chime wenn ein Angebot angenommen oder QR gescannt wird",
+    "haptics_label": "Haptisches Feedback",
+    "haptics_sub": "Vibration bei Tap und Erfolg",
+    "radius_label": "Such-Radius",
+    "radius_sub": "Wie weit die App nach Geschäften und Karte sucht.",
+    "privacy": "Datenschutz",
+    "forget_me_button": "🗑  Vergiss mich",
+    "forget_me_done": "✓ Verlauf gelöscht · Hash rotiert"
   }
 }
