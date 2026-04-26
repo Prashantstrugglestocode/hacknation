@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -239,6 +239,16 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
 }) {
   const [items, setItems] = useState<ExtractedItem[]>(initial);
   const [saving, setSaving] = useState(false);
+  // Free-form text buffer per row for the price input. Without this, every
+  // keystroke would re-format via toFixed(2) and block the user from typing
+  // decimals naturally ("3" → "3.00" → can't type ".5" anymore).
+  const [priceDrafts, setPriceDrafts] = useState<Record<number, string>>(() => {
+    const seed: Record<number, string> = {};
+    initial.forEach((it, i) => {
+      seed[i] = it.price_cents != null ? (it.price_cents / 100).toFixed(2) : '';
+    });
+    return seed;
+  });
 
   const updateItem = (i: number, patch: Partial<ExtractedItem>) => {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it));
@@ -246,13 +256,40 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
   const removeItem = (i: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setItems(prev => prev.filter((_, idx) => idx !== i));
+    setPriceDrafts(prev => {
+      const next: Record<number, string> = {};
+      let target = 0;
+      Object.keys(prev).forEach((k) => {
+        const idx = Number(k);
+        if (idx === i) return;
+        next[target++] = prev[idx];
+      });
+      return next;
+    });
   };
-  const setPriceFromText = (i: number, txt: string) => {
-    const norm = txt.trim().replace(',', '.');
-    if (norm === '') { updateItem(i, { price_cents: null }); return; }
-    const n = parseFloat(norm);
-    if (!Number.isFinite(n) || n <= 0) return;
-    updateItem(i, { price_cents: Math.round(n * 100) });
+
+  // Commit the typed price draft into structured price_cents on blur. While
+  // the user is typing, only the draft string is updated — never the cents.
+  const onPriceDraftChange = (i: number, txt: string) => {
+    setPriceDrafts(prev => ({ ...prev, [i]: txt }));
+  };
+  const commitPriceDraft = (i: number) => {
+    const raw = (priceDrafts[i] ?? '').trim().replace(',', '.');
+    if (raw === '') {
+      updateItem(i, { price_cents: null });
+      setPriceDrafts(prev => ({ ...prev, [i]: '' }));
+      return;
+    }
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      // Invalid — revert the draft to whatever cents currently holds.
+      const cents = items[i]?.price_cents;
+      setPriceDrafts(prev => ({ ...prev, [i]: cents != null ? (cents / 100).toFixed(2) : '' }));
+      return;
+    }
+    const cents = Math.round(n * 100);
+    updateItem(i, { price_cents: cents });
+    setPriceDrafts(prev => ({ ...prev, [i]: (cents / 100).toFixed(2) }));
   };
 
   const save = async () => {
@@ -285,7 +322,13 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // The header is fixed-height; offsetting by it lets the price-row
+      // ScrollView scroll the focused field above the keyboard.
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       {/* Header */}
       <View style={{
         paddingHorizontal: 20,
@@ -318,7 +361,7 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, gap: 12 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -416,11 +459,14 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
                 </Text>
                 <View style={{ flex: 1 }} />
                 <TextInput
-                  value={it.price_cents != null ? (it.price_cents / 100).toFixed(2) : ''}
-                  onChangeText={(t) => setPriceFromText(i, t)}
+                  value={priceDrafts[i] ?? ''}
+                  onChangeText={(t) => onPriceDraftChange(i, t)}
+                  onBlur={() => commitPriceDraft(i)}
+                  onSubmitEditing={() => commitPriceDraft(i)}
                   placeholder="0.00"
                   placeholderTextColor={theme.textMuted}
                   keyboardType="decimal-pad"
+                  returnKeyType="done"
                   style={{
                     minWidth: 70, textAlign: 'right',
                     color: theme.primary, fontSize: 17, fontWeight: '900',
@@ -465,6 +511,6 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
