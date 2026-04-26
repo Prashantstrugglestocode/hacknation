@@ -21,7 +21,7 @@ import ShimmerCard from '../../lib/components/Shimmer';
 import LlmStatusPill from '../../lib/components/LlmStatusPill';
 import FreshnessChip from '../../lib/components/FreshnessChip';
 import Confetti from '../../lib/components/Confetti';
-import { theme } from '../../lib/theme';
+import { theme, space } from '../../lib/theme';
 import i18n from '../../lib/i18n';
 
 const { height } = Dimensions.get('window');
@@ -260,12 +260,12 @@ export default function CustomerHome() {
       />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+        contentContainerStyle={{ flexGrow: 1, padding: space.lg, gap: space.md }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
         }
       >
-        <View style={{ alignItems: 'center', marginBottom: 10 }}>
+        <View style={{ alignItems: 'center' }}>
           <RoleSwitch active="customer" />
         </View>
         <LiveHeader stats={stats} />

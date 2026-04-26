@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
@@ -9,7 +9,7 @@ import { encodeGeohash6 } from '../context/geohash';
 import { SavingsStats } from '../savings';
 import AnimatedNumber from './AnimatedNumber';
 import LangToggle from './LangToggle';
-import { theme } from '../theme';
+import { theme, space, radius, type } from '../theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
@@ -64,95 +64,91 @@ export default function LiveHeader({ stats }: Props) {
     return () => { mounted = false; if (timer) clearInterval(timer); };
   }, []);
 
-  const tickerLabel = live
-    ? `${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c} °C · ${String(live.hour).padStart(2, '0')}:${String(live.minute).padStart(2, '0')}`
-    : 'Wird geladen…';
-
   return (
     <View style={{
-      borderRadius: 18, overflow: 'hidden', marginBottom: 14,
+      borderRadius: radius.lg, overflow: 'hidden', marginBottom: space.md,
       borderWidth: 1, borderColor: theme.border,
       backgroundColor: theme.surface,
     }}>
-      <BlurView intensity={30} tint="light" style={{ paddingVertical: 14, paddingHorizontal: 16 }}>
+      <BlurView intensity={30} tint="light" style={{ paddingVertical: space.md, paddingHorizontal: space.lg, gap: space.md }}>
+
+        {/* Row 1 — small live ticker + lang toggle */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <MotiView
-                from={{ scale: 0.9, opacity: 0.5 }}
-                animate={{ scale: 1.4, opacity: 1 }}
-                transition={{ type: 'timing', duration: 1100, loop: true }}
-                style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
-              />
-              <Text style={{ color: theme.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 }}>
-                LIVE · {tickerLabel}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-              <AnimatedNumber
-                value={stats.total_eur}
-                format={fmtEur}
-                style={{ color: theme.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 }}
-              />
-              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '600' }}>gespart</Text>
-            </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flex: 1 }}>
+            <MotiView
+              from={{ scale: 0.9, opacity: 0.5 }}
+              animate={{ scale: 1.4, opacity: 1 }}
+              transition={{ type: 'timing', duration: 1100, loop: true }}
+              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
+            />
+            <Text
+              style={{ color: theme.primary, fontSize: type.micro, fontWeight: '800', letterSpacing: 1.4 }}
+              numberOfLines={1}
+            >
+              {live
+                ? `LIVE · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
+                : 'LIVE · wird geladen…'}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <LangToggle variant="dark" />
+        </View>
+
+        {/* Row 2 — savings number (left) + streak + heart (right) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.xs }}>
+            <AnimatedNumber
+              value={stats.total_eur}
+              format={fmtEur}
+              style={{ color: theme.text, fontSize: type.display, fontWeight: '900', letterSpacing: -0.6 }}
+            />
+            <Text style={{ color: theme.textMuted, fontSize: type.body, fontWeight: '600' }}>gespart</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
             {showStreak && (
               <MotiView
                 from={{ scale: 0.7, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', damping: 14 }}
                 style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: theme.primary, borderRadius: 999,
-                  paddingHorizontal: 11, paddingVertical: 6,
+                  flexDirection: 'row', alignItems: 'center', gap: space.xs,
+                  backgroundColor: theme.primary, borderRadius: radius.pill,
+                  paddingHorizontal: space.md, paddingVertical: space.xs,
                 }}
               >
-                <Text style={{ fontSize: 13 }}>🔥</Text>
-                <Text style={{ color: theme.textOnPrimary, fontSize: 13, fontWeight: '800' }}>
+                <Text style={{ fontSize: type.body }}>🔥</Text>
+                <Text style={{ color: theme.textOnPrimary, fontSize: type.small, fontWeight: '900' }}>
                   {stats.count_this_week}
                 </Text>
               </MotiView>
             )}
-            <TouchableOpacity
+            <Pressable
               onPress={() => router.push('/(customer)/saved')}
               hitSlop={10}
               style={{
-                width: 36, height: 36, borderRadius: 18,
+                width: 44, height: 44, borderRadius: 22,
                 backgroundColor: theme.primaryWash,
                 borderWidth: 1, borderColor: theme.primary + '44',
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16 }}>❤️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/(customer)/map')}
-              hitSlop={10}
-              style={{
-                width: 36, height: 36, borderRadius: 18,
-                backgroundColor: theme.surface,
-                borderWidth: 1, borderColor: theme.border,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 14 }}>🗺</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/(customer)/history')}
-              hitSlop={10}
-              style={{
-                width: 36, height: 36, borderRadius: 18,
-                backgroundColor: theme.surface,
-                borderWidth: 1, borderColor: theme.border,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 14 }}>🕐</Text>
-            </TouchableOpacity>
-            <LangToggle variant="dark" />
+              <Text style={{ fontSize: 18 }}>❤️</Text>
+            </Pressable>
           </View>
+        </View>
+
+        {/* Row 3 — secondary navigation as text links (less visual weight) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space['2xl'] }}>
+          <Pressable onPress={() => router.push('/(customer)/map')} hitSlop={8}>
+            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
+              🗺  Karte
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/(customer)/history')} hitSlop={8}>
+            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
+              🕐  Verlauf
+            </Text>
+          </Pressable>
         </View>
       </BlurView>
     </View>
