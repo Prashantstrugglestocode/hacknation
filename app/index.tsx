@@ -16,20 +16,13 @@ const MERCHANT_KEY = 'merchant_id';
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
 // Anon-device-hash boot (no login wall — brief anti-pattern).
-// The landing screen now stays until the user explicitly swipes up so the
-// brand moment isn't a 450ms blip. Routes after swipe:
-//   has merchant_id    → /(merchant)/dashboard
-//   role=customer      → /(customer)/home
-//   role=merchant      → /(merchant)/setup
-//   no choice yet      → /role
+// Landing screen stays until the user explicitly swipes up. After the
+// swipe we ALWAYS go to /role — even if a role + merchant_id are saved.
+// The role picker → walkthrough → home/setup chain runs every session
+// per product decision so each demo run starts at the same shared step.
 async function decideDestination(): Promise<string> {
-  const [merchantId, role] = await Promise.all([
-    AsyncStorage.getItem(MERCHANT_KEY),
-    AsyncStorage.getItem(ROLE_KEY),
-  ]);
-  if (merchantId) return '/(merchant)/dashboard';
-  if (role === 'customer') return '/(customer)/home';
-  if (role === 'merchant') return '/(merchant)/setup';
+  // Async pre-warm only; don't gate routing on the result.
+  void AsyncStorage.multiGet([MERCHANT_KEY, ROLE_KEY]).catch(() => {});
   return '/role';
 }
 

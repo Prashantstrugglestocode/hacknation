@@ -15,16 +15,19 @@ const { height } = Dimensions.get('window');
 export default function RolePicker() {
   const insets = useSafeAreaInsets();
 
+  // Both role choices now route through a per-role walkthrough first.
+  // Walkthrough's "Get started" / "Skip" finishes into the right home
+  // screen for that role, so this picker doesn't need to know about
+  // existing merchant_ids etc. anymore.
   const goCustomer = async () => {
     await AsyncStorage.setItem(ROLE_KEY, 'customer');
     Haptics.selectionAsync().catch(() => {});
-    router.replace('/(customer)/home');
+    router.replace('/(customer)/walkthrough');
   };
   const goMerchant = async () => {
     await AsyncStorage.setItem(ROLE_KEY, 'merchant');
     Haptics.selectionAsync().catch(() => {});
-    const existing = await AsyncStorage.getItem('merchant_id');
-    router.replace(existing ? '/(merchant)/dashboard' : '/(merchant)/setup');
+    router.replace('/(merchant)/walkthrough');
   };
 
   return (

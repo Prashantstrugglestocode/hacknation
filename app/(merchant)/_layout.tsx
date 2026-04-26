@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 export default function MerchantLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="walkthrough" options={{ presentation: 'fullScreenModal', animation: 'slide_from_right' }} />
       <Stack.Screen name="setup" />
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
