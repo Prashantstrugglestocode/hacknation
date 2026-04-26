@@ -20,7 +20,18 @@ menu.post('/:id/menu/scan', async (c) => {
   const body = await c.req.json() as { photo_data_url?: string; dry_run?: boolean };
   if (!body.photo_data_url) return c.json({ error: 'photo_data_url required' }, 400);
 
-  const items = await extractMenu(body.photo_data_url);
+  let items: Awaited<ReturnType<typeof extractMenu>>;
+  try {
+    items = await extractMenu(body.photo_data_url);
+  } catch (e) {
+    // All vision tiers failed — surface a clear error to the client so the
+    // user sees "OCR unavailable, try again" instead of canned demo data.
+    return c.json({
+      error: 'OCR backends unavailable. Check MISTRAL_API_KEY (free-tier may be rate-limited) or pull `ollama pull llava:7b` for the on-device fallback.',
+      code: (e as Error).message ?? 'OCR_FAILED',
+      items: [],
+    }, 503);
+  }
   if (items.length === 0) return c.json({ items: [] });
 
   // dry_run: return the OCR result without writing — the client review screen

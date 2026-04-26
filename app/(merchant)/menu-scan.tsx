@@ -52,14 +52,24 @@ export default function MenuScan() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ photo_data_url: dataUrl, dry_run: true }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      // 503 → all vision tiers failed (rate-limit / no key / no Ollama).
+      // Surface the server's actual reason so the merchant knows what to fix.
+      if (!res.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setPhase({
+          kind: 'error',
+          message: data?.error
+            ?? `OCR failed (HTTP ${res.status}). Check the server's MISTRAL_API_KEY or try better lighting.`,
+        });
+        return;
+      }
       const items: ExtractedItem[] = data.items ?? [];
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPhase({ kind: 'review', items });
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setPhase({ kind: 'error', message: 'Could not read the menu. Try again with better lighting.' });
+      setPhase({ kind: 'error', message: 'Could not reach the server. Check the tunnel URL in app.json.' });
     }
   };
 
@@ -264,116 +274,174 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
     }
   };
 
+  // Used in the per-card category chip group.
+  const CATEGORIES = [
+    { id: 'food', label: 'Food', emoji: '🍽️' },
+    { id: 'drink', label: 'Drink', emoji: '🥤' },
+    { id: 'dessert', label: 'Dessert', emoji: '🍰' },
+    { id: 'special', label: 'Special', emoji: '✨' },
+  ] as const;
+
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <View style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 12 }}>
-        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
-          REVIEW & EDIT
+      {/* Header */}
+      <View style={{
+        paddingHorizontal: 20,
+        paddingTop: insets.top + 12,
+        paddingBottom: 12,
+        gap: 4,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{
+            backgroundColor: theme.primaryWash, borderRadius: 999,
+            paddingHorizontal: 10, paddingVertical: 4,
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+          }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }} />
+            <Text style={{ color: theme.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
+              REVIEW
+            </Text>
+          </View>
+          <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800' }}>
+            {items.length} {items.length === 1 ? 'item' : 'items'}
+          </Text>
+        </View>
+        <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.4, marginTop: 6 }}>
+          Check the menu before saving
         </Text>
-        <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 }}>
-          {items.length} items detected
-        </Text>
-        <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 19 }}>
-          Tap to edit, swipe wrong lines away, then save — nothing is in your menu yet.
+        <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 18, marginTop: 2 }}>
+          Edit any field, drop wrong rows. Nothing is in your menu yet — only what you keep gets saved.
         </Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14, gap: 8 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24, gap: 12 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {items.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: 40, gap: 10 }}>
-            <Text style={{ fontSize: 48 }}>🤷</Text>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>Nothing detected</Text>
-            <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', maxWidth: 280 }}>
-              Try again with better lighting and the full menu inside the frame.
+          <View style={{ alignItems: 'center', paddingVertical: 56, gap: 12 }}>
+            <Text style={{ fontSize: 56 }}>🤷</Text>
+            <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>Nothing detected</Text>
+            <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', maxWidth: 280, lineHeight: 18 }}>
+              Try again with brighter light, less glare, and the full menu inside the frame.
             </Text>
           </View>
         ) : (
           items.map((it, i) => (
             <MotiView
-              key={`${i}-${it.name}`}
-              from={{ opacity: 0, translateY: 8 }}
+              key={`row-${i}`}
+              from={{ opacity: 0, translateY: 6 }}
               animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 220, delay: Math.min(i * 30, 240) }}
+              transition={{ type: 'timing', duration: 200, delay: Math.min(i * 25, 200) }}
               style={{
-                backgroundColor: theme.surface, borderRadius: 14,
-                padding: 12, gap: 8,
+                backgroundColor: theme.surface,
+                borderRadius: 18,
+                padding: 16,
+                gap: 14,
                 borderWidth: 1, borderColor: theme.border,
+                shadowColor: '#000', shadowOpacity: 0.04,
+                shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
               }}
             >
+              {/* Top row: index pill + name input + delete */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{
-                  width: 28, height: 28, borderRadius: 8,
+                  width: 26, height: 26, borderRadius: 13,
                   backgroundColor: theme.primaryWash,
                   alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '900' }}>{i + 1}</Text>
+                  <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '900' }}>
+                    {i + 1}
+                  </Text>
                 </View>
                 <TextInput
                   value={it.name}
                   onChangeText={(t) => updateItem(i, { name: t })}
-                  placeholder="Name"
+                  placeholder="Item name"
                   placeholderTextColor={theme.textMuted}
                   style={{
-                    flex: 1, color: theme.text, fontSize: 15, fontWeight: '700',
-                    backgroundColor: theme.bg, borderRadius: 8,
-                    paddingHorizontal: 10, paddingVertical: 8,
-                    borderWidth: 1, borderColor: theme.border,
+                    flex: 1,
+                    color: theme.text, fontSize: 17, fontWeight: '800',
+                    paddingVertical: 4,
                   }}
                 />
-                <Pressable onPress={() => removeItem(i)} hitSlop={8}
+                <Pressable onPress={() => removeItem(i)} hitSlop={10}
                   style={{
-                    paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8,
+                    width: 32, height: 32, borderRadius: 16,
+                    alignItems: 'center', justifyContent: 'center',
                     backgroundColor: theme.danger + '14',
-                    borderWidth: 1, borderColor: theme.danger + '44',
                   }}>
-                  <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '900' }}>✕</Text>
+                  <Text style={{ color: theme.danger, fontSize: 14, fontWeight: '900' }}>✕</Text>
                 </Pressable>
               </View>
-              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                {(['drink', 'food', 'dessert', 'special'] as const).map(cat => {
-                  const active = (it.category ?? 'food') === cat;
+
+              {/* Category chips — full row, wrap, much bigger touch targets */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {CATEGORIES.map(cat => {
+                  const active = (it.category ?? 'food') === cat.id;
                   return (
-                    <Pressable key={cat} onPress={() => updateItem(i, { category: cat })}
+                    <Pressable key={cat.id} onPress={() => updateItem(i, { category: cat.id })}
                       style={{
-                        paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999,
+                        flexDirection: 'row', alignItems: 'center', gap: 5,
+                        paddingHorizontal: 12, paddingVertical: 8,
+                        borderRadius: 999,
                         backgroundColor: active ? theme.primary : theme.bg,
                         borderWidth: 1, borderColor: active ? theme.primary : theme.border,
                       }}>
+                      <Text style={{ fontSize: 13 }}>{cat.emoji}</Text>
                       <Text style={{
                         color: active ? '#FFF' : theme.textMuted,
-                        fontSize: 10, fontWeight: '900', letterSpacing: 0.3,
+                        fontSize: 12, fontWeight: '800', letterSpacing: 0.2,
                       }}>
-                        {cat.toUpperCase()}
+                        {cat.label}
                       </Text>
                     </Pressable>
                   );
                 })}
+              </View>
+
+              {/* Price row — clear €, big right-aligned tabular input */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10,
+                backgroundColor: theme.bg, borderRadius: 12,
+                paddingHorizontal: 12, paddingVertical: 8,
+                borderWidth: 1, borderColor: theme.border,
+              }}>
+                <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>
+                  PRICE
+                </Text>
                 <View style={{ flex: 1 }} />
                 <TextInput
-                  value={it.price_cents != null ? (it.price_cents / 100).toFixed(2).replace('.', ',') : ''}
+                  value={it.price_cents != null ? (it.price_cents / 100).toFixed(2) : ''}
                   onChangeText={(t) => setPriceFromText(i, t)}
-                  placeholder="—"
+                  placeholder="0.00"
                   placeholderTextColor={theme.textMuted}
                   keyboardType="decimal-pad"
                   style={{
-                    width: 80, textAlign: 'right',
-                    color: theme.primary, fontSize: 14, fontWeight: '900',
-                    backgroundColor: theme.bg, borderRadius: 8,
-                    paddingHorizontal: 10, paddingVertical: 6,
-                    borderWidth: 1, borderColor: theme.border,
+                    minWidth: 70, textAlign: 'right',
+                    color: theme.primary, fontSize: 17, fontWeight: '900',
+                    paddingVertical: 2,
                     fontVariant: ['tabular-nums'],
                   }}
                 />
-                <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '900' }}>€</Text>
+                <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '900' }}>€</Text>
               </View>
             </MotiView>
           ))
         )}
       </ScrollView>
 
+      {/* Sticky bottom bar */}
       <View style={{
-        flexDirection: 'row', gap: 10, padding: 16,
-        borderTopWidth: 1, borderColor: theme.border, backgroundColor: theme.bg,
+        flexDirection: 'row', gap: 10,
+        paddingHorizontal: 16, paddingTop: 12,
+        paddingBottom: insets.bottom + 12,
+        borderTopWidth: 1, borderColor: theme.border,
+        backgroundColor: theme.bg,
       }}>
         <TouchableOpacity onPress={onCaptureAgain}
           style={{
@@ -385,12 +453,15 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
         </TouchableOpacity>
         <TouchableOpacity onPress={save} disabled={saving || items.length === 0}
           style={{
-            flex: 1.4, backgroundColor: (saving || items.length === 0) ? theme.primaryWash : theme.primary, borderRadius: 14,
-            paddingVertical: 14, alignItems: 'center',
-            shadowColor: theme.primary, shadowOpacity: (saving || items.length === 0) ? 0 : 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
+            flex: 1.5,
+            backgroundColor: (saving || items.length === 0) ? theme.primaryWash : theme.primary,
+            borderRadius: 14, paddingVertical: 14, alignItems: 'center',
+            shadowColor: theme.primary,
+            shadowOpacity: (saving || items.length === 0) ? 0 : 0.3,
+            shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
           }}>
-          <Text style={{ color: theme.textOnPrimary, fontSize: 14, fontWeight: '800' }}>
-            {saving ? 'Saving…' : `✓ Save ${items.length}`}
+          <Text style={{ color: theme.textOnPrimary, fontSize: 15, fontWeight: '900', letterSpacing: 0.2 }}>
+            {saving ? 'Saving…' : `✓ Save ${items.length} ${items.length === 1 ? 'item' : 'items'}`}
           </Text>
         </TouchableOpacity>
       </View>

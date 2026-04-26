@@ -22,11 +22,11 @@ const openaiClient = process.env.OPENAI_API_KEY
   : null;
 
 const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava:7b';
-// Mistral vision-capable model. Pixtral Large (124B-class multimodal)
-// gives noticeably better OCR on printed café menus than the 12B variant —
-// fewer hallucinated prices, better umlaut handling, more reliable on
-// multi-column layouts. Override via MISTRAL_VISION_MODEL if needed.
-const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-large-2411';
+// Mistral vision-capable model. pixtral-12b-2409 is the safe default —
+// available on the free tier, no rate-limit surprises. Pixtral Large is
+// stronger but rate-limited on free plans (returns 429 silently). Set
+// MISTRAL_VISION_MODEL=pixtral-large-latest to opt in.
+const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-12b-2409';
 
 const MenuItem = z.object({
   name: z.string().min(1).max(80),
@@ -107,13 +107,22 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
   // Tier 1: Mistral Pixtral cloud — preferred per project policy
-  // (EU-hosted, brief explicitly favours Mistral). Pixtral Large gives
-  // strong OCR on printed café menus with mixed fonts and umlauts.
+  // (EU-hosted, brief explicitly favours Mistral). One retry with a 1.2s
+  // backoff covers the most common Mistral free-tier 429 (~1 req/sec limit).
   if (mistralClient) {
-    try {
-      return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
-    } catch (e) {
-      console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) failed:`, (e as Error).message);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
+      } catch (e) {
+        const msg = (e as Error).message ?? '';
+        const isRateLimit = msg.includes('429') || msg.toLowerCase().includes('rate');
+        console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) attempt ${attempt} failed:`, msg);
+        if (isRateLimit && attempt === 1) {
+          await new Promise(r => setTimeout(r, 1200));
+          continue;
+        }
+        break;
+      }
     }
   }
   // Tier 2: OpenAI gpt-4o-mini fallback for the rare cases Mistral is
@@ -131,13 +140,9 @@ export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
   } catch (e) {
     console.warn(`[vision] On-device SLM (${VISION_MODEL}) failed:`, (e as Error).message);
   }
-  // Demo fallback — return a small canned menu so the flow never breaks
-  return [
-    { name: 'Cappuccino', price_eur: 3.5, category: 'drink', tags: ['hot'] },
-    { name: 'Espresso', price_eur: 2.5, category: 'drink', tags: ['hot'] },
-    { name: 'Sandwich Caprese', price_eur: 6.9, category: 'food', tags: ['vegetarisch'] },
-    { name: 'Croissant', price_eur: 2.2, category: 'food', tags: [] },
-    { name: 'Apfelstrudel', price_eur: 4.5, category: 'dessert', tags: ['hausgemacht'] },
-    { name: 'Tagessuppe', price_eur: 5.5, category: 'special', tags: ['seasonal'] },
-  ];
+  // No canned demo data: showing a fake menu after a real OCR failure is
+  // worse than showing nothing — the merchant ends up with garbage in their
+  // menu_items table and trusts the system less. Throw so the route can
+  // return a visible error to the client instead.
+  throw new Error('OCR_ALL_TIERS_FAILED');
 }
