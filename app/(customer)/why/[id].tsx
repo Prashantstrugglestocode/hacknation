@@ -233,6 +233,36 @@ export default function WhyScreen() {
         </Text>
       </View>
 
+      {/* SLM-spirit privacy banner — answers the brief's "abstract intent
+          signal" requirement explicitly. */}
+      <View style={{
+        backgroundColor: theme.success + '12', borderRadius: 16, padding: 14, gap: 8,
+        borderWidth: 1, borderColor: theme.success + '44',
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 16 }}>🔒</Text>
+          <Text style={{ color: theme.success, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
+            ON-DEVICE INTENT-ENCODER
+          </Text>
+        </View>
+        <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, fontWeight: '600' }}>
+          Deine echte Position bleibt auf dem Gerät. An den Server geht nur
+          eine 1,2 km Geohash-Zelle und ein abstrakter Intent-Vektor
+          (z.B. „kalt", „regnerisch", „Mittagszeit") — berechnet lokal,
+          niemals dein Bewegungsprofil.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+          {['Geohash-6', 'Intent-Flags', 'Rotierender Hash', 'Kein Profil'].map(t => (
+            <View key={t} style={{
+              backgroundColor: theme.success + '22', borderRadius: 8,
+              paddingHorizontal: 8, paddingVertical: 3,
+            }}>
+              <Text style={{ color: theme.success, fontSize: 10, fontWeight: '800' }}>{t}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
       {reasoning ? (
         <View style={{
           backgroundColor: theme.primaryWash, borderRadius: 16, padding: 16,

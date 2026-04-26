@@ -77,13 +77,19 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
 }
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
-  // Mistral pixtral only (per user instruction — no Ollama fallback).
+  // Tier 1: Mistral pixtral cloud — fast vision OCR.
   if (mistralClient) {
     try {
       return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
     } catch (e) {
       console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) failed:`, (e as Error).message);
     }
+  }
+  // Tier 2: on-device SLM (Ollama llava:7b) — local vision fallback.
+  try {
+    return await tryVision(ollama, VISION_MODEL, dataUrl);
+  } catch (e) {
+    console.warn(`[vision] On-device SLM (${VISION_MODEL}) failed:`, (e as Error).message);
   }
   // Demo fallback — return a small canned menu so the flow never breaks
   return [

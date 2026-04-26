@@ -96,11 +96,15 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
     }));
   };
 
-  // Mistral only (per user instruction — no Ollama fallback).
+  // Tier 1: Mistral cloud.
   if (mistralClient) {
     try { return await tryRun(mistralClient, MISTRAL_MODEL); } catch (e) {
       console.warn('[insights] Mistral failed:', (e as Error).message);
     }
+  }
+  // Tier 2: on-device SLM fallback.
+  try { return await tryRun(ollama, TEXT_MODEL); } catch (e) {
+    console.warn(`[insights] On-device SLM (${TEXT_MODEL}) failed:`, (e as Error).message);
   }
   // Deterministic fallback — surface low performers + at least one never-featured.
   const out: Insight[] = [];

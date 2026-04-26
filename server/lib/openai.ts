@@ -244,19 +244,27 @@ export async function generateOffer(params: {
   const m = params.merchant;
   const d = params.distance_m;
 
-  // Mistral primary — and now ONLY (per user instruction). Retry once
-  // before giving up so a transient network blip doesn't break the demo.
+  // Tier 1: Mistral cloud — fast, reliable, ~3-8s.
   if (mistralClient) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
-      } catch (e) {
-        console.warn(`[offer-engine] Mistral attempt ${attempt} failed:`, (e as Error).message);
-      }
+    try {
+      return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
+    } catch (e) {
+      console.warn('[offer-engine] Mistral failed:', (e as Error).message);
     }
   }
 
-  // Last-resort deterministic offer so the customer always sees something.
-  console.warn('[offer-engine] Mistral failed, returning deterministic fallback');
+  // Tier 2: on-device SLM (Ollama gemma3:4b ~4B params). This is the
+  // "SLM spirit" the brief encourages — runs locally, no data leaves
+  // the device for inference. Used as fallback when cloud is unreachable.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
+    } catch (e) {
+      console.warn(`[offer-engine] On-device SLM (${LOCAL_MODEL}) attempt ${attempt} failed:`, (e as Error).message);
+    }
+  }
+
+  // Tier 3: deterministic offer so the customer always sees something.
+  console.warn('[offer-engine] All AI backends failed, returning deterministic fallback');
   return fillDefaults({}, params.locale, m, d);
 }
