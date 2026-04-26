@@ -95,6 +95,26 @@ export default function LiveHeader({ stats: _stats }: Props) {
           Hero card / receipt, no need for a running tally on top. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          {/* "Behind the scenes" — opens the Inside Stadtpuls modal so
+              the demo can close-the-loop and surface GDPR on demand. */}
+          <Pressable
+            onPress={() => router.push('/(customer)/inside' as any)}
+            hitSlop={12}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              height: 44, borderRadius: 22,
+              paddingHorizontal: 14,
+              backgroundColor: theme.primaryWash,
+              borderWidth: 1, borderColor: theme.primary + '44',
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>ⓘ</Text>
+            <Text style={{
+              color: theme.primary, fontSize: type.small, fontWeight: '900', letterSpacing: 0.4,
+            }}>
+              Behind the scenes
+            </Text>
+          </Pressable>
           <Pressable
             onPress={() => router.push('/settings' as any)}
             hitSlop={12}

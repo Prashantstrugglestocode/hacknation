@@ -10,6 +10,7 @@ export default function CustomerLayout() {
           payment sheet, not just another tab. */}
       <Stack.Screen name="pay/[id]" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="why/[id]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="inside" options={{ presentation: 'modal' }} />
       <Stack.Screen name="history" options={{ presentation: 'modal' }} />
       <Stack.Screen name="map" options={{ presentation: 'modal' }} />
       <Stack.Screen name="menu/[merchantId]" options={{ presentation: 'modal' }} />
