@@ -10,6 +10,7 @@ export default function MerchantLayout() {
       <Stack.Screen name="menu" />
       <Stack.Screen name="menu-scan" options={{ presentation: 'fullScreenModal' }} />
       <Stack.Screen name="preview" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="flash-sale" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

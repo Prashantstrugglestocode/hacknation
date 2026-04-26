@@ -8,6 +8,7 @@ import { getNearbyPOIs } from '../lib/pois.ts';
 import { center, neighbors, distanceMeters } from '../lib/geohash.ts';
 import { firedTriggers, scoreMerchant } from '../lib/composite.ts';
 import { generateOffer } from '../lib/openai.ts';
+import { getFlash } from '../lib/flash.ts';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -118,6 +119,17 @@ offer.post('/generate', async (c) => {
     .maybeSingle();
   const previousLayout: string | undefined = lastOfferRow?.widget_spec?.layout;
 
+  // Active flash-sale (merchant-managed boost). When present the LLM is
+  // told to feature these items prominently in copy + use the flash discount.
+  const flash = getFlash(best.merchant.id);
+  if (flash) {
+    contextState.flash_sale = {
+      items: flash.items,
+      pct: flash.pct,
+      minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
+    };
+  }
+
   // Generate offer via OpenAI
   let widgetSpec: any;
   try {
@@ -128,6 +140,7 @@ offer.post('/generate', async (c) => {
         distance_m: Math.round(best.dist),
         fired_triggers: best.triggers,
         previous_layout: previousLayout,
+        flash_sale: contextState.flash_sale,
       },
       locale,
       distance_m: best.dist,

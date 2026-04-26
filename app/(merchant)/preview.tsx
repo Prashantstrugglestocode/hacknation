@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { MotiView, AnimatePresence } from 'moti';
 import WidgetRenderer from '../../lib/generative/renderer';
 import ShimmerCard from '../../lib/components/Shimmer';
+import LlmStatusPill from '../../lib/components/LlmStatusPill';
 import { theme } from '../../lib/theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -124,12 +125,7 @@ export default function MerchantPreview() {
             {loading ? (
               <View style={{ flex: 1 }}>
                 <ShimmerCard />
-                <Text style={{
-                  color: theme.textMuted, fontSize: 11, fontWeight: '700',
-                  textAlign: 'center', marginTop: 8, letterSpacing: 0.6,
-                }}>
-                  KI generiert · ~10 Sek.
-                </Text>
+                <LlmStatusPill verb="generiert" />
               </View>
             ) : spec ? (
               <MotiView

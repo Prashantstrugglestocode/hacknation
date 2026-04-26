@@ -15,9 +15,23 @@ interface Props {
   onChange: (loc: PickedLocation) => void;
 }
 
-function staticMapUrl(lat: number, lng: number, w = 600, h = 280): string {
-  // Free OSM static map service. Marker syntax: lat,lng,red-pushpin
-  return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=16&size=${w}x${h}&markers=${lat},${lng},red-pushpin`;
+// Slippy-tile coords for the OSM tile-server (much more reliable than the
+// staticmap.openstreetmap.de service which is intermittently down).
+// Returns integer tile coords + fractional offset so the pin lands on the
+// actual lat/lng instead of the tile center.
+function tileCoords(lat: number, lng: number, z: number) {
+  const latRad = (lat * Math.PI) / 180;
+  const n = Math.pow(2, z);
+  const worldX = ((lng + 180) / 360) * n;
+  const worldY = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  const x = Math.floor(worldX);
+  const y = Math.floor(worldY);
+  return { x, y, fracX: worldX - x, fracY: worldY - y };
+}
+
+function osmTileUrl(lat: number, lng: number, z = 16): string {
+  const { x, y } = tileCoords(lat, lng, z);
+  return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
 }
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
@@ -95,26 +109,53 @@ export default function LocationPicker({ value, onChange }: Props) {
         STANDORT
       </Text>
 
-      {/* Static map preview */}
-      {value && (
-        <MotiView
-          key={`${value.lat}-${value.lng}`}
-          from={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'timing', duration: 350 }}
-          style={{
-            borderRadius: 14, overflow: 'hidden',
-            borderWidth: 1, borderColor: theme.border,
-            backgroundColor: theme.bgMuted,
-          }}
-        >
-          <Image
-            source={{ uri: staticMapUrl(value.lat, value.lng) }}
-            style={{ width: '100%', height: 160 }}
-            resizeMode="cover"
-          />
-        </MotiView>
-      )}
+      {/* Map preview — single OSM tile at z=16, pin offset to actual lat/lng */}
+      {value && (() => {
+        const { fracX, fracY } = tileCoords(value.lat, value.lng, 16);
+        const PIN_FONT = 36;
+        // Anchor: the tip of 📍 sits roughly at horizontal center, ~80% down.
+        // Translate the pin element so its tip lands on the fractional point.
+        return (
+          <MotiView
+            key={`${value.lat}-${value.lng}`}
+            from={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'timing', duration: 350 }}
+            style={{
+              borderRadius: 14, overflow: 'hidden',
+              borderWidth: 1, borderColor: theme.border,
+              backgroundColor: theme.bgMuted,
+              position: 'relative',
+            }}
+          >
+            <Image
+              source={{ uri: osmTileUrl(value.lat, value.lng, 16) }}
+              style={{ width: '100%', height: 180 }}
+              resizeMode="cover"
+            />
+            <View pointerEvents="none" style={{
+              position: 'absolute',
+              left: `${fracX * 100}%`,
+              top: `${fracY * 100}%`,
+              marginLeft: -PIN_FONT / 2,
+              marginTop: -PIN_FONT * 0.8,
+              shadowColor: '#000', shadowOpacity: 0.4,
+              shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+            }}>
+              <Text style={{ fontSize: PIN_FONT }}>📍</Text>
+            </View>
+            <View style={{
+              position: 'absolute', bottom: 6, right: 8,
+              backgroundColor: '#FFFFFFCC', borderRadius: 6,
+              paddingHorizontal: 6, paddingVertical: 2,
+            }}>
+              <Text style={{ color: '#1F1F23', fontSize: 9, fontWeight: '700' }}>
+                © OpenStreetMap
+              </Text>
+            </View>
+          </MotiView>
+        );
+      })()}
 
       {/* Address input */}
       <View style={{

@@ -9,6 +9,7 @@ import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/real
 import Sparkline from '../../lib/components/Sparkline';
 import AnimatedNumber from '../../lib/components/AnimatedNumber';
 import RoleSwitch from '../../lib/components/RoleSwitch';
+import LangToggle from '../../lib/components/LangToggle';
 import { theme } from '../../lib/theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -185,14 +186,17 @@ export default function MerchantDashboard() {
                   {merchant?.name ?? 'Dein Geschäft'}
                 </Text>
               </View>
-              <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
-                hitSlop={8}
-                style={{
-                  width: 38, height: 38, borderRadius: 19,
-                  backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
-                }}>
-                <Text style={{ fontSize: 16 }}>⚙️</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <LangToggle variant="light" />
+                <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
+                  hitSlop={8}
+                  style={{
+                    width: 38, height: 38, borderRadius: 19,
+                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <Text style={{ fontSize: 16 }}>⚙️</Text>
+                </Pressable>
+              </View>
             </View>
 
             {/* Hero stat: today's redeemed + EUR moved */}
@@ -264,6 +268,12 @@ export default function MerchantDashboard() {
             title="Vorschau"
             sub="So sehen es Kunden"
             tone="primary"
+          />
+          <ActionTile
+            onPress={() => router.push('/(merchant)/flash-sale')}
+            emoji="🔥"
+            title="Flash"
+            sub="Sofort-Aktion starten"
           />
           <ActionTile
             onPress={() => merchant && router.push(`/(merchant)/menu?id=${merchant.id}`)}

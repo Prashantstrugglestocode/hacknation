@@ -8,6 +8,7 @@ import Constants from 'expo-constants';
 import { encodeGeohash6 } from '../context/geohash';
 import { SavingsStats } from '../savings';
 import AnimatedNumber from './AnimatedNumber';
+import LangToggle from './LangToggle';
 import { theme } from '../theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -150,6 +151,7 @@ export default function LiveHeader({ stats }: Props) {
             >
               <Text style={{ fontSize: 14 }}>🕐</Text>
             </TouchableOpacity>
+            <LangToggle variant="dark" />
           </View>
         </View>
       </BlurView>

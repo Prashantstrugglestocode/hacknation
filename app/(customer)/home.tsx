@@ -18,6 +18,7 @@ import LiveHeader from '../../lib/components/LiveHeader';
 import RoleSwitch from '../../lib/components/RoleSwitch';
 import MilestoneModal, { isMilestone } from '../../lib/components/MilestoneModal';
 import ShimmerCard from '../../lib/components/Shimmer';
+import LlmStatusPill from '../../lib/components/LlmStatusPill';
 import FreshnessChip from '../../lib/components/FreshnessChip';
 import Confetti from '../../lib/components/Confetti';
 import { theme } from '../../lib/theme';
@@ -271,7 +272,10 @@ export default function CustomerHome() {
 
         <View style={{ flex: 1, minHeight: height - 220 }}>
           {state.status === 'idle' || state.status === 'loading' ? (
-            <ShimmerCard />
+            <View style={{ flex: 1 }}>
+              <ShimmerCard />
+              <LlmStatusPill verb="generiert" />
+            </View>
           ) : state.status === 'location_denied' ? (
             <LocationDeniedState onRetry={generate} />
           ) : state.status === 'no_merchant' ? (

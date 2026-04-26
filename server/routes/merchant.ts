@@ -4,6 +4,7 @@ import ngeohash from 'ngeohash';
 import { generateOffer } from '../lib/openai.ts';
 import { getWeather } from '../lib/weather.ts';
 import { getPayoneDensity } from '../lib/payone-mock.ts';
+import { setFlash, getFlash, clearFlash } from '../lib/flash.ts';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -175,6 +176,32 @@ merchant.get('/:id/stats', async (c) => {
   }
 
   return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved, weekly: buckets });
+});
+
+// Flash-sale: merchant-managed boost on specific inventory items.
+// Read by /api/offer/generate so the LLM prioritizes the flagged items.
+merchant.get('/:id/flash', (c) => {
+  const sale = getFlash(c.req.param('id'));
+  if (!sale) return c.json({ active: false });
+  const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
+  return c.json({ active: true, items: sale.items, pct: sale.pct, minutes_left });
+});
+
+merchant.post('/:id/flash', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const items = Array.isArray(body.items) ? body.items as string[] : [];
+  const pct = typeof body.pct === 'number' ? body.pct : 20;
+  const duration_min = typeof body.duration_min === 'number' ? body.duration_min : 60;
+  if (items.length === 0) return c.json({ error: 'items required' }, 400);
+  const sale = setFlash(id, items, pct, duration_min);
+  const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
+  return c.json({ active: true, items: sale.items, pct: sale.pct, minutes_left });
+});
+
+merchant.delete('/:id/flash', (c) => {
+  clearFlash(c.req.param('id'));
+  return c.json({ active: false });
 });
 
 merchant.get('s/nearby', async (c) => {
