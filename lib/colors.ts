@@ -24,13 +24,17 @@ export function safeHex(c: any, fallback: string = SAFE_DEFAULT): string {
   return fallback;
 }
 
-// Append an alpha byte safely. `alpha` is a 2-char hex like '22', '88'.
-export function withAlpha(c: any, alpha: string, fallback: string = SAFE_DEFAULT): string {
+// Apply alpha as `rgba(r, g, b, a)` — RN parses this format unconditionally,
+// so it can never produce an "invalid colour value" error the way `#RRGGBB +
+// 'XX'` concatenation can if the base string isn't well-formed.
+// alpha01 is a 0–1 float (0.13 ≈ '22', 0.4 ≈ '66', 0.8 ≈ 'CC').
+export function withAlpha(c: any, alpha01: number, fallback: string = SAFE_DEFAULT): string {
   const base = safeHex(c, fallback);
-  // Strip any existing alpha first.
-  const six = base.slice(0, 7);
-  const a = /^[0-9a-f]{2}$/i.test(alpha) ? alpha : 'FF';
-  return six + a;
+  const r = parseInt(base.slice(1, 3), 16);
+  const g = parseInt(base.slice(3, 5), 16);
+  const b = parseInt(base.slice(5, 7), 16);
+  const a = Math.max(0, Math.min(1, alpha01));
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 // Normalize a palette object in one shot.

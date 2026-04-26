@@ -6,7 +6,9 @@ import { Platform } from 'react-native';
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      // expo-notifications v0.30+ API split shouldShowAlert into banner/list.
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),

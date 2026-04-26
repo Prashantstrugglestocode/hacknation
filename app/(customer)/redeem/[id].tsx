@@ -183,11 +183,12 @@ export default function RedeemScreen() {
 
       {/* QR ticket */}
       <MotiView
-        from={{ opacity: 0, scale: 0.85 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', delay: 100, damping: 16, stiffness: 200 }}
+        from={{ opacity: 0, scale: 0.88, translateY: 8 }}
+        animate={{ opacity: 1, scale: 1, translateY: 0 }}
+        transition={{ type: 'spring', delay: 120, damping: 16, stiffness: 220 }}
         style={{
-          backgroundColor: '#FFFFFF', alignItems: 'center', paddingTop: 24, paddingBottom: 22, gap: 14,
+          backgroundColor: '#FFFFFF', alignItems: 'center',
+          paddingTop: space['2xl'], paddingBottom: space.xl, gap: space.md,
         }}
       >
         {token && !expired ? (
@@ -208,18 +209,22 @@ export default function RedeemScreen() {
             <View style={{ alignItems: 'center', gap: 2 }}>
               <Text style={{
                 color: secondsLeft < 60 ? theme.danger : theme.text,
-                fontSize: 32, fontWeight: '900',
-                fontVariant: ['tabular-nums'], letterSpacing: -0.5,
+                fontSize: typo.display + 4, fontWeight: '900',
+                fontVariant: ['tabular-nums'], letterSpacing: -0.6,
+                lineHeight: typo.display + 8,
               }}>
                 {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
               </Text>
-              <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 }}>
+              <Text style={{
+                color: theme.textMuted, fontSize: typo.caption,
+                fontWeight: '800', letterSpacing: 1.6,
+              }}>
                 ZEIT ZUM EINLÖSEN
               </Text>
             </View>
-            {/* Subtle regenerate link — for cases where the QR didn't scan */}
+            {/* Subtle regenerate link */}
             <TouchableOpacity onPress={regenerate} disabled={regenerating} hitSlop={8}>
-              <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+              <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
                 {regenerating ? '…' : '🔄  Neuen QR-Code generieren'}
               </Text>
             </TouchableOpacity>
@@ -254,13 +259,13 @@ export default function RedeemScreen() {
 
       {/* Cashback stub */}
       <MotiView
-        from={{ opacity: 0, translateY: 16 }}
+        from={{ opacity: 0, translateY: 18 }}
         animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'spring', delay: 200, damping: 18, stiffness: 180 }}
+        transition={{ type: 'spring', delay: 240, damping: 18, stiffness: 200 }}
         style={{
           backgroundColor: '#FFFFFF',
-          borderBottomLeftRadius: 22, borderBottomRightRadius: 22,
-          padding: 16, gap: 8,
+          borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl,
+          padding: space.lg, gap: space.sm,
         }}
       >
         {cashbackDone ? (
