@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
+import FallbackImage from '../../lib/components/FallbackImage';
+import { itemImageUrl } from '../../lib/images';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -41,6 +43,8 @@ function fmtPrice(cents: number | null): string {
   return `${(cents / 100).toFixed(2).replace('.', ',')} €`;
 }
 
+const CATEGORIES = ['drink', 'food', 'dessert', 'special'] as const;
+
 export default function MenuScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const [merchantId, setMerchantId] = useState<string | null>(params.id ?? null);
@@ -49,6 +53,40 @@ export default function MenuScreen() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Inline-add form state
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newPrice, setNewPrice] = useState('');
+  const [newCategory, setNewCategory] = useState<typeof CATEGORIES[number]>('food');
+  const [adding, setAdding] = useState(false);
+
+  const submitNew = async () => {
+    if (!merchantId || !newName.trim()) {
+      Alert.alert('Name fehlt', 'Bitte einen Posten-Namen eingeben.');
+      return;
+    }
+    setAdding(true);
+    try {
+      const priceCents = newPrice ? Math.round(parseFloat(newPrice.replace(',', '.')) * 100) : null;
+      const res = await fetch(`${API}/api/merchant/${merchantId}/menu`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim(), price_cents: priceCents, category: newCategory }),
+      });
+      if (res.ok) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setNewName(''); setNewPrice(''); setNewCategory('food');
+        setAddOpen(false);
+        await load();
+      } else {
+        Alert.alert('Fehler', 'Konnte nicht gespeichert werden.');
+      }
+    } catch {
+      Alert.alert('Fehler', 'Netzwerkfehler.');
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const load = useCallback(async () => {
     let mid = merchantId;
@@ -123,6 +161,9 @@ export default function MenuScreen() {
       }
     >
       {/* Header */}
+      <TouchableOpacity onPress={() => router.back()} hitSlop={10} style={{ alignSelf: 'flex-start' }}>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+      </TouchableOpacity>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>SPEISEKARTE</Text>
@@ -130,16 +171,103 @@ export default function MenuScreen() {
             {items.length} Posten
           </Text>
         </View>
-        <TouchableOpacity onPress={() => router.push(`/(merchant)/menu-scan?id=${merchantId}`)}
-          style={{
-            backgroundColor: theme.primary, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 12,
-            flexDirection: 'row', alignItems: 'center', gap: 6,
-            shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-          }}>
-          <Text style={{ fontSize: 16 }}>📷</Text>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 14 }}>Karte scannen</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity onPress={() => setAddOpen(o => !o)}
+            style={{
+              backgroundColor: addOpen ? theme.primary : theme.surface,
+              borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12,
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              borderWidth: 1, borderColor: theme.primary,
+            }}>
+            <Text style={{ color: addOpen ? theme.textOnPrimary : theme.primary, fontSize: 16, fontWeight: '900' }}>
+              {addOpen ? '×' : '+'}
+            </Text>
+            <Text style={{ color: addOpen ? theme.textOnPrimary : theme.primary, fontWeight: '800', fontSize: 13 }}>
+              {addOpen ? 'Schließen' : 'Posten'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push(`/(merchant)/menu-scan?id=${merchantId}`)}
+            style={{
+              backgroundColor: theme.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12,
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+            }}>
+            <Text style={{ fontSize: 14 }}>📷</Text>
+            <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 13 }}>Scannen</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Inline add form */}
+      {addOpen && (
+        <MotiView
+          from={{ opacity: 0, translateY: -6 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 220 }}
+          style={{
+            backgroundColor: theme.surface, borderRadius: 14, padding: 14, gap: 10,
+            borderWidth: 1.5, borderColor: theme.primary,
+          }}
+        >
+          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
+            NEUER POSTEN
+          </Text>
+          <TextInput
+            value={newName}
+            onChangeText={setNewName}
+            placeholder="z.B. Cappuccino"
+            placeholderTextColor={theme.textMuted}
+            style={{
+              backgroundColor: theme.bg, borderRadius: 10, padding: 12,
+              color: theme.text, fontSize: 15, borderWidth: 1, borderColor: theme.border,
+            }}
+            autoFocus
+          />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={newPrice}
+              onChangeText={setNewPrice}
+              placeholder="3,50"
+              placeholderTextColor={theme.textMuted}
+              keyboardType="decimal-pad"
+              style={{
+                flex: 1, backgroundColor: theme.bg, borderRadius: 10, padding: 12,
+                color: theme.text, fontSize: 15, borderWidth: 1, borderColor: theme.border,
+              }}
+            />
+            <Text style={{ alignSelf: 'center', color: theme.textMuted, fontSize: 14, fontWeight: '700' }}>€</Text>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {CATEGORIES.map(c => {
+              const active = newCategory === c;
+              return (
+                <TouchableOpacity key={c} onPress={() => setNewCategory(c)}
+                  style={{
+                    backgroundColor: active ? theme.primary : theme.bg,
+                    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                    borderWidth: 1, borderColor: active ? theme.primary : theme.border,
+                  }}>
+                  <Text style={{
+                    color: active ? theme.textOnPrimary : theme.text,
+                    fontSize: 12, fontWeight: active ? '800' : '600',
+                  }}>
+                    {c === 'drink' ? '🥤' : c === 'food' ? '🍽' : c === 'dessert' ? '🍰' : '⭐'} {c}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity onPress={submitNew} disabled={adding || !newName.trim()}
+            style={{
+              backgroundColor: (adding || !newName.trim()) ? theme.primaryWash : theme.primary,
+              borderRadius: 12, paddingVertical: 13, alignItems: 'center',
+            }}>
+            <Text style={{ color: theme.textOnPrimary, fontSize: 14, fontWeight: '900' }}>
+              {adding ? 'Wird gespeichert…' : '+ Posten hinzufügen'}
+            </Text>
+          </TouchableOpacity>
+        </MotiView>
+      )}
 
       {/* Insights card */}
       {insights.length > 0 && (
@@ -194,10 +322,15 @@ export default function MenuScreen() {
             const colored = p && p.shown >= 3;
             return (
               <View key={item.id} style={{
-                backgroundColor: theme.surface, borderRadius: 14, padding: 14,
+                backgroundColor: theme.surface, borderRadius: 14, padding: 10,
                 borderWidth: 1, borderColor: theme.border,
                 flexDirection: 'row', alignItems: 'center', gap: 12,
               }}>
+                <FallbackImage
+                  uri={itemImageUrl(item.name, item.category, 120, 120)}
+                  style={{ width: 56, height: 56, borderRadius: 10 }}
+                  fallbackEmoji={item.category === 'drink' ? '🥤' : item.category === 'dessert' ? '🍰' : '🍽'}
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{item.name}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>

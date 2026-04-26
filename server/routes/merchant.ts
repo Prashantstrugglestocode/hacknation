@@ -109,15 +109,28 @@ merchant.get('/:id/preview', async (c) => {
     .from('merchants').select('*').eq('id', id).single();
   if (error || !m) return c.json({ error: 'merchant not found' }, 404);
 
-  const [weather, payone] = await Promise.all([
+  const [weather, payone, { data: menuItemRows }] = await Promise.all([
     getWeather(m.lat, m.lng),
     Promise.resolve(getPayoneDensity()),
+    supabase.from('menu_items').select('id, name, price_cents, category, tags').eq('merchant_id', id).eq('active', true),
   ]);
+  const menuItems = menuItemRows ?? [];
   const hour = new Date().getHours();
+
+  const flash = getFlash(id);
+  const flashCtx = flash ? {
+    items: menuItems.filter(it => flash.menu_item_ids.includes(it.id)),
+    menu_item_ids: flash.menu_item_ids,
+    pct: flash.pct,
+    minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
+  } : undefined;
+
   const context = {
     weather, payone, hour,
     intent: { browsing: false, hungry_likely: hour >= 11 && hour <= 14, cold: weather.temp_c < 14, rainy: ['rain', 'drizzle'].includes(weather.condition.toLowerCase()) },
     distance_m: 50,
+    menu_items: menuItems.length > 0 ? menuItems : undefined,
+    flash_sale: flashCtx,
   };
   const widgetSpec = await generateOffer({
     merchant: m,
@@ -178,30 +191,72 @@ merchant.get('/:id/stats', async (c) => {
   return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved, weekly: buckets });
 });
 
-// Flash-sale: merchant-managed boost on specific inventory items.
+// Flash-sale: merchant-managed boost on specific menu_items.
 // Read by /api/offer/generate so the LLM prioritizes the flagged items.
-merchant.get('/:id/flash', (c) => {
+merchant.get('/:id/flash', async (c) => {
   const sale = getFlash(c.req.param('id'));
   if (!sale) return c.json({ active: false });
   const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
-  return c.json({ active: true, items: sale.items, pct: sale.pct, minutes_left });
+  // Enrich with actual menu_item rows so the client can show names + prices.
+  let items: any[] = [];
+  if (sale.menu_item_ids.length > 0) {
+    const { data } = await supabase
+      .from('menu_items')
+      .select('id, name, price_cents, category')
+      .in('id', sale.menu_item_ids);
+    items = data ?? [];
+  }
+  return c.json({
+    active: true,
+    menu_item_ids: sale.menu_item_ids,
+    items,
+    pct: sale.pct,
+    minutes_left,
+  });
 });
 
 merchant.post('/:id/flash', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
-  const items = Array.isArray(body.items) ? body.items as string[] : [];
+  const menu_item_ids = Array.isArray(body.menu_item_ids)
+    ? (body.menu_item_ids as string[])
+    : Array.isArray(body.items) ? (body.items as string[]) : []; // back-compat
   const pct = typeof body.pct === 'number' ? body.pct : 20;
   const duration_min = typeof body.duration_min === 'number' ? body.duration_min : 60;
-  if (items.length === 0) return c.json({ error: 'items required' }, 400);
-  const sale = setFlash(id, items, pct, duration_min);
+  if (menu_item_ids.length === 0) return c.json({ error: 'menu_item_ids required' }, 400);
+  const sale = setFlash(id, menu_item_ids, pct, duration_min);
   const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
-  return c.json({ active: true, items: sale.items, pct: sale.pct, minutes_left });
+  let items: any[] = [];
+  const { data } = await supabase
+    .from('menu_items')
+    .select('id, name, price_cents, category')
+    .in('id', sale.menu_item_ids);
+  items = data ?? [];
+  return c.json({
+    active: true,
+    menu_item_ids: sale.menu_item_ids,
+    items,
+    pct: sale.pct,
+    minutes_left,
+  });
 });
 
 merchant.delete('/:id/flash', (c) => {
   clearFlash(c.req.param('id'));
   return c.json({ active: false });
+});
+
+// Owned merchants for a device — multi-merchant picker on the client.
+merchant.get('s/owned', async (c) => {
+  const device_id = c.req.query('device_id');
+  if (!device_id) return c.json({ error: 'device_id required' }, 400);
+  const { data, error } = await supabase
+    .from('merchants')
+    .select('id, name, type, goal, max_discount_pct, lat, lng, created_at')
+    .eq('owner_device_id', device_id)
+    .order('created_at', { ascending: false });
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data ?? []);
 });
 
 merchant.get('s/nearby', async (c) => {

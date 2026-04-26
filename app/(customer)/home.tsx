@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { addMerchantId } from '../../lib/merchant-store';
 import { MotiView, AnimatePresence } from 'moti';
 import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
@@ -118,7 +119,7 @@ export default function CustomerHome() {
       if (!res.ok) throw new Error('seed failed');
       const created = await res.json();
       // Take ownership: save merchant_id locally so Händler tab works
-      if (created?.id) await AsyncStorage.setItem('merchant_id', created.id);
+      if (created?.id) await addMerchantId(created.id);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await generate();
     } catch (e) {
@@ -304,14 +305,24 @@ export default function CustomerHome() {
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <FreshnessChip generatedAt={state.generatedAt} />
-                <TouchableOpacity
-                  onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
-                  hitSlop={12}
-                >
-                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
-                    {i18n.t('customer.why')}  ›
-                  </Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/(customer)/menu/${state.offer.widget_spec.merchant.id}`)}
+                    hitSlop={12}
+                  >
+                    <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '700' }}>
+                      📋 Speisekarte
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
+                    hitSlop={12}
+                  >
+                    <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
+                      {i18n.t('customer.why')}  ›
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </MotiView>
           ) : null}

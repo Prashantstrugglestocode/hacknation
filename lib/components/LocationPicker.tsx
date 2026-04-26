@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } fro
 import * as Location from 'expo-location';
 import { MotiView } from 'moti';
 import { theme } from '../theme';
+import { ShimmerBlock } from './Shimmer';
 
 export interface PickedLocation {
   lat: number;
@@ -61,6 +62,8 @@ export default function LocationPicker({ value, onChange }: Props) {
   const [loadingGps, setLoadingGps] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tileState, setTileState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [tileNonce, setTileNonce] = useState(0); // bump to force <Image> reload on retry
 
   const useGps = useCallback(async () => {
     setLoadingGps(true); setError(null);
@@ -113,8 +116,7 @@ export default function LocationPicker({ value, onChange }: Props) {
       {value && (() => {
         const { fracX, fracY } = tileCoords(value.lat, value.lng, 16);
         const PIN_FONT = 36;
-        // Anchor: the tip of 📍 sits roughly at horizontal center, ~80% down.
-        // Translate the pin element so its tip lands on the fractional point.
+        const HEIGHT = 180;
         return (
           <MotiView
             key={`${value.lat}-${value.lng}`}
@@ -126,33 +128,75 @@ export default function LocationPicker({ value, onChange }: Props) {
               borderWidth: 1, borderColor: theme.border,
               backgroundColor: theme.bgMuted,
               position: 'relative',
+              height: HEIGHT,
             }}
           >
-            <Image
-              source={{ uri: osmTileUrl(value.lat, value.lng, 16) }}
-              style={{ width: '100%', height: 180 }}
-              resizeMode="cover"
-            />
-            <View pointerEvents="none" style={{
-              position: 'absolute',
-              left: `${fracX * 100}%`,
-              top: `${fracY * 100}%`,
-              marginLeft: -PIN_FONT / 2,
-              marginTop: -PIN_FONT * 0.8,
-              shadowColor: '#000', shadowOpacity: 0.4,
-              shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
-            }}>
-              <Text style={{ fontSize: PIN_FONT }}>📍</Text>
-            </View>
-            <View style={{
-              position: 'absolute', bottom: 6, right: 8,
-              backgroundColor: '#FFFFFFCC', borderRadius: 6,
-              paddingHorizontal: 6, paddingVertical: 2,
-            }}>
-              <Text style={{ color: '#1F1F23', fontSize: 9, fontWeight: '700' }}>
-                © OpenStreetMap
-              </Text>
-            </View>
+            {/* Skeleton sits behind everything; Image loads on top when ready. */}
+            <ShimmerBlock height={HEIGHT} style={{ borderRadius: 0 }} />
+
+            {tileState !== 'error' && (
+              <Image
+                key={tileNonce}
+                source={{ uri: osmTileUrl(value.lat, value.lng, 16) }}
+                style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  opacity: tileState === 'loaded' ? 1 : 0,
+                }}
+                resizeMode="cover"
+                onLoadStart={() => setTileState('loading')}
+                onLoad={() => setTileState('loaded')}
+                onError={() => setTileState('error')}
+              />
+            )}
+
+            {/* Error overlay with retry */}
+            {tileState === 'error' && (
+              <View style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                alignItems: 'center', justifyContent: 'center', gap: 8,
+                backgroundColor: theme.bgMuted,
+              }}>
+                <Text style={{ fontSize: 28 }}>🗺</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>
+                  Karte konnte nicht geladen werden
+                </Text>
+                <TouchableOpacity onPress={() => { setTileState('loading'); setTileNonce(n => n + 1); }}
+                  style={{
+                    backgroundColor: theme.primary, borderRadius: 10,
+                    paddingHorizontal: 14, paddingVertical: 7,
+                  }}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>↻ Erneut versuchen</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Pin overlay — only after the tile is actually loaded */}
+            {tileState === 'loaded' && (
+              <View pointerEvents="none" style={{
+                position: 'absolute',
+                left: `${fracX * 100}%`,
+                top: `${fracY * 100}%`,
+                marginLeft: -PIN_FONT / 2,
+                marginTop: -PIN_FONT * 0.8,
+                shadowColor: '#000', shadowOpacity: 0.4,
+                shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+              }}>
+                <Text style={{ fontSize: PIN_FONT }}>📍</Text>
+              </View>
+            )}
+
+            {/* Attribution */}
+            {tileState === 'loaded' && (
+              <View style={{
+                position: 'absolute', bottom: 6, right: 8,
+                backgroundColor: '#FFFFFFCC', borderRadius: 6,
+                paddingHorizontal: 6, paddingVertical: 2,
+              }}>
+                <Text style={{ color: '#1F1F23', fontSize: 9, fontWeight: '700' }}>
+                  © OpenStreetMap
+                </Text>
+              </View>
+            )}
           </MotiView>
         );
       })()}

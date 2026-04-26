@@ -49,6 +49,29 @@ menu.get('/:id/menu', async (c) => {
   return c.json(data ?? []);
 });
 
+// POST /api/merchant/:id/menu  body: { name, price_cents?, category?, tags? }
+// Manual add (no camera scan).
+menu.post('/:id/menu', async (c) => {
+  const merchantId = c.req.param('id');
+  const body = await c.req.json();
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) return c.json({ error: 'name required' }, 400);
+  const row = {
+    merchant_id: merchantId,
+    name,
+    price_cents: typeof body.price_cents === 'number' ? Math.round(body.price_cents) : null,
+    category: typeof body.category === 'string' ? body.category : 'food',
+    tags: Array.isArray(body.tags) ? body.tags : [],
+  };
+  const { data, error } = await supabase
+    .from('menu_items')
+    .insert(row)
+    .select()
+    .single();
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data, 201);
+});
+
 // PATCH /api/merchant/:id/menu/:itemId
 menu.patch('/:id/menu/:itemId', async (c) => {
   const itemId = c.req.param('itemId');

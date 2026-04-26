@@ -1,19 +1,23 @@
-// In-memory flash-sale store. The merchant flags inventory tags as
+// In-memory flash-sale store. The merchant flags specific menu_items as
 // "active flash sale" with a discount % and expiry; the offer engine reads
-// this state when generating so the LLM prioritizes the flagged items.
+// this state when generating so the LLM prioritizes the flagged items
+// (passed to the LLM as enriched menu_item data — name, price, category).
 // Hackathon scope — not persisted, not migrated. State is lost on restart.
 
 export interface FlashSale {
-  items: string[];      // inventory_tags marked as on-sale
-  pct: number;          // discount % (1-50)
-  until: number;        // ms epoch
+  menu_item_ids: string[]; // UUIDs from menu_items table
+  pct: number;             // discount % (1-50)
+  until: number;           // ms epoch
 }
 
 const STORE = new Map<string, FlashSale>();
 
-export function setFlash(merchantId: string, items: string[], pct: number, durationMin: number): FlashSale {
+export function setFlash(merchantId: string, menu_item_ids: string[], pct: number, durationMin: number): FlashSale {
   const sale: FlashSale = {
-    items: items.filter(s => s && s.trim()).map(s => s.trim().toLowerCase()),
+    menu_item_ids: menu_item_ids
+      .filter(id => typeof id === 'string' && id.length > 0)
+      // Tolerate any string here; the offer engine will validate against menu_items.
+      .map(id => id.trim()),
     pct: Math.max(1, Math.min(50, Math.round(pct))),
     until: Date.now() + Math.max(5, Math.min(240, Math.round(durationMin))) * 60 * 1000,
   };

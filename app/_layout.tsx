@@ -9,7 +9,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top']}>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
+          <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        </Stack>
       </SafeAreaView>
     </SafeAreaProvider>
   );

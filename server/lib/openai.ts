@@ -15,62 +15,49 @@ const openaiClient = process.env.OPENAI_API_KEY
 
 const LOCAL_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
 
-const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator for the DSV Gruppe / Sparkassen network. Given a merchant and the current real-world context, produce a single offer as a JSON object. Rules:
+const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator. Produce ONE JSON offer.
 
-- Match mood to context. Cold and drizzle and quiet = cozy. Sunny and crowded with event nearby = energetic. Closing in under 30 minutes with stock = urgent. Lunchtime quiet café = cozy or discreet.
-- Pick layout to fit mood. Cozy or playful favors hero or sticker. Factual or discreet favors compact. Energetic favors split. Urgent favors fullbleed.
-- If context.previous_layout is provided, DO NOT pick the same layout again. Choose a visibly distinct one so pull-to-refresh feels different.
+GENERAL
+- Match mood to context (cold+quiet=cozy, sunny+event=energetic, closing-soon+stock=urgent, lunch+quiet café=discreet).
+- Layout: cozy/playful→hero or sticker; discreet/factual→compact; energetic→split; urgent→fullbleed.
+- If context.previous_layout is set, pick a DIFFERENT layout (so pull-to-refresh looks different).
+- Palette: 3 #RRGGBB colors harmonizing with mood; fg on bg must pass WCAG AA.
+- Copy: concrete, no marketing fluff, no emojis unless mood=playful. Headline <8 words. Subline <14 words. CTA <4 words.
+- discount.value must not exceed merchant.max_discount_pct.
+- validity_minutes: 15-90 (shorter for urgent, longer for cozy).
+- All user-facing strings in context.locale (de/en).
+- signal_chips: 2-4 short labels showing actual context signals (in user locale).
+- reasoning: one plain sentence why this offer at this moment.
 
-FLASH-SALE OVERRIDE (highest priority when active):
-- If context.flash_sale is provided, the merchant has manually flagged a flash sale on specific inventory items.
-- Build the offer around context.flash_sale.items[0] (e.g. headline names that exact item).
-- Use discount.kind = "pct" with discount.value = context.flash_sale.pct (do not override with a different number).
-- Set mood to "urgent" and prefer layout "fullbleed" or "split". CTA short and direct.
-- Set pressure = { kind: "time", value: "Noch <minutes_left> Min" } using context.flash_sale.minutes_left.
-- signal_chips MUST include "🔥 Flash" (or "🔥 Flash" in EN) plus the item name.
-- Palette: 3 hex colors (#RRGGBB) that harmonize with the mood and pass WCAG AA contrast for fg-on-bg.
-- signal_chips: array of 2-4 short strings showing actual context signals. Use the locale language.
-- Copy is concrete, never marketing fluff. No emojis unless mood is playful.
-- Headline under 8 words. Subline under 14 words. CTA under 4 words.
-- Discount value must not exceed merchant max_discount_pct.
-- reasoning: one plain-language sentence explaining why this offer right now.
-- validity_minutes: integer 15-90. Shorter for urgent, longer for cozy.
-- Write all user-facing strings in the given locale (de = German, en = English).
+MENU ITEMS (context.menu_items, when provided)
+- Array of { id, name, price_cents, category, tags } from the merchant's real menu.
+- Strongly prefer naming a specific real item in the headline. Pick an item suited to the time-of-day rules.
+- featured_item_ids MUST be UUIDs from context.menu_items (never invented). Usually 1, max 3.
 
-TIME APPROPRIATENESS (hard rules — violating these is wrong):
-- Use context.hour (0-23) and context.time_bucket to pick what makes sense:
-  * 06-10: breakfast (coffee, croissant, frühstück, eggs). NEVER cake, NEVER alcohol, NEVER ice cream.
-  * 11-14: lunch (sandwich, salad, soup, hot meals, lunch menu). Coffee OK. NEVER cake as primary, NEVER alcohol unless merchant_type=bar/restaurant with lunch wine.
-  * 14-17: afternoon (coffee, cake, kaffee und kuchen, tea). Light food OK. NEVER hard alcohol.
-  * 17-21: dinner (full meals, wine, beer, desserts AFTER dinner). Coffee acceptable but secondary.
-  * 21-23: late evening (drinks, snacks, dessert ONLY if merchant is bar/restaurant). NEVER breakfast pastries, NEVER cake-as-snack alone, NEVER fresh-baked items (bakeries closed).
-  * 23-06: night (only bars/restaurants if open; otherwise NO offer).
-- If the suggested item violates time-appropriateness, pick a different inventory_tag from merchant.inventory_tags or use merchant.type generically. Never force a wrong-time item.
-- If merchant_type is bakery and hour > 19, the offer should reference packaged/take-home items, not fresh pastries.
-- If merchant_type is café and hour > 20, lean tea/herbal/decaf, not espresso.
+FLASH-SALE OVERRIDE (highest priority — context.flash_sale)
+- Build the offer around flash_sale.items[0]: headline names it.
+- discount.kind="pct", value=flash_sale.pct (do not change).
+- mood="urgent", layout="fullbleed" or "split", short factual CTA.
+- pressure={kind:"time", value:"Noch <minutes_left> Min"} from flash_sale.minutes_left.
+- signal_chips must include "🔥 Flash" + item name.
+- featured_item_ids must include the flash item ids.
 
-WEATHER + ITEM:
-- Cold/rain → hot drinks, soup, indoor warmth language.
-- Hot/sunny → iced drinks, salads, terrace language.
-- Snow → cozy hot chocolate, indoor pastries (during day only).
+TIME-OF-DAY (context.hour) — wrong-time items break the demo
+- 06-10 breakfast: coffee, croissant. NO cake/alcohol/ice cream.
+- 11-14 lunch: sandwich, salad, soup, lunch menu, coffee. NO cake-as-primary, NO alcohol (unless bar/restaurant).
+- 14-17 afternoon: coffee, cake, tea. NO hard alcohol.
+- 17-21 dinner: full meals, wine, beer; dessert AFTER. Coffee secondary.
+- 21-23 late: drinks/snacks (bar/restaurant only). NO breakfast pastries, NO fresh-baked.
+- 23-06 night: bar/restaurant only or skip.
+- Bakery >19h → take-home items, not fresh pastries. Café >20h → tea/decaf, not espresso.
 
-Return ONLY valid JSON matching this exact structure, no prose, no markdown:
-{
-  "layout": "hero"|"compact"|"split"|"fullbleed"|"sticker",
-  "palette": { "bg": "#RRGGBB", "fg": "#RRGGBB", "accent": "#RRGGBB" },
-  "mood": "cozy"|"energetic"|"urgent"|"playful"|"discreet",
-  "hero": { "type": "icon"|"gradient"|"pattern", "value": "<emoji or description>" },
-  "headline": "<string>",
-  "subline": "<string>",
-  "cta": "<string>",
-  "signal_chips": ["<string>", "<string>"],
-  "pressure": null | { "kind": "time"|"stock", "value": "<string>" },
-  "reasoning": "<string>",
-  "merchant": { "id": "<id>", "name": "<name>", "distance_m": <number> },
-  "discount": { "kind": "pct"|"eur"|"item", "value": <number>, "constraint": null|"<string>" },
-  "validity_minutes": <integer>,
-  "locale": "de"|"en"
-}`;
+WEATHER
+- Cold/rain → hot drinks, soup, indoor warmth.
+- Hot/sunny → iced drinks, salads, terrace.
+- Snow → hot chocolate, indoor.
+
+Return ONLY this JSON (no prose, no markdown):
+{"layout":"hero|compact|split|fullbleed|sticker","palette":{"bg":"#RRGGBB","fg":"#RRGGBB","accent":"#RRGGBB"},"mood":"cozy|energetic|urgent|playful|discreet","hero":{"type":"icon|gradient|pattern","value":"<string>"},"headline":"<string>","subline":"<string>","cta":"<string>","signal_chips":["<string>",...],"pressure":null|{"kind":"time|stock","value":"<string>"},"reasoning":"<string>","merchant":{"id":"<id>","name":"<name>","distance_m":<number>},"discount":{"kind":"pct|eur|item","value":<number>,"constraint":null|"<string>"},"validity_minutes":<integer>,"locale":"de|en","featured_item_ids":["<uuid>",...]}`;
 
 const LAYOUTS = ['hero', 'compact', 'split', 'fullbleed', 'sticker'];
 const MOODS = ['cozy', 'energetic', 'urgent', 'playful', 'discreet'];
@@ -81,6 +68,19 @@ function pickFirstValid(...candidates: any[]): string | undefined {
     if (typeof c === 'string') return c;
   }
   return undefined;
+}
+
+// Normalize anything the model returns into a strict #RRGGBB hex.
+// Adds the leading '#', expands 3-char shorthand, falls back to a default
+// if the value is unrecognizable (prevents "invalid colour value" RN crashes).
+function normalizeHex(c: any, fallback: string): string {
+  if (typeof c !== 'string') return fallback;
+  let s = c.trim();
+  if (!s.startsWith('#')) s = '#' + s;
+  if (/^#[0-9a-f]{3}$/i.test(s)) {
+    s = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+  }
+  return /^#[0-9a-f]{6}$/i.test(s) ? s : fallback;
 }
 
 function fillDefaults(p: any, locale: string, merchant: any, distance_m: number): any {
@@ -102,10 +102,10 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
     : HERO_TYPES.includes(heroTypeCandidate as any) ? heroTypeCandidate
     : 'gradient';
   if (!p.hero.value) p.hero.value = '☕';
-  p.palette = p.palette ?? { bg: '#1A1A2E', fg: '#FFFFFF', accent: '#E11D48' };
-  if (!p.palette.bg) p.palette.bg = '#1A1A2E';
-  if (!p.palette.fg) p.palette.fg = '#FFFFFF';
-  if (!p.palette.accent) p.palette.accent = '#E11D48';
+  p.palette = p.palette ?? {};
+  p.palette.bg = normalizeHex(p.palette.bg, '#1A1A2E');
+  p.palette.fg = normalizeHex(p.palette.fg, '#FFFFFF');
+  p.palette.accent = normalizeHex(p.palette.accent, '#E11D48');
   p.headline = p.headline ?? 'Angebot in der Nähe';
   p.subline = p.subline ?? 'Schau vorbei.';
   p.cta = p.cta ?? 'Akzeptieren';
@@ -123,6 +123,12 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
   if (!p.discount.kind) p.discount.kind = 'pct';
   if (p.discount.constraint === undefined) p.discount.constraint = null;
   p.validity_minutes = typeof p.validity_minutes === 'number' ? p.validity_minutes : 30;
+
+  // featured_item_ids: validate against UUID format; drop invalid ids the model invented.
+  if (!Array.isArray(p.featured_item_ids)) p.featured_item_ids = [];
+  p.featured_item_ids = p.featured_item_ids.filter((s: any) =>
+    typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  );
 
   // Auto-fill a hero image URL by querying loremflickr with merchant tags
   if (!p.hero_image_url) {

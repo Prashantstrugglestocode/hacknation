@@ -138,7 +138,7 @@ export default function LiveHeader({ stats }: Props) {
         </View>
 
         {/* Row 3 — secondary navigation as text links (less visual weight) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space['2xl'] }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xl }}>
           <Pressable onPress={() => router.push('/(customer)/map')} hitSlop={8}>
             <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
               🗺  Karte
@@ -147,6 +147,11 @@ export default function LiveHeader({ stats }: Props) {
           <Pressable onPress={() => router.push('/(customer)/history')} hitSlop={8}>
             <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
               🕐  Verlauf
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/settings' as any)} hitSlop={8}>
+            <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700' }}>
+              ⚙️  Einstellungen
             </Text>
           </Pressable>
         </View>

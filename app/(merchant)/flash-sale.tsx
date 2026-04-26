@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable, Alert } from 'react-native';
+import FallbackImage from '../../lib/components/FallbackImage';
+import { itemImageUrl } from '../../lib/images';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,22 +13,36 @@ import { theme } from '../../lib/theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
+interface MenuItem {
+  id: string;
+  name: string;
+  price_cents: number | null;
+  category: string | null;
+  tags?: string[];
+  active?: boolean;
+}
+
 interface FlashState {
   active: boolean;
-  items?: string[];
+  menu_item_ids?: string[];
+  items?: MenuItem[];
   pct?: number;
   minutes_left?: number;
 }
 
+const fmtPrice = (cents: number | null | undefined) =>
+  cents == null ? '' : `${(cents / 100).toFixed(2).replace('.', ',')} €`;
+
 export default function FlashSale() {
   const [merchantId, setMerchantId] = useState<string | null>(null);
-  const [inventoryTags, setInventoryTags] = useState<string[]>([]);
+  const [items, setItems] = useState<MenuItem[]>([]);
   const [maxDiscount, setMaxDiscount] = useState(30);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pct, setPct] = useState(20);
   const [duration, setDuration] = useState(60);
   const [current, setCurrent] = useState<FlashState>({ active: false });
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadCurrent = useCallback(async (id: string) => {
     try {
@@ -41,29 +57,37 @@ export default function FlashSale() {
       if (!id) { router.replace('/(merchant)/setup'); return; }
       setMerchantId(id);
       try {
-        const r = await fetch(`${API}/api/merchant/${id}`);
-        if (r.ok) {
-          const m = await r.json();
-          setInventoryTags(m.inventory_tags ?? []);
+        const [merchantRes, menuRes] = await Promise.all([
+          fetch(`${API}/api/merchant/${id}`),
+          fetch(`${API}/api/merchant/${id}/menu`),
+        ]);
+        if (merchantRes.ok) {
+          const m = await merchantRes.json();
           setMaxDiscount(m.max_discount_pct ?? 30);
           setPct(Math.min(20, m.max_discount_pct ?? 20));
         }
+        if (menuRes.ok) {
+          const data = await menuRes.json();
+          const list = Array.isArray(data) ? data : [];
+          setItems(list.filter((it: MenuItem) => it.active !== false));
+        }
       } catch {}
-      loadCurrent(id);
+      await loadCurrent(id);
+      setLoading(false);
     })();
   }, [loadCurrent]);
 
-  // Live tick on the "X min left" badge
+  // Tick remaining time every 30s while a flash is active.
   useEffect(() => {
     if (!current.active || !merchantId) return;
     const t = setInterval(() => loadCurrent(merchantId), 30_000);
     return () => clearInterval(t);
   }, [current.active, merchantId, loadCurrent]);
 
-  const toggle = (tag: string) => {
+  const toggle = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(tag) ? next.delete(tag) : next.add(tag);
+      next.has(id) ? next.delete(id) : next.add(id);
       Haptics.selectionAsync();
       return next;
     });
@@ -80,7 +104,7 @@ export default function FlashSale() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: Array.from(selected),
+          menu_item_ids: Array.from(selected),
           pct,
           duration_min: duration,
         }),
@@ -140,26 +164,32 @@ export default function FlashSale() {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={{ padding: 16, gap: 10 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <MotiView
-                      from={{ scale: 0.9, opacity: 0.6 }}
-                      animate={{ scale: 1.3, opacity: 1 }}
-                      transition={{ type: 'timing', duration: 800, loop: true }}
-                      style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFF' }}
-                    />
-                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.2 }}>
-                      AKTIV · {current.pct} % · noch {current.minutes_left} Min
-                    </Text>
-                  </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <MotiView
+                    from={{ scale: 0.9, opacity: 0.6 }}
+                    animate={{ scale: 1.3, opacity: 1 }}
+                    transition={{ type: 'timing', duration: 800, loop: true }}
+                    style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFF' }}
+                  />
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.2 }}>
+                    AKTIV · {current.pct} % · noch {current.minutes_left} Min
+                  </Text>
                 </View>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                <View style={{ gap: 4 }}>
                   {(current.items ?? []).map(it => (
-                    <View key={it} style={{
-                      backgroundColor: '#FFFFFF22', borderRadius: 999,
-                      paddingHorizontal: 10, paddingVertical: 4,
+                    <View key={it.id} style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 8,
+                      backgroundColor: '#FFFFFF22', borderRadius: 10,
+                      paddingHorizontal: 10, paddingVertical: 6,
                     }}>
-                      <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>{it}</Text>
+                      <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                        {it.name}
+                      </Text>
+                      {it.price_cents != null && (
+                        <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700' }}>
+                          {fmtPrice(it.price_cents)}
+                        </Text>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -181,7 +211,11 @@ export default function FlashSale() {
           <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
             POSTEN AUSWÄHLEN
           </Text>
-          {inventoryTags.length === 0 ? (
+          {loading ? (
+            <Text style={{ color: theme.textMuted, fontSize: 13, paddingVertical: 12, textAlign: 'center' }}>
+              Lade Speisekarte…
+            </Text>
+          ) : items.length === 0 ? (
             <View style={{
               backgroundColor: theme.surface, borderRadius: 14, padding: 16,
               alignItems: 'center', gap: 8, borderWidth: 1, borderColor: theme.border,
@@ -202,25 +236,62 @@ export default function FlashSale() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {inventoryTags.map(tag => {
-                const active = selected.has(tag);
+            <View style={{ gap: 8 }}>
+              {items.map(item => {
+                const active = selected.has(item.id);
                 return (
-                  <Pressable key={tag} onPress={() => toggle(tag)}>
+                  <Pressable key={item.id} onPress={() => toggle(item.id)}>
                     <MotiView
-                      animate={{ scale: active ? 1 : 0.97, backgroundColor: active ? theme.primary : theme.surface }}
+                      animate={{
+                        scale: active ? 1 : 0.99,
+                        backgroundColor: active ? theme.primary : theme.surface,
+                      }}
                       transition={{ type: 'timing', duration: 160 }}
                       style={{
-                        borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10,
-                        borderWidth: 1, borderColor: active ? theme.primary : theme.border,
+                        borderRadius: 14, padding: 14,
+                        borderWidth: 1.5, borderColor: active ? theme.primary : theme.border,
+                        flexDirection: 'row', alignItems: 'center', gap: 12,
                       }}
                     >
-                      <Text style={{
-                        color: active ? '#FFF' : theme.text,
-                        fontSize: 14, fontWeight: active ? '800' : '600',
+                      <View style={{
+                        width: 44, height: 44, borderRadius: 10, overflow: 'hidden',
+                        alignItems: 'center', justifyContent: 'center',
                       }}>
-                        {active ? '🔥 ' : ''}{tag}
-                      </Text>
+                        <FallbackImage
+                          uri={itemImageUrl(item.name, item.category, 100, 100)}
+                          style={{ width: 44, height: 44 }}
+                          fallbackEmoji={item.category === 'drink' ? '🥤' : item.category === 'dessert' ? '🍰' : '🍽'}
+                        />
+                        {active && (
+                          <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFFCC' }}>
+                            <Text style={{ fontSize: 18 }}>🔥</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{
+                          color: active ? '#FFF' : theme.text,
+                          fontSize: 15, fontWeight: '800',
+                        }} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {item.category ? (
+                          <Text style={{
+                            color: active ? '#FFFFFFCC' : theme.textMuted,
+                            fontSize: 11, marginTop: 1,
+                          }} numberOfLines={1}>
+                            {item.category}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {item.price_cents != null && (
+                        <Text style={{
+                          color: active ? '#FFF' : theme.primary,
+                          fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'],
+                        }}>
+                          {fmtPrice(item.price_cents)}
+                        </Text>
+                      )}
                     </MotiView>
                   </Pressable>
                 );

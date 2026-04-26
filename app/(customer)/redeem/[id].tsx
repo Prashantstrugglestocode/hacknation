@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MotiView } from 'moti';
@@ -31,23 +31,38 @@ export default function RedeemScreen() {
   const [secondsLeft, setSecondsLeft] = useState(TTL_SECONDS);
   const [offer, setOffer] = useState<OfferData | null>(null);
   const [cashbackDone, setCashbackDone] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  // Single source-of-truth for fetching a fresh signed QR token.
+  const loadToken = useCallback(async () => {
+    setRegenerating(true);
+    try {
+      const r = await fetch(`${API}/api/offer/${id}/qr`, { method: 'POST' });
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.token) {
+          setToken(data.token);
+          setSecondsLeft(TTL_SECONDS);
+        }
+      }
+    } catch {} finally {
+      setRegenerating(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
     Promise.all([
-      fetch(`${API}/api/offer/${id}/qr`, { method: 'POST' })
-        .then(r => (r.ok ? r.json() : null))
-        .catch(() => null),
+      loadToken(),
       fetch(`${API}/api/offer/${id}`)
         .then(r => (r.ok ? r.json() : null))
         .catch(() => null),
-    ]).then(([qrData, offerData]) => {
+    ]).then(([_, offerData]) => {
       if (!alive) return;
-      if (qrData?.token) setToken(qrData.token);
       if (offerData) setOffer(offerData);
     });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, loadToken]);
 
   useEffect(() => {
     if (!token) return;
@@ -56,6 +71,12 @@ export default function RedeemScreen() {
     }, 1000);
     return () => clearInterval(t);
   }, [token]);
+
+  const regenerate = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    await loadToken();
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
 
   const palette = useMemo(() => ({
     bg: bg ? `#${bg}` : (offer?.widget_spec?.palette?.bg ?? theme.primary),
@@ -178,12 +199,35 @@ export default function RedeemScreen() {
                 ZEIT ZUM EINLÖSEN
               </Text>
             </View>
+            {/* Subtle regenerate link — for cases where the QR didn't scan */}
+            <TouchableOpacity onPress={regenerate} disabled={regenerating} hitSlop={8}>
+              <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+                {regenerating ? '…' : '🔄  Neuen QR-Code generieren'}
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
-          <View style={{ width: 240, height: 240, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 18 }}>
+            <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 56 }}>{token ? '⌛' : '⏳'}</Text>
+            </View>
             <Text style={{ color: token ? theme.danger : theme.textMuted, fontSize: 16, fontWeight: '700' }}>
               {token ? i18n.t('customer.expired') : 'Lade…'}
             </Text>
+            {token && (
+              <TouchableOpacity
+                onPress={regenerate}
+                disabled={regenerating}
+                style={{
+                  backgroundColor: regenerating ? theme.primaryWash : theme.primary,
+                  borderRadius: 14, paddingHorizontal: 22, paddingVertical: 12,
+                  shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
+                }}>
+                <Text style={{ color: theme.textOnPrimary, fontSize: 14, fontWeight: '900' }}>
+                  {regenerating ? 'Wird generiert…' : '🔄  Neuen QR-Code generieren'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </MotiView>

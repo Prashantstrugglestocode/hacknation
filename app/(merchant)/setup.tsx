@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { addMerchantId } from '../../lib/merchant-store';
 import Constants from 'expo-constants';
 import { encodeGeohash6 } from '../../lib/context/geohash';
 import { getDeviceHash } from '../../lib/privacy/intent-encoder';
@@ -94,7 +94,7 @@ export default function MerchantSetup() {
 
       if (!res.ok) throw new Error('Server error');
       const merchant = await res.json();
-      await AsyncStorage.setItem('merchant_id', merchant.id);
+      await addMerchantId(merchant.id);
       // Land in preview so the merchant sees the AI compose for their store first.
       router.replace({
         pathname: '/(merchant)/preview',
@@ -119,6 +119,9 @@ export default function MerchantSetup() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 20, gap: 22, paddingBottom: 40 }}>
+      <TouchableOpacity onPress={() => router.replace('/role')} hitSlop={10} style={{ alignSelf: 'flex-start' }}>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+      </TouchableOpacity>
       <View>
         <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>EINRICHTUNG</Text>
         <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>

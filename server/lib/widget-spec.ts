@@ -34,6 +34,9 @@ export const WidgetSpec = z.object({
   validity_minutes: z.number().int().min(10).max(120),
   locale: z.enum(['de', 'en']),
   hero_image_url: z.string().url().optional().nullable(),
+  // Menu item UUIDs the offer copy references — used to write offer_item_links
+  // so insights can attribute performance back to specific items.
+  featured_item_ids: z.array(z.string().uuid()).optional().default([]),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;

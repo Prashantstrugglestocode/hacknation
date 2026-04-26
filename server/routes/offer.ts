@@ -119,12 +119,26 @@ offer.post('/generate', async (c) => {
     .maybeSingle();
   const previousLayout: string | undefined = lastOfferRow?.widget_spec?.layout;
 
-  // Active flash-sale (merchant-managed boost). When present the LLM is
-  // told to feature these items prominently in copy + use the flash discount.
+  // Fetch the merchant's actual menu_items — the LLM uses these to ground
+  // headline copy in real products instead of generic merchant.inventory_tags.
+  const { data: menuItemRows } = await supabase
+    .from('menu_items')
+    .select('id, name, price_cents, category, tags')
+    .eq('merchant_id', best.merchant.id)
+    .eq('active', true);
+  const menuItems = menuItemRows ?? [];
+  if (menuItems.length > 0) {
+    contextState.menu_items = menuItems;
+  }
+
+  // Active flash-sale (merchant-managed boost). Resolve the menu_item_ids to
+  // full item rows so the LLM can name them by name in the headline.
   const flash = getFlash(best.merchant.id);
   if (flash) {
+    const flashItems = menuItems.filter(it => flash.menu_item_ids.includes(it.id));
     contextState.flash_sale = {
-      items: flash.items,
+      items: flashItems,
+      menu_item_ids: flash.menu_item_ids,
       pct: flash.pct,
       minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
     };
@@ -141,6 +155,7 @@ offer.post('/generate', async (c) => {
         fired_triggers: best.triggers,
         previous_layout: previousLayout,
         flash_sale: contextState.flash_sale,
+        menu_items: contextState.menu_items,
       },
       locale,
       distance_m: best.dist,
@@ -185,6 +200,19 @@ offer.post('/generate', async (c) => {
     .single();
 
   if (error) return c.json({ error: error.message }, 500);
+
+  // Write offer_item_links so insights can attribute performance back to
+  // specific menu_items. Only insert ids that actually exist in this
+  // merchant's menu (the model occasionally hallucinates UUIDs).
+  const featuredIds: string[] = Array.isArray(widgetSpec.featured_item_ids) ? widgetSpec.featured_item_ids : [];
+  const validIds = featuredIds.filter(id => menuItems.some(it => it.id === id));
+  if (validIds.length > 0) {
+    await supabase
+      .from('offer_item_links')
+      .insert(validIds.map(menu_item_id => ({ offer_id: offerRow.id, menu_item_id })))
+      .then(() => {})
+      .catch(() => {}); // best-effort; never block the response
+  }
 
   // Broadcast to merchant realtime channel
   await supabase.channel(`merchant:${best.merchant.id}`).send({

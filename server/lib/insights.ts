@@ -31,26 +31,35 @@ export interface Insight {
 
 const SYS = `Du bist Café/Restaurant-Analyst für City Wallet. Eingabe: ein Händler und Performance-Daten der letzten 7 Tage pro Menüposten.
 
+Du erhältst zwei Listen:
+- low_performers: Posten die ≥3 Mal angezeigt wurden, aber niedrige Annahmequote haben.
+- never_featured: Posten in der Speisekarte, die in 7 Tagen NIE in einem Angebot verwendet wurden.
+
 Regeln:
 - Gib NUR JSON zurück: {"insights":[{"item_id":"...","observation":"...","suggestion":"...","confidence":"low|medium|high"}]}
-- observation: ein faktischer Satz auf Deutsch, max. 18 Wörter.
-- suggestion: konkrete Aktion (z.B. "20% Mittagsrabatt", "mit Kaffee koppeln", "Zeitfenster verschieben", "deaktivieren").
-- Nur Items mit ≥3 shown markieren.
-- Maximal 3 Insights, sortiert nach Wirkung.
+- observation: ein faktischer Satz auf Deutsch, max. 20 Wörter.
+- suggestion: konkrete Aktion (z.B. "Flash-Sale 20% nachmittags", "mit Kaffee koppeln", "Zeitfenster verschieben", "deaktivieren", "manuell in Flash-Sale aufnehmen").
+- Decke BEIDE Kategorien ab: mindestens ein Insight für ein never_featured Item, falls vorhanden — die KI hat es noch nie gewählt; erkläre wahrscheinlich warum (Tageszeit, Wetter, fehlt im Profil) und schlage konkrete Aktion vor.
+- Maximal 4 Insights, sortiert nach Wirkung.
 - Keine Einleitung, kein Markdown, nur JSON.`;
 
 export async function generateInsights(merchant: any, items: ItemPerf[]): Promise<Insight[]> {
-  const ranked = items
-    .filter(i => i.shown >= 3)
+  const lowPerformers = items
+    .filter(i => i.shown >= 3 && i.accept_rate < 0.5)
     .sort((a, b) => a.accept_rate - b.accept_rate)
-    .slice(0, 8);
+    .slice(0, 6);
+  const neverFeatured = items
+    .filter(i => i.shown === 0)
+    .slice(0, 6);
 
-  if (ranked.length === 0) return [];
+  if (lowPerformers.length === 0 && neverFeatured.length === 0) return [];
 
   const userMessage = JSON.stringify({
     merchant: { name: merchant.name, type: merchant.type, goal: merchant.goal, max_discount_pct: merchant.max_discount_pct },
-    items: ranked,
+    low_performers: lowPerformers,
+    never_featured: neverFeatured,
     window_days: 7,
+    current_hour: new Date().getHours(),
   });
 
   const tryRun = async (client: OpenAI, model: string): Promise<Insight[]> => {
@@ -67,7 +76,7 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim();
     const parsed = JSON.parse(cleaned);
     const list = Array.isArray(parsed.insights) ? parsed.insights : [];
-    return list.slice(0, 3).map((i: any) => ({
+    return list.slice(0, 4).map((i: any) => ({
       item_id: String(i.item_id ?? ''),
       observation: String(i.observation ?? ''),
       suggestion: String(i.suggestion ?? ''),
@@ -83,11 +92,23 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
       console.warn('[insights] OpenAI failed:', (e as Error).message);
     }
   }
-  // Deterministic fallback
-  return ranked.slice(0, 2).map(i => ({
-    item_id: i.item_id,
-    observation: `${i.name}: ${i.shown} angezeigt, ${Math.round(i.accept_rate * 100)} % angenommen.`,
-    suggestion: i.accept_rate < 0.2 ? 'Deutlicher Rabatt oder anderes Zeitfenster.' : 'Mit beliebtem Item koppeln.',
-    confidence: 'low',
-  }));
+  // Deterministic fallback — surface low performers + at least one never-featured.
+  const out: Insight[] = [];
+  for (const i of lowPerformers.slice(0, 2)) {
+    out.push({
+      item_id: i.item_id,
+      observation: `${i.name}: ${i.shown} angezeigt, ${Math.round(i.accept_rate * 100)} % angenommen.`,
+      suggestion: i.accept_rate < 0.2 ? 'Deutlicher Rabatt oder anderes Zeitfenster.' : 'Mit beliebtem Item koppeln.',
+      confidence: 'low',
+    });
+  }
+  for (const i of neverFeatured.slice(0, 2)) {
+    out.push({
+      item_id: i.item_id,
+      observation: `${i.name} wurde in 7 Tagen nie ausgespielt.`,
+      suggestion: 'In Flash-Sale aufnehmen oder Tageszeit prüfen.',
+      confidence: 'low',
+    });
+  }
+  return out;
 }

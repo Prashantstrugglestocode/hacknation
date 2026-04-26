@@ -34,6 +34,7 @@ export const WidgetSpec = z.object({
   validity_minutes: z.number().int().min(10).max(120),
   locale: z.enum(['de', 'en']),
   hero_image_url: z.string().url().optional().nullable(),
+  featured_item_ids: z.array(z.string()).optional(),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;

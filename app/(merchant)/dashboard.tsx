@@ -10,6 +10,8 @@ import Sparkline from '../../lib/components/Sparkline';
 import AnimatedNumber from '../../lib/components/AnimatedNumber';
 import RoleSwitch from '../../lib/components/RoleSwitch';
 import LangToggle from '../../lib/components/LangToggle';
+import FallbackImage from '../../lib/components/FallbackImage';
+import { shopImageUrl } from '../../lib/images';
 import { theme } from '../../lib/theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -171,24 +173,44 @@ export default function MerchantDashboard() {
           marginHorizontal: 14, marginTop: 8, borderRadius: 28, overflow: 'hidden',
           shadowColor: theme.primary, shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
         }}>
+          {/* Shop banner photo (loremflickr) under a darkening gradient */}
+          {merchant && (
+            <FallbackImage
+              uri={shopImageUrl(merchant.name, merchant.type)}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              fallbackEmoji="🏪"
+              fallbackBg={theme.primaryDark}
+            />
+          )}
           <LinearGradient
-            colors={[theme.primary, theme.primaryDark] as any}
+            colors={[theme.primary + 'EE', theme.primaryDark + 'F2'] as any}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={{ padding: 22, gap: 18 }}
           >
             {/* Top row: greeting + role/avatar buttons */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
+              <Pressable onPress={() => router.push('/(merchant)/picker')} hitSlop={8} style={{ flex: 1 }}>
                 <Text style={{ color: '#FFFFFFCC', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
                   {greeting.hi} {greeting.emoji}
                 </Text>
-                <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.6, marginTop: 2 }} numberOfLines={1}>
-                  {merchant?.name ?? 'Dein Geschäft'}
-                </Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.6 }} numberOfLines={1}>
+                    {merchant?.name ?? 'Dein Geschäft'}
+                  </Text>
+                  <Text style={{ color: '#FFFFFFCC', fontSize: 14, fontWeight: '900' }}>▾</Text>
+                </View>
+              </Pressable>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <LangToggle variant="light" />
                 <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
+                  hitSlop={8}
+                  style={{
+                    width: 38, height: 38, borderRadius: 19,
+                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <Text style={{ fontSize: 16 }}>📐</Text>
+                </Pressable>
+                <Pressable onPress={() => router.push('/settings' as any)}
                   hitSlop={8}
                   style={{
                     width: 38, height: 38, borderRadius: 19,
@@ -266,20 +288,20 @@ export default function MerchantDashboard() {
             onPress={() => merchant && router.push(`/(merchant)/preview?id=${merchant.id}`)}
             emoji="👁"
             title="Vorschau"
-            sub="So sehen es Kunden"
+            sub="Live-Beispiel"
             tone="primary"
           />
           <ActionTile
             onPress={() => router.push('/(merchant)/flash-sale')}
             emoji="🔥"
             title="Flash"
-            sub="Sofort-Aktion starten"
+            sub="Sofort-Aktion"
           />
           <ActionTile
             onPress={() => merchant && router.push(`/(merchant)/menu?id=${merchant.id}`)}
             emoji="📋"
             title="Karte"
-            sub="Speisekarte & Insights"
+            sub="Posten & KI"
           />
         </View>
 
