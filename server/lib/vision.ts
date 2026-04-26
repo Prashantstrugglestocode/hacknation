@@ -12,7 +12,7 @@ const mistralClient = process.env.MISTRAL_API_KEY
   ? new OpenAI({
       baseURL: 'https://api.mistral.ai/v1',
       apiKey: process.env.MISTRAL_API_KEY,
-      timeout: 30000, // vision is slower than text
+      timeout: 45000, // dense menu OCR on pixtral-12b can take 10-20s
       maxRetries: 0,
     })
   : null;
@@ -41,23 +41,28 @@ const MenuExtract = z.object({
 
 export type ExtractedItem = z.infer<typeof MenuItem>;
 
-const VISION_PROMPT = `You are an OCR-grade menu reader for printed German/English café & restaurant menus. Accuracy beats coverage — a wrong item is worse than a missing one.
+const VISION_PROMPT = `You are an OCR-grade menu reader for printed café and restaurant menus (German + English). Extract EVERY menu item visible in the photo.
 
 OUTPUT FORMAT (strict, no prose, no code fences)
 {"items": [{"name": "...", "price_eur": 3.5, "category": "drink"|"food"|"dessert"|"special", "tags": ["vegan","seasonal","hot"]}]}
 
-NAME — verbatim, case-preserving
+NAME — verbatim, complete
 - Copy the name exactly as printed. Preserve umlauts (ä ö ü ß) and capitalisation.
-- DO NOT translate. DO NOT paraphrase. DO NOT add marketing words like "delicious".
-- If a description line follows the name (e.g. "mit Tomate, Mozzarella, Basilikum"), MERGE it into the name only if it's <= 4 words and clearly part of the dish name. Otherwise drop it — descriptions are not menu items.
-- Strip leading bullets, numbers like "1.", "•", "-", or stars.
-- Skip ALL CAPS section headers (e.g. "GETRÄNKE", "BREAKFAST", "DESSERTS"). They're navigation, not items.
+- DO NOT translate. DO NOT paraphrase. DO NOT add marketing words.
+- Description line that follows the dish name on a new line: drop it. The dish name itself is usually 1–4 words above the description.
+- Strip leading bullets, numbers like "1.", "•", "-", "*", or stars.
+- Skip section headings (single short words like "GETRÄNKE", "DRINKS", "DESSERTS", "FOOD", "STARTERS").
 
-PRICE — be conservative
-- Only set price_eur when a number is unambiguously next to the item. Patterns: "3,50 €", "3.50€", "EUR 3.50", "€3.50".
+PRICE
+- Set price_eur from numbers visually adjacent to the item (same line or directly under). Patterns: "3,50 €", "3.50€", "EUR 3.50", "€3.50", "3.50".
 - "from 3,50" / "ab 3,50" / "kl 2,50 / gr 4,00" → set price_eur to the LOWEST visible number, add tag "from".
-- If no price is on the same line/visually adjacent → price_eur: null. Do NOT guess.
-- Reject sub-€0.50 or above €200 — those are page numbers / dates / phone digits, not prices.
+- If you genuinely cannot see a price for an item, set price_eur: null. Don't invent prices.
+- Skip obvious non-prices (page numbers, phone numbers, allergen codes).
+
+COVERAGE — extract everything
+- Default to MORE items, not fewer. If you see 15 items on the menu, return 15.
+- A typical café menu has 8–25 items; a restaurant menu often 20–40. Empty or 1–2 item results almost always mean the OCR gave up too early — try again row-by-row before returning.
+- Only return {"items": []} if the photo is so blurry/dark you literally cannot make out any text.
 
 CATEGORY
 - drink: coffee, tea, espresso, water, beer, wine, cocktail, juice, smoothie, soda, schorle.
@@ -66,18 +71,14 @@ CATEGORY
 - food: everything else (sandwich, pizza, pasta, salad, soup, breakfast plates).
 
 TAGS — only when explicit
-- Add ONLY when the menu text says it: "vegan", "vegetarisch", "vegan", "glutenfrei", "lactosefrei", "scharf", "spicy", "hot" (only for hot drinks), "cold", "seasonal", "saisonal", "bio", "kids", "from".
-- Don't infer from item names — "Sandwich Caprese" does NOT auto-tag "vegetarisch" unless the menu marks it.
+- Add ONLY when the menu text says it: "vegan", "vegetarisch", "glutenfrei", "lactosefrei", "scharf", "spicy", "hot" (hot drinks), "cold", "seasonal", "saisonal", "bio", "kids", "from".
+- Don't infer from item names alone.
 
 SKIP — never as items
-- Section headings (single-word categories, ALL CAPS lines).
-- Allergen legends ("A,B,C..."), opening hours, phone numbers, addresses, social handles, hashtags.
+- Section headings (ALL CAPS single words).
+- Allergen legends ("A,B,C..."), opening hours, phone numbers, addresses, social handles.
 - Floating prices with no name on the same row.
-- "Free wifi" / wifi password lines / payment-method icons ("Wir akzeptieren ...").
-
-CONFIDENCE GATE
-- If the photo is too blurry / dark / partial to read confidently → return {"items": []} rather than guessing.
-- Prefer 5 correct items over 12 partly-correct ones.
+- "Free wifi" lines, payment-method footers.
 
 Output strictly valid JSON. No markdown, no commentary, no trailing text.`;
 
@@ -102,7 +103,11 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
   if (!raw) throw new Error('empty');
   const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim();
   const parsed = JSON.parse(cleaned);
-  return MenuExtract.parse(parsed).items;
+  const items = MenuExtract.parse(parsed).items;
+  // Debug log so we can see how many items each tier returned. Without this
+  // a partial-extraction is indistinguishable from a successful one in logs.
+  console.log(`[vision] ${model} returned ${items.length} items: ${items.slice(0, 5).map(i => i.name).join(' | ')}${items.length > 5 ? ' …' : ''}`);
+  return items;
 }
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {

@@ -41,19 +41,19 @@ export interface Insight {
   confidence: 'low' | 'medium' | 'high';
 }
 
-const SYS = `Du bist Café/Restaurant-Analyst für Stadtpuls. Eingabe: ein Händler und Performance-Daten der letzten 7 Tage pro Menüposten.
+const SYS = `You are a café/restaurant analyst for Stadtpuls. Input: one merchant and 7-day performance data per menu item.
 
-Du erhältst zwei Listen:
-- low_performers: Posten die ≥3 Mal angezeigt wurden, aber niedrige Annahmequote haben.
-- never_featured: Posten in der Speisekarte, die in 7 Tagen NIE in einem Angebot verwendet wurden.
+You receive two lists:
+- low_performers: items shown ≥3 times with a low accept rate.
+- never_featured: items in the menu that were NEVER used in an offer over the last 7 days.
 
-Regeln:
-- Gib NUR JSON zurück: {"insights":[{"item_id":"...","observation":"...","suggestion":"...","confidence":"low|medium|high"}]}
-- observation: ein faktischer Satz auf Deutsch, max. 20 Wörter.
-- suggestion: konkrete Aktion (z.B. "Flash-Sale 20% nachmittags", "mit Kaffee koppeln", "Zeitfenster verschieben", "deaktivieren", "manuell in Flash-Sale aufnehmen").
-- Decke BEIDE Kategorien ab: mindestens ein Insight für ein never_featured Item, falls vorhanden — die KI hat es noch nie gewählt; erkläre wahrscheinlich warum (Tageszeit, Wetter, fehlt im Profil) und schlage konkrete Aktion vor.
-- Maximal 4 Insights, sortiert nach Wirkung.
-- Keine Einleitung, kein Markdown, nur JSON.`;
+Rules:
+- Output ONLY JSON: {"insights":[{"item_id":"...","observation":"...","suggestion":"...","confidence":"low|medium|high"}]}
+- observation: one factual sentence in plain English, max 20 words.
+- suggestion: a concrete action (e.g. "Flash sale 20% in the afternoon", "pair with coffee", "shift the time window", "deactivate", "add to a flash sale manually").
+- Cover BOTH categories: include at least one insight for a never_featured item when available — the AI has never picked it; explain the likely reason (time of day, weather, missing tags) and suggest a concrete action.
+- Max 4 insights, sorted by impact.
+- No preamble, no markdown, JSON only.`;
 
 export async function generateInsights(merchant: any, items: ItemPerf[]): Promise<Insight[]> {
   const lowPerformers = items
@@ -111,16 +111,16 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
   for (const i of lowPerformers.slice(0, 2)) {
     out.push({
       item_id: i.item_id,
-      observation: `${i.name}: ${i.shown} angezeigt, ${Math.round(i.accept_rate * 100)} % angenommen.`,
-      suggestion: i.accept_rate < 0.2 ? 'Deutlicher Rabatt oder anderes Zeitfenster.' : 'Mit beliebtem Item koppeln.',
+      observation: `${i.name}: shown ${i.shown}×, accepted ${Math.round(i.accept_rate * 100)}%.`,
+      suggestion: i.accept_rate < 0.2 ? 'Try a deeper discount or a different time window.' : 'Pair it with a popular item.',
       confidence: 'low',
     });
   }
   for (const i of neverFeatured.slice(0, 2)) {
     out.push({
       item_id: i.item_id,
-      observation: `${i.name} wurde in 7 Tagen nie ausgespielt.`,
-      suggestion: 'In Flash-Sale aufnehmen oder Tageszeit prüfen.',
+      observation: `${i.name} was never featured in the last 7 days.`,
+      suggestion: 'Add to a flash sale or check the time-of-day fit.',
       confidence: 'low',
     });
   }
