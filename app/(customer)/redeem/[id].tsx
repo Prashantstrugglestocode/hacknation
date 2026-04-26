@@ -123,7 +123,7 @@ export default function RedeemScreen() {
       if (event.type === 'offer.scan_pending') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
         notifyScanPending(event.merchant_name ?? null);
-        // Push the customer to the dedicated Payone payment sheet instead
+        // Push the customer to the dedicated Sparkasse Pay sheet instead
         // of swapping the QR card inline. The pay screen owns the slide-to-
         // pay UX; this screen returns to either the redeem receipt (after
         // /confirm-payment broadcasts offer.redeemed) or stays on QR if the

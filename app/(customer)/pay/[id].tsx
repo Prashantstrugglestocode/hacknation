@@ -11,11 +11,14 @@ import { theme, space, radius, type as typo } from '../../../lib/theme';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 
-// Dedicated Payone payment sheet shown after the merchant scans the
-// customer's QR. Full-screen modal so it reads as a real payment flow,
-// not just another card swap. On confirm → POST /confirm-payment, show
-// the brief success state, then dismiss back to the redeem screen which
-// receives offer.redeemed via realtime and renders the receipt.
+// Dedicated Sparkasse Pay payment sheet shown after the merchant scans
+// the customer's QR. Full-screen modal so it reads as a real payment
+// flow, not just another card swap. On confirm → POST /confirm-payment,
+// show the brief success state, then dismiss back to the redeem screen
+// which receives offer.redeemed via realtime and renders the receipt.
+// Note: "Payone" is a separate concept in this app — it's the DSV
+// transaction-density data signal driving offer scoring (surfaced on
+// the merchant dashboard), not a payment portal brand.
 export default function PayScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -59,7 +62,7 @@ export default function PayScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      {/* Payone-branded header — Sparkasse red gradient bar */}
+      {/* Sparkasse Pay header — red gradient bar */}
       <LinearGradient
         colors={[theme.primary, theme.primaryDark] as any}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -89,7 +92,7 @@ export default function PayScreen() {
             <Text style={{
               color: '#FFF', fontSize: 11, fontWeight: '900', letterSpacing: 1.2,
             }}>
-              PAYONE
+              SPARKASSE PAY
             </Text>
           </View>
         </View>
@@ -189,7 +192,7 @@ export default function PayScreen() {
                 color: theme.textMuted, fontSize: 11, fontWeight: '700',
                 textAlign: 'center', lineHeight: 16,
               }}>
-                Powered by Payone · Sparkassen-Konto secured & encrypted
+                Sparkasse Pay · secured & encrypted
               </Text>
             </MotiView>
           )}

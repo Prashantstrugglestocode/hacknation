@@ -399,9 +399,46 @@ export default function MerchantDashboard() {
           </LinearGradient>
         </View>
 
-        {/* Payone density chip intentionally hidden on the merchant side —
-            the signal still drives offer scoring server-side and surfaces in
-            the customer's why-screen, but adds noise to the merchant view. */}
+        {/* Payone signal — DSV's transaction-density asset. Per-merchant
+            density (low / medium / high) drives offer-engine scoring; we
+            surface it here so the merchant sees what the AI sees. */}
+        {payone && (
+          <View style={{
+            marginHorizontal: space['2xl'], marginTop: space.lg,
+            backgroundColor: theme.surface, borderRadius: radius.md,
+            paddingVertical: space.md, paddingHorizontal: space.md,
+            borderWidth: 1, borderColor: theme.border,
+            flexDirection: 'row', alignItems: 'center', gap: space.md,
+          }}>
+            <View style={{
+              width: 36, height: 36, borderRadius: 10,
+              backgroundColor: payone.density === 'low' ? theme.success + '18'
+                : payone.density === 'high' ? theme.warn + '18'
+                : theme.primaryWash,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ fontSize: 18 }}>
+                {payone.density === 'low' ? '🟢' : payone.density === 'high' ? '🔴' : '🟡'}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.textMuted, fontSize: typeScale.micro, fontWeight: '900', letterSpacing: 1.2 }}>
+                PAYONE SIGNAL
+              </Text>
+              <Text style={{ color: theme.text, fontSize: typeScale.body, fontWeight: '900', marginTop: 2 }}>
+                {payone.density === 'low' ? 'Quiet now — good time to push offers'
+                  : payone.density === 'high' ? 'Busy now — discounts auto-pause'
+                  : 'Normal flow'}
+              </Text>
+            </View>
+            <Text style={{
+              color: theme.textMuted, fontSize: typeScale.caption, fontWeight: '700',
+              fontVariant: ['tabular-nums'],
+            }}>
+              ~{payone.txn_per_min}/min
+            </Text>
+          </View>
+        )}
 
         {/* SPARKLINE — minimal, no card chrome around it */}
         {(stats.weekly?.length ?? 0) > 0 && (() => {
