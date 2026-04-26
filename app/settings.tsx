@@ -136,20 +136,17 @@ export default function Settings() {
           </View>
         </Section>
 
-        {/* GDPR transparency — what stays local vs what we send.
-            Visible to anyone who taps Settings; no need to hunt through a
-            policy doc. Built from i18n.t() so it flips with the language. */}
-        <GdprSection />
-
-        {/* Privacy — single user action */}
-        <Section title={i18n.t('settings.privacy').toUpperCase()}>
+        {/* Account — reset device id + wipe local cache.
+            Privacy mechanisms (geohashing, PII scrubbing, rotating hash)
+            still run under the hood; we just don't surface them in the UI. */}
+        <Section title="ACCOUNT">
           {forgotDone ? (
             <View style={{
               backgroundColor: theme.success + '22', borderRadius: radius.md, padding: space.md,
               alignItems: 'center', borderWidth: 1, borderColor: theme.success + '66',
             }}>
               <Text style={{ color: theme.success, fontSize: type.body, fontWeight: '800' }}>
-                {i18n.t('settings.forget_me_done')}
+                Reset done
               </Text>
             </View>
           ) : (
@@ -160,95 +157,13 @@ export default function Settings() {
                 borderWidth: 1, borderColor: theme.danger + '44',
               }}>
               <Text style={{ color: theme.danger, fontSize: type.body, fontWeight: '800' }}>
-                {i18n.t('settings.forget_me_button')}
+                Reset device & wipe local data
               </Text>
             </TouchableOpacity>
           )}
         </Section>
       </ScrollView>
     </View>
-  );
-}
-
-// GDPR transparency: pipe-separated lists in i18n become real chip rows here.
-// Two columns visualise the data-minimisation contract.
-function GdprSection() {
-  const local = i18n.t('settings.gdpr_local_items').split('|');
-  const sent = i18n.t('settings.gdpr_sent_items').split('|');
-  const principles = i18n.t('settings.gdpr_principles_items').split('|');
-  return (
-    <MotiView
-      from={{ opacity: 0, translateY: 6 }}
-      animate={{ opacity: 1, translateY: 0 }}
-      transition={{ type: 'timing', duration: 280 }}
-      style={{
-        backgroundColor: theme.surface, borderRadius: radius.lg,
-        padding: space.lg, gap: space.md,
-        borderWidth: 1, borderColor: theme.border,
-      }}
-    >
-      <View>
-        <Text style={{ color: theme.primary, fontSize: type.caption, fontWeight: '900', letterSpacing: 1 }}>
-          {i18n.t('settings.gdpr_title')}
-        </Text>
-        <Text style={{ color: theme.textMuted, fontSize: type.small, fontWeight: '700', marginTop: 2 }}>
-          {i18n.t('settings.gdpr_subtitle')}
-        </Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        {/* On-device column */}
-        <View style={{
-          flex: 1, gap: 6,
-          backgroundColor: theme.success + '0E',
-          borderWidth: 1, borderColor: theme.success + '44',
-          borderRadius: radius.md, padding: space.sm + 2,
-        }}>
-          <Text style={{ color: theme.success, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
-            🔒 {i18n.t('settings.gdpr_local_title').toUpperCase()}
-          </Text>
-          {local.map((item, i) => (
-            <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
-              · {item.trim()}
-            </Text>
-          ))}
-        </View>
-        {/* Sent column */}
-        <View style={{
-          flex: 1, gap: 6,
-          backgroundColor: theme.warn + '0E',
-          borderWidth: 1, borderColor: theme.warn + '44',
-          borderRadius: radius.md, padding: space.sm + 2,
-        }}>
-          <Text style={{ color: theme.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>
-            ☁️ {i18n.t('settings.gdpr_sent_title').toUpperCase()}
-          </Text>
-          {sent.map((item, i) => (
-            <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
-              · {item.trim()}
-            </Text>
-          ))}
-        </View>
-      </View>
-
-      <View style={{ gap: 4 }}>
-        <Text style={{ color: theme.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }}>
-          {i18n.t('settings.gdpr_principles_title').toUpperCase()}
-        </Text>
-        {principles.map((item, i) => (
-          <Text key={i} style={{ color: theme.text, fontSize: 11, fontWeight: '700', lineHeight: 15 }}>
-            ✓ {item.trim()}
-          </Text>
-        ))}
-      </View>
-
-      <Text style={{
-        color: theme.textMuted, fontSize: 10, fontWeight: '700',
-        textAlign: 'center', fontStyle: 'italic',
-      }}>
-        {i18n.t('settings.gdpr_legal')}
-      </Text>
-    </MotiView>
   );
 }
 

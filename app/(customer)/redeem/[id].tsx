@@ -233,21 +233,8 @@ export default function RedeemScreen() {
               color: palette.fg + 'BB', fontSize: typo.caption,
               fontWeight: '800', letterSpacing: 1.6,
             }}>
-              STADTPULS · ANGEBOT
+              STADTPULS · OFFER
             </Text>
-            {/* GDPR mark — on-device intent only */}
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              backgroundColor: palette.fg + '1F', borderRadius: radius.pill,
-              paddingHorizontal: 8, paddingVertical: 2,
-            }}>
-              <Text style={{ fontSize: 10 }}>🇪🇺</Text>
-              <Text style={{
-                color: palette.fg, fontSize: 10, fontWeight: '900', letterSpacing: 0.8,
-              }}>
-                GDPR
-              </Text>
-            </View>
           </View>
           <Text style={{
             color: palette.fg, fontSize: typo.display - 2,

@@ -84,9 +84,9 @@ function buildSignalRows(ctx: any): SignalRow[] {
   if (ctx?.geohash6) {
     rows.push({
       icon: '📍',
-      source: 'Location (anonymised)',
-      label: 'Geohash cell ~1.2 km',
-      detail: 'Exact position stays on your device',
+      source: 'Location cell',
+      label: 'Geohash · 1.2 km',
+      detail: 'Used only for nearby-merchant lookup',
       value: ctx.geohash6,
     });
   }
@@ -231,36 +231,6 @@ export default function WhyScreen() {
         <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 19 }}>
           These signals triggered the offer. You see exactly what we know.
         </Text>
-      </View>
-
-      {/* SLM-spirit privacy banner — answers the brief's "abstract intent
-          signal" requirement explicitly. */}
-      <View style={{
-        backgroundColor: theme.success + '12', borderRadius: 16, padding: 14, gap: 8,
-        borderWidth: 1, borderColor: theme.success + '44',
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 16 }}>🔒</Text>
-          <Text style={{ color: theme.success, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-            ON-DEVICE INTENT ENCODER
-          </Text>
-        </View>
-        <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, fontWeight: '600' }}>
-          Your real position never leaves your phone. The server receives only
-          a 1.2 km geohash cell and an abstract intent vector
-          (e.g. "cold", "rainy", "lunchtime") — computed locally,
-          never your movement profile.
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-          {['Geohash-6', 'Intent flags', 'Rotating hash', 'No profile'].map(t => (
-            <View key={t} style={{
-              backgroundColor: theme.success + '22', borderRadius: 8,
-              paddingHorizontal: 8, paddingVertical: 3,
-            }}>
-              <Text style={{ color: theme.success, fontSize: 10, fontWeight: '800' }}>{t}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       {reasoning ? (

@@ -161,13 +161,14 @@ export default function RolePicker() {
         </TouchableOpacity>
       </MotiView>
 
-      {/* Footer: privacy hint (language toggle removed — app is English-only) */}
+      {/* Footer: short tagline. Privacy mechanism stays in code; we
+          don't surface a banner about it. */}
       <View style={{ alignItems: 'center' }}>
         <Text style={{
           color: theme.textMuted, fontSize: typo.small,
           textAlign: 'center', fontWeight: '600',
         }}>
-          {i18n.t('role_picker.anon_hint')}
+          No sign-in needed
         </Text>
       </View>
     </View>

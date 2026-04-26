@@ -165,22 +165,6 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
             }} numberOfLines={1}>
               {merchant.name} · {distance}
             </Text>
-            {/* GDPR / EU compliance trust mark — visible on every card so
-                the privacy story isn't hidden behind a settings button. */}
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', gap: 4,
-              backgroundColor: palette.fg + '14',
-              borderRadius: radius.pill,
-              paddingHorizontal: 8, paddingVertical: 3,
-              borderWidth: 1, borderColor: palette.fg + '22',
-            }}>
-              <Text style={{ fontSize: 9 }}>🇪🇺</Text>
-              <Text style={{
-                color: palette.fg, fontSize: 9, fontWeight: '900', letterSpacing: 0.6,
-              }}>
-                GDPR · 1.2 km
-              </Text>
-            </View>
           </View>
 
           {pressure && (
