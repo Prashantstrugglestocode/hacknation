@@ -7,7 +7,6 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { MotiView } from 'moti';
-import LangToggle from '../../lib/components/LangToggle';
 import LocationPicker, { PickedLocation } from '../../lib/components/LocationPicker';
 import i18n, { useLocaleVersion } from '../../lib/i18n';
 import { theme, space, radius, type as typo } from '../../lib/theme';
@@ -80,7 +79,7 @@ export default function MerchantSettings() {
         }),
       });
       if (!r.ok) {
-        Alert.alert('Fehler', 'Standort konnte nicht gespeichert werden.');
+        Alert.alert('Error', 'Location could not be saved.');
         return;
       }
       const updated = await r.json().catch(() => null);
@@ -99,7 +98,7 @@ export default function MerchantSettings() {
       setTimeout(() => setLocationSaved(false), 3500);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch {
-      Alert.alert('Fehler', 'Netzwerkfehler beim Speichern.');
+      Alert.alert('Error', 'Network error while saving.');
     } finally {
       setSavingLocation(false);
     }
@@ -122,7 +121,7 @@ export default function MerchantSettings() {
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      Alert.alert('Fehler', 'Konnte Öffnungszeiten nicht speichern.');
+      Alert.alert('Error', 'Could not save business hours.');
     } finally {
       setSaving(false);
     }
@@ -204,9 +203,9 @@ export default function MerchantSettings() {
       </Section>
 
       {/* Business hours */}
-      <Section title="ÖFFNUNGSZEITEN">
+      <Section title="OPENING HOURS">
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Geöffnet</Text>
+          <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Open</Text>
           <Text style={{ color: theme.primary, fontSize: typo.bodyL, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
             {String(hours.open).padStart(2, '0')}:00 – {String(hours.close).padStart(2, '0')}:00
           </Text>
@@ -214,7 +213,7 @@ export default function MerchantSettings() {
 
         <View style={{ marginTop: space.sm }}>
           <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-            Öffnen · {String(hours.open).padStart(2, '0')}:00
+            Open · {String(hours.open).padStart(2, '0')}:00
           </Text>
           <Slider
             minimumValue={0} maximumValue={23} step={1}
@@ -228,7 +227,7 @@ export default function MerchantSettings() {
             thumbTintColor={theme.primary}
           />
           <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-            Schließen · {String(hours.close).padStart(2, '0')}:00
+            Close · {String(hours.close).padStart(2, '0')}:00
           </Text>
           <Slider
             minimumValue={Math.min(23, hours.open + 1)} maximumValue={24} step={1}
@@ -247,13 +246,13 @@ export default function MerchantSettings() {
             alignItems: 'center', marginTop: space.sm,
           }}>
           <Text style={{ color: theme.textOnPrimary, fontSize: typo.body, fontWeight: '900' }}>
-            {saving ? 'Wird gespeichert…' : '✓ Öffnungszeiten speichern'}
+            {saving ? 'Saving…' : '✓ Save business hours'}
           </Text>
         </TouchableOpacity>
       </Section>
 
       {/* Quick links to other merchant tools */}
-      <Section title="ZIEL & RABATTE">
+      <Section title="GOAL & DISCOUNTS">
         <Pressable onPress={() => router.push('/(merchant)/rules')}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: space.md,
@@ -261,9 +260,9 @@ export default function MerchantSettings() {
           }}>
           <Text style={{ fontSize: typo.bodyL }}>📐</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Regeln bearbeiten</Text>
+            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Edit rules</Text>
             <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Ziel und maximalen Rabatt anpassen
+              Tune your goal and max discount
             </Text>
           </View>
           <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
@@ -275,9 +274,9 @@ export default function MerchantSettings() {
           }}>
           <Text style={{ fontSize: typo.bodyL }}>📋</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Speisekarte verwalten</Text>
+            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Manage menu</Text>
             <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Posten hinzufügen, scannen, Insights
+              Add items, scan, see insights
             </Text>
           </View>
           <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
@@ -289,9 +288,9 @@ export default function MerchantSettings() {
           }}>
           <Text style={{ fontSize: typo.bodyL }}>🔥</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Flash-Sale starten</Text>
+            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Start a flash sale</Text>
             <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Sofort-Aktion auf einzelne Posten
+              Instant offer on selected items
             </Text>
           </View>
           <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
@@ -303,37 +302,25 @@ export default function MerchantSettings() {
           }}>
           <Text style={{ fontSize: typo.bodyL }}>🎁</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Combos verwalten</Text>
+            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Manage combos</Text>
             <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Bündele 2-4 Posten zu einem Festpreis
+              Bundle 2–4 items at a fixed price
             </Text>
           </View>
           <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
         </Pressable>
       </Section>
 
-      {/* App-wide settings inlined here to avoid nested-modal glitches.
-          (Pushing /settings — itself a modal — on top of this modal caused
-          a re-presenting loop on some devices.) */}
-      <Section title="APP · SPRACHE">
-        <View style={{ alignItems: 'flex-start' }}>
-          <LangToggle variant="dark" />
-        </View>
-        <Text style={{ color: theme.textMuted, fontSize: typo.small, marginTop: space.sm }}>
-          Bestimmt die Sprache für Angebote, Beschreibungen und Hinweise.
-        </Text>
-      </Section>
-
       {/* Danger zone */}
-      <Section title="GEFAHRENZONE">
+      <Section title="DANGER ZONE">
         <Pressable
           onPress={() => Alert.alert(
-            'Alle Angebote löschen?',
-            'Das löscht ALLE Angebote dieses Geschäfts (gezeigt, akzeptiert, eingelöst). Statistik startet bei 0. Diese Aktion kann nicht rückgängig gemacht werden.',
+            'Delete all offers?',
+            'This deletes ALL offers from this shop (shown, accepted, redeemed). Stats reset to 0. This cannot be undone.',
             [
-              { text: 'Abbrechen', style: 'cancel' },
+              { text: 'Cancel', style: 'cancel' },
               {
-                text: 'Alle löschen',
+                text: 'Delete all',
                 style: 'destructive',
                 onPress: async () => {
                   if (!merchantId) return;
@@ -341,12 +328,12 @@ export default function MerchantSettings() {
                     const r = await fetch(`${API}/api/merchant/${merchantId}/offers`, { method: 'DELETE' });
                     if (r.ok) {
                       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      Alert.alert('Erledigt', 'Alle Angebote gelöscht.');
+                      Alert.alert('Done', 'All offers deleted.');
                     } else {
-                      Alert.alert('Fehler', 'Konnte nicht löschen.');
+                      Alert.alert('Error', 'Could not delete.');
                     }
                   } catch {
-                    Alert.alert('Fehler', 'Netzwerkfehler.');
+                    Alert.alert('Error', 'Network error.');
                   }
                 },
               },
@@ -358,7 +345,7 @@ export default function MerchantSettings() {
             borderWidth: 1, borderColor: theme.danger + '44',
           }}>
           <Text style={{ color: theme.danger, fontSize: typo.body, fontWeight: '900' }}>
-            🗑  Alle Angebote löschen
+            🗑  Delete all offers
           </Text>
         </Pressable>
       </Section>

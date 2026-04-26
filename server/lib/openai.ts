@@ -147,7 +147,7 @@ function normalizeHex(c: any, fallback: string): string {
 }
 
 function fillDefaults(p: any, locale: string, merchant: any, distance_m: number): any {
-  p.locale = p.locale === 'en' ? 'en' : locale === 'en' ? 'en' : 'de';
+  p.locale = 'en';
 
   // Self-correct: model often swaps enum fields. Detect and fix.
   const layoutCandidate = pickFirstValid(p.layout, p.mood, p.hero?.type);
@@ -173,7 +173,9 @@ function fillDefaults(p: any, locale: string, merchant: any, distance_m: number)
   p.palette.accent = normalizeHex(p.palette.accent, '#FFE5E5');
   // Merchant-specific fallbacks so a deterministic offer (when LLM is down)
   // still names the shop and reads as plausibly real.
-  const isEN = locale === 'en';
+  // App is English-only — locale gates kept as `isEN = true` so any future
+  // re-localisation only needs to flip this back to a real check.
+  const isEN = true;
   const distM = Math.round(distance_m);
   const merchantName = merchant.name ?? (isEN ? 'a nearby shop' : 'in deiner Nähe');
   const tag = (merchant.inventory_tags ?? [])[0];
@@ -357,7 +359,7 @@ export async function explainBestOffer(params: {
   winnerIndex: number;
 }): Promise<string> {
   const { locale, offers, winnerIndex } = params;
-  const isEN = locale === 'en';
+  const isEN = true;
   const winner = offers[winnerIndex];
   const others = offers.filter((_, i) => i !== winnerIndex);
   if (!winner || others.length === 0) {

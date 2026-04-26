@@ -59,7 +59,7 @@ export default function MenuScan() {
       setPhase({ kind: 'review', items });
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setPhase({ kind: 'error', message: 'Karte konnte nicht erkannt werden. Versuch noch mal mit besserem Licht.' });
+      setPhase({ kind: 'error', message: 'Could not read the menu. Try again with better lighting.' });
     }
   };
 
@@ -71,14 +71,14 @@ export default function MenuScan() {
       <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
         <Text style={{ fontSize: 64 }}>📷</Text>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>
-          Kamera-Zugriff gebraucht
+          Camera access required
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center', maxWidth: 280, lineHeight: 20 }}>
-          Wir analysieren das Foto lokal mit KI und extrahieren Posten.
+          The AI reads your menu photo and extracts items.
         </Text>
         <TouchableOpacity onPress={requestPermission}
           style={{ backgroundColor: theme.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Zugriff erlauben</Text>
+          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Allow access</Text>
         </TouchableOpacity>
       </View>
     );
@@ -97,57 +97,77 @@ export default function MenuScan() {
         </Text>
         <TouchableOpacity onPress={() => setPhase({ kind: 'capture' })}
           style={{ backgroundColor: theme.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Erneut versuchen</Text>
+          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Try again</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>Abbrechen</Text>
+          <Text style={{ color: theme.textMuted, fontSize: 13 }}>Cancel</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // Capture screen
+  // Capture screen — camera occupies the top ~62% with a rounded bottom;
+  // controls + tip live in a flat panel below so the capture button doesn't
+  // float over the lens, and the layout fits Pro Max → mini without the
+  // bracket guide overflowing the safe area.
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
-
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      {/* Camera viewport — fixed proportional height, rounded bottom corners */}
       <View style={{
-        position: 'absolute', top: insets.top + 8, left: 16, right: 16,
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        height: '62%',
+        backgroundColor: '#000',
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        overflow: 'hidden',
       }}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}
-          style={{ backgroundColor: '#00000088', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 }}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Abbrechen</Text>
-        </TouchableOpacity>
-        <View style={{ backgroundColor: theme.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>
-            SPEISEKARTE
+        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
+
+        {/* Top chrome — cancel + scope chip */}
+        <View style={{
+          position: 'absolute', top: insets.top + 8, left: 12, right: 12,
+          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={12}
+            style={{ backgroundColor: '#00000088', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
+          <View style={{ backgroundColor: theme.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+            <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>
+              MENU
+            </Text>
+          </View>
+        </View>
+
+        {/* Frame guide bracketing the menu — leaves headroom for the tip pill */}
+        <View pointerEvents="none" style={{
+          position: 'absolute', top: '14%', left: '6%', right: '6%', bottom: '14%',
+        }}>
+          <Corner pos="tl" />
+          <Corner pos="tr" />
+          <Corner pos="bl" />
+          <Corner pos="br" />
+        </View>
+
+        {/* Tip pill — sits just under the top chrome */}
+        <View pointerEvents="none" style={{
+          position: 'absolute', top: insets.top + 56, left: 0, right: 0, alignItems: 'center',
+        }}>
+          <Text style={{
+            color: '#fff', fontSize: 12, fontWeight: '700',
+            backgroundColor: '#00000099', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+          }}>
+            Hold the menu fully inside the frame
           </Text>
         </View>
       </View>
 
-      {/* Frame guide with corner brackets */}
-      <View pointerEvents="none" style={{
-        position: 'absolute', top: '20%', left: '8%', right: '8%', bottom: '25%',
+      {/* Bottom panel — capture button + helper copy */}
+      <View style={{
+        flex: 1,
+        alignItems: 'center', justifyContent: 'center',
+        paddingHorizontal: 24, paddingBottom: insets.bottom + 8,
+        gap: 14,
       }}>
-        <Corner pos="tl" />
-        <Corner pos="tr" />
-        <Corner pos="bl" />
-        <Corner pos="br" />
-      </View>
-      <View pointerEvents="none" style={{
-        position: 'absolute', top: '15%', left: 0, right: 0, alignItems: 'center',
-      }}>
-        <Text style={{
-          color: '#fff', fontSize: 13, fontWeight: '700',
-          backgroundColor: '#00000099', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-        }}>
-          Karte vollständig im Rahmen
-        </Text>
-      </View>
-
-      {/* Bottom: capture or processing pill */}
-      <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', gap: 14 }}>
         <AnimatePresence>
           {phase.kind === 'processing' ? (
             <MotiView
@@ -157,7 +177,7 @@ export default function MenuScan() {
               exit={{ opacity: 0 }}
               transition={{ type: 'spring' }}
             >
-              <LlmStatusPill brand="KI liest die Karte" />
+              <LlmStatusPill brand="Reading your menu" />
             </MotiView>
           ) : (
             <MotiView
@@ -166,16 +186,20 @@ export default function MenuScan() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring' }}
+              style={{ alignItems: 'center', gap: 10 }}
             >
               <TouchableOpacity onPress={capture} disabled={phase.kind !== 'capture'}
                 style={{
-                  width: 80, height: 80, borderRadius: 40,
+                  width: 72, height: 72, borderRadius: 36,
                   backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
-                  borderWidth: 5, borderColor: theme.primary,
-                  shadowColor: theme.primary, shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+                  borderWidth: 4, borderColor: theme.primary,
+                  shadowColor: theme.primary, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 4 },
                 }}>
-                <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: theme.primary }} />
+                <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: theme.primary }} />
               </TouchableOpacity>
+              <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700', textAlign: 'center', maxWidth: 280 }}>
+                Tap to scan · keep the menu flat and well-lit
+              </Text>
             </MotiView>
           )}
         </AnimatePresence>
@@ -234,7 +258,7 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace({ pathname: '/(merchant)/menu', params: { id: merchantId } });
     } catch (e) {
-      Alert.alert('Fehler', 'Speisekarte konnte nicht gespeichert werden.');
+      Alert.alert('Error', 'Menu could not be saved.');
     } finally {
       setSaving(false);
     }
@@ -244,13 +268,13 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <View style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 12 }}>
         <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
-          PRÜFEN & BEARBEITEN
+          REVIEW & EDIT
         </Text>
         <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 }}>
-          {items.length} Posten erkannt
+          {items.length} items detected
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 19 }}>
-          Tippe zum Bearbeiten. Lösche falsche Zeilen. Erst dann speichern — nichts ist bisher in deiner Karte.
+          Tap to edit, swipe wrong lines away, then save — nothing is in your menu yet.
         </Text>
       </View>
 
@@ -258,9 +282,9 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
         {items.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 40, gap: 10 }}>
             <Text style={{ fontSize: 48 }}>🤷</Text>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>Nichts erkannt</Text>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>Nothing detected</Text>
             <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', maxWidth: 280 }}>
-              Versuch noch mal mit besserer Beleuchtung und voller Karte im Rahmen.
+              Try again with better lighting and the full menu inside the frame.
             </Text>
           </View>
         ) : (
@@ -357,7 +381,7 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
             paddingVertical: 14, alignItems: 'center',
             borderWidth: 1, borderColor: theme.border,
           }}>
-          <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '800' }}>↻ Noch ein Foto</Text>
+          <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '800' }}>↻ Retake</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={save} disabled={saving || items.length === 0}
           style={{
@@ -366,7 +390,7 @@ function ReviewScreen({ items: initial, onCaptureAgain, merchantId }: {
             shadowColor: theme.primary, shadowOpacity: (saving || items.length === 0) ? 0 : 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
           }}>
           <Text style={{ color: theme.textOnPrimary, fontSize: 14, fontWeight: '800' }}>
-            {saving ? 'Speichere…' : `✓ ${items.length} speichern`}
+            {saving ? 'Saving…' : `✓ Save ${items.length}`}
           </Text>
         </TouchableOpacity>
       </View>

@@ -42,14 +42,13 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 export async function showOfferNotification(headline: string, merchantName: string) {
-  // We only trigger local notifications
   await Notifications.scheduleNotificationAsync({
     content: {
       title: headline,
-      body: `Neues Angebot von ${merchantName} - jetzt ansehen!`,
+      body: `New offer from ${merchantName} — open the app to view.`,
       sound: true,
     },
-    trigger: null, // trigger immediately
+    trigger: null,
   });
 }
 
@@ -58,10 +57,10 @@ export async function showOfferNotification(headline: string, merchantName: stri
 export async function notifyScanPending(merchantName: string | null) {
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '💳 Zahlung bestätigen',
+      title: '💳 Confirm payment',
       body: merchantName
-        ? `${merchantName} hat dich gescannt. Schiebe zum Bezahlen.`
-        : 'Schiebe zum Bezahlen, um die Zahlung freizugeben.',
+        ? `${merchantName} just scanned you. Slide to pay.`
+        : 'Slide to pay to confirm the transaction.',
       sound: 'default',
     },
     trigger: null,
@@ -72,14 +71,14 @@ export async function notifyScanPending(merchantName: string | null) {
 // system sound — short positive ping.
 export async function notifyRedeemed(merchantName: string | null, cents: number | null) {
   const eur = cents != null && cents > 0
-    ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(cents / 100)
+    ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(cents / 100)
     : null;
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: '✅ Eingelöst',
-      body: merchantName && eur ? `${merchantName} · gespart: ${eur}`
-        : merchantName ? `Bei ${merchantName} eingelöst`
-        : 'Angebot eingelöst',
+      title: '✅ Redeemed',
+      body: merchantName && eur ? `${merchantName} · saved: ${eur}`
+        : merchantName ? `Redeemed at ${merchantName}`
+        : 'Offer redeemed',
       sound: 'default',
     },
     trigger: null,

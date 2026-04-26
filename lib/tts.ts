@@ -36,7 +36,7 @@ export async function speak(text: string, opts: { force?: boolean } = {}) {
   try {
     m.stop();
     m.speak(text, {
-      language: getLocale() === 'en' ? 'en-US' : 'de-DE',
+      language: 'en-US',
       pitch: 1.0,
       rate: 1.0,
     });

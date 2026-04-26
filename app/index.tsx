@@ -96,7 +96,7 @@ export default function Index() {
             color: theme.textMuted, fontSize: 14, fontWeight: '700',
             letterSpacing: 0.4, textAlign: 'center',
           }}>
-            Der Puls deiner Stadt
+            The pulse of your city
           </Text>
         </View>
 

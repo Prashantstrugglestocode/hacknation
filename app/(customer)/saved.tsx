@@ -47,7 +47,7 @@ export default function SavedScreen() {
               (d.constraint ?? '');
             return {
               id,
-              merchant_name: spec.merchant?.name ?? 'Geschäft',
+              merchant_name: spec.merchant?.name ?? 'Shop',
               headline: spec.headline ?? '',
               discount_label,
               expires_at: data.expires_at,
@@ -80,14 +80,14 @@ export default function SavedScreen() {
       });
       if (res.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Cashback eingelöst', 'Wir merken dir dein Guthaben gut.', [
+        Alert.alert('Cashback redeemed', 'Your credit has been recorded.', [
           { text: 'OK', onPress: () => remove(id) },
         ]);
       } else {
         throw new Error();
       }
     } catch {
-      Alert.alert('Fehler', 'Cashback konnte nicht eingelöst werden.');
+      Alert.alert('Error', 'Cashback could not be redeemed.');
     }
   };
 
@@ -95,18 +95,18 @@ export default function SavedScreen() {
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 16, gap: 12 }}>
       <View style={{ marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
-          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>GESPEICHERT</Text>
+          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>SAVED</Text>
           <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
-            {offers.length} Angebot{offers.length === 1 ? '' : 'e'}
+            {offers.length} offer{offers.length === 1 ? '' : 's'}
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Schließen</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Close</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <Text style={{ color: theme.textMuted, textAlign: 'center', padding: 30 }}>Lädt…</Text>
+        <Text style={{ color: theme.textMuted, textAlign: 'center', padding: 30 }}>Loading…</Text>
       ) : offers.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 }}>
           <Text style={{ fontSize: 56 }}>🤍</Text>

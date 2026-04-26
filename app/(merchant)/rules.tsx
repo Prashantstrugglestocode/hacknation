@@ -41,7 +41,7 @@ export default function RulesScreen() {
 
   const handleSave = async () => {
     if (!merchantId) {
-      Alert.alert('Fehler', 'Kein Geschäft eingerichtet. Bitte erst „Demo-Café" erstellen oder Einrichtung abschließen.');
+      Alert.alert('Error', 'No shop set up yet. Please create one or finish setup first.');
       return;
     }
     setSaving(true);
@@ -59,10 +59,10 @@ export default function RulesScreen() {
         });
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.error ?? 'Konnte nicht gespeichert werden.');
+        Alert.alert('Error', err.error ?? 'Could not save.');
       }
     } catch (e) {
-      Alert.alert('Fehler', 'Netzwerkfehler.');
+      Alert.alert('Error', 'Network error.');
     } finally {
       setSaving(false);
     }
@@ -77,17 +77,17 @@ export default function RulesScreen() {
       <View style={{ flex: 1, backgroundColor: theme.bg, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <Text style={{ fontSize: 56 }}>⚙️</Text>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>
-          Erst Geschäft einrichten
+          Set up a shop first
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center', maxWidth: 280, lineHeight: 20 }}>
-          Regeln können erst gespeichert werden, wenn ein Geschäft existiert.
+          Rules can only be saved once a shop exists.
         </Text>
         <TouchableOpacity onPress={() => router.replace('/(merchant)/setup')}
           style={{ backgroundColor: theme.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Zur Einrichtung</Text>
+          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Open setup</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()} style={{ paddingVertical: 8 }}>
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>Schließen</Text>
+          <Text style={{ color: theme.textMuted, fontSize: 13 }}>Close</Text>
         </TouchableOpacity>
       </View>
     );
@@ -96,11 +96,11 @@ export default function RulesScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 22, gap: 22, paddingBottom: 40 }}>
       <TouchableOpacity onPress={() => router.back()}>
-        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
       </TouchableOpacity>
 
       <View>
-        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>EINSTELLUNGEN</Text>
+        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>SETTINGS</Text>
         <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
           {i18n.t('merchant.rules_title')}
         </Text>
@@ -166,7 +166,7 @@ export default function RulesScreen() {
         }}
       >
         <Text style={{ color: theme.textOnPrimary, fontSize: 16, fontWeight: '800', letterSpacing: 0.3 }}>
-          {saving ? 'Wird gespeichert…' : i18n.t('merchant.save_rules')}
+          {saving ? 'Saving…' : i18n.t('merchant.save_rules')}
         </Text>
       </TouchableOpacity>
     </ScrollView>

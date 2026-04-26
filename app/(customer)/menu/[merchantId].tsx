@@ -72,12 +72,12 @@ export default function CustomerMenuView() {
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={{ padding: 18, gap: 14, paddingBottom: 40 }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Schließen</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Close</Text>
         </TouchableOpacity>
 
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
-            SPEISEKARTE
+            MENU
           </Text>
           <Text style={{ color: theme.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.6 }} numberOfLines={1}>
             {merchant?.name ?? '—'}
@@ -102,9 +102,9 @@ export default function CustomerMenuView() {
             borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed',
           }}>
             <Text style={{ fontSize: 40 }}>📋</Text>
-            <Text style={{ color: theme.text, fontWeight: '700', marginTop: 8 }}>Speisekarte noch nicht erfasst</Text>
+            <Text style={{ color: theme.text, fontWeight: '700', marginTop: 8 }}>Menu not yet captured</Text>
             <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', maxWidth: 280 }}>
-              Dieser Händler hat seine Karte noch nicht digitalisiert.
+              This merchant hasn't digitised their menu yet.
             </Text>
           </View>
         ) : (

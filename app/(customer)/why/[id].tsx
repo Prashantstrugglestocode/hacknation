@@ -94,13 +94,13 @@ function buildSignalRows(ctx: any): SignalRow[] {
     rows.push({
       icon: '🗺️',
       source: 'OpenStreetMap · Overpass',
-      label: 'Geschäfte in 500 m',
-      detail: `${ctx.pois.cafes} Cafés · ${ctx.pois.restaurants} Restaurants · ${ctx.pois.shops} Läden`,
+      label: 'Shops within 500 m',
+      detail: `${ctx.pois.cafes} cafés · ${ctx.pois.restaurants} restaurants · ${ctx.pois.shops} shops`,
       value: String(ctx.pois.total),
     });
   }
   if (ctx?.payone) {
-    const label = ctx.payone.density === 'low' ? 'Ruhig' : ctx.payone.density === 'high' ? 'Stoßzeit' : 'Normal';
+    const label = ctx.payone.density === 'low' ? 'Quiet' : ctx.payone.density === 'high' ? 'Peak' : 'Normal';
     rows.push({
       icon: '💳',
       source: 'Payone',
@@ -218,7 +218,7 @@ export default function WhyScreen() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: 22, gap: 20 }}>
       <TouchableOpacity onPress={() => router.back()} style={{ alignSelf: 'flex-start' }}>
-        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
       </TouchableOpacity>
 
       <View>

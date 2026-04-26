@@ -21,13 +21,13 @@ function fmtTime(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
   if (d.toDateString() === today.toDateString()) {
-    return `Heute · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    return `Today · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
   }
   const yesterday = new Date(today.getTime() - 86_400_000);
   if (d.toDateString() === yesterday.toDateString()) {
-    return `Gestern · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+    return `Yesterday · ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
   }
-  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 
 export default function HistoryScreen() {
@@ -62,7 +62,7 @@ export default function HistoryScreen() {
   const statusBadge = (status: string) => {
     const cfg: Record<string, { color: string; label: string }> = {
       accepted: { color: theme.success, label: 'Angenommen' },
-      redeemed: { color: theme.success, label: 'Eingelöst' },
+      redeemed: { color: theme.success, label: 'Redeemed' },
       declined: { color: theme.warn, label: 'Abgelehnt' },
       expired: { color: theme.danger, label: 'Abgelaufen' },
       shown: { color: theme.textMuted, label: 'Angezeigt' },
@@ -92,7 +92,7 @@ export default function HistoryScreen() {
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Schließen</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Close</Text>
         </TouchableOpacity>
       </View>
 

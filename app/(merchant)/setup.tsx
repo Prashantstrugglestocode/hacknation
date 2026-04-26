@@ -30,18 +30,18 @@ export default function MerchantSetup() {
   const GOALS = [
     {
       id: 'fill_quiet_hours' as const, label: i18n.t('merchant.goal_fill_quiet'), emoji: '☕',
-      desc: 'Ruhige Stunden mit Angeboten füllen',
-      preview: '15 % Mittagsrabatt · Cappuccino',
+      desc: 'Fill quiet hours with offers',
+      preview: '15 % lunch discount · Cappuccino',
     },
     {
       id: 'move_slow_stock' as const, label: i18n.t('merchant.goal_move_stock'), emoji: '📦',
-      desc: 'Produkte mit wenig Umsatz abverkaufen',
-      preview: '30 % auf letzte 5 Stück',
+      desc: 'Sell down low-turnover stock',
+      preview: '30 % off last 5 in stock',
     },
     {
       id: 'build_loyalty' as const, label: i18n.t('merchant.goal_loyalty'), emoji: '❤️',
-      desc: 'Stammkunden mit Rabatten belohnen',
-      preview: '+5 % Treuerabatt für Wiederkehrer',
+      desc: 'Reward regulars with discounts',
+      preview: '+5 % loyalty discount for repeat visits',
     },
   ];
 
@@ -61,8 +61,8 @@ export default function MerchantSetup() {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim()) { Alert.alert('Name fehlt', 'Bitte gib den Namen deines Geschäfts ein.'); return; }
-    if (!location) { Alert.alert('Standort fehlt', 'Bitte Standort bestätigen oder Adresse eingeben.'); return; }
+    if (!name.trim()) { Alert.alert('Name missing', 'Please enter the name of your shop.'); return; }
+    if (!location) { Alert.alert('Location missing', 'Please confirm a location or enter an address.'); return; }
     setSubmitting(true);
     try {
       const { lat, lng } = location;
@@ -107,7 +107,7 @@ export default function MerchantSetup() {
         params: { id: merchant.id, fromSetup: '1' },
       });
     } catch (e) {
-      Alert.alert('Fehler', 'Geschäft konnte nicht gespeichert werden. Bitte erneut versuchen.');
+      Alert.alert('Error', 'Shop could not be saved. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +137,7 @@ export default function MerchantSetup() {
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity onPress={() => router.replace('/role')} hitSlop={10} style={{ alignSelf: 'flex-start' }}>
-        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+        <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
       </TouchableOpacity>
       <View>
         <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>EINRICHTUNG</Text>
@@ -316,7 +316,7 @@ export default function MerchantSetup() {
         }}
       >
         <Text style={{ color: theme.textOnPrimary, fontSize: 17, fontWeight: '800', letterSpacing: 0.3 }}>
-          {submitting ? 'Wird gespeichert...' : i18n.t('merchant.submit')}
+          {submitting ? 'Saving…' : i18n.t('merchant.submit')}
         </Text>
       </TouchableOpacity>
     </ScrollView>

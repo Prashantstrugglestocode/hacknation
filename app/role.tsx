@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -7,22 +7,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme, space, radius, type as typo } from '../lib/theme';
-import i18n, { setLocale, getLocale, useLocaleVersion } from '../lib/i18n';
+import i18n from '../lib/i18n';
 
 const ROLE_KEY = 'cw_preferred_role';
 const { height } = Dimensions.get('window');
 
 export default function RolePicker() {
-  useLocaleVersion();
   const insets = useSafeAreaInsets();
-  const [locale, setLocaleState] = useState<'de' | 'en'>(getLocale());
-
-  const switchLocale = async (l: 'de' | 'en') => {
-    if (l === locale) return;
-    await setLocale(l);
-    setLocaleState(l);
-    Haptics.selectionAsync().catch(() => {});
-  };
 
   const goCustomer = async () => {
     await AsyncStorage.setItem(ROLE_KEY, 'customer');
@@ -170,38 +161,8 @@ export default function RolePicker() {
         </TouchableOpacity>
       </MotiView>
 
-      {/* Footer: language + privacy hint */}
-      <View style={{ alignItems: 'center', gap: space.md }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', gap: 4,
-          backgroundColor: theme.bgMuted, borderRadius: radius.pill, padding: 4,
-          borderWidth: 1, borderColor: theme.border,
-        }}>
-          {(['de', 'en'] as const).map(l => {
-            const active = locale === l;
-            return (
-              <TouchableOpacity
-                key={l}
-                onPress={() => switchLocale(l)}
-                hitSlop={4}
-                style={{
-                  paddingHorizontal: space.lg, paddingVertical: space.sm,
-                  borderRadius: radius.pill,
-                  backgroundColor: active ? theme.primary : 'transparent',
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                }}
-              >
-                <Text style={{ fontSize: 14 }}>{l === 'de' ? '🇩🇪' : '🇬🇧'}</Text>
-                <Text style={{
-                  color: active ? theme.textOnPrimary : theme.text,
-                  fontSize: typo.small, fontWeight: '900', letterSpacing: 0.4,
-                }}>
-                  {l === 'de' ? 'Deutsch' : 'English'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      {/* Footer: privacy hint (language toggle removed — app is English-only) */}
+      <View style={{ alignItems: 'center' }}>
         <Text style={{
           color: theme.textMuted, fontSize: typo.small,
           textAlign: 'center', fontWeight: '600',

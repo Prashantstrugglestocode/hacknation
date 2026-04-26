@@ -106,11 +106,11 @@ export default function MapScreen() {
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>KARTE</Text>
           <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
-            {merchants.length} in der Nähe
+            {merchants.length} nearby
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Schließen</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>Close</Text>
         </TouchableOpacity>
       </View>
 
@@ -160,7 +160,7 @@ export default function MapScreen() {
           }}>
             <Text style={{ fontSize: 28 }}>🗺</Text>
             <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>
-              Karte konnte nicht geladen werden
+              Map could not be loaded
             </Text>
             <TouchableOpacity onPress={() => { setTileState('loading'); setTileNonce(n => n + 1); }}
               style={{
@@ -236,7 +236,7 @@ export default function MapScreen() {
           borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed',
         }}>
           <Text style={{ fontSize: 40 }}>🗺️</Text>
-          <Text style={{ color: theme.text, fontWeight: '700', marginTop: 8 }}>Kein Geschäft in 500 m</Text>
+          <Text style={{ color: theme.text, fontWeight: '700', marginTop: 8 }}>No shops within 500 m</Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', maxWidth: 280 }}>
             Werde Händler oder bewege dich in der Stadt — neue Angebote tauchen automatisch auf.
           </Text>

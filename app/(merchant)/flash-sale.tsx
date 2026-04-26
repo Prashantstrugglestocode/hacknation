@@ -132,7 +132,7 @@ export default function FlashSale() {
 
   const startFlash = async () => {
     if (!merchantId || (selected.size === 0 && selectedCombos.size === 0)) {
-      Alert.alert('Auswahl fehlt', 'Wähle mindestens einen Posten oder eine Combo für die Flash-Sale.');
+      Alert.alert('Selection missing', 'Pick at least one item or combo for the flash sale.');
       return;
     }
     setSubmitting(true);
@@ -156,10 +156,10 @@ export default function FlashSale() {
         setSelectedCombos(new Set());
         await loadCurrent(merchantId); // refresh full list
       } else {
-        Alert.alert('Fehler', 'Konnte nicht gestartet werden.');
+        Alert.alert('Error', 'Could not be started.');
       }
     } catch {
-      Alert.alert('Fehler', 'Netzwerkfehler.');
+      Alert.alert('Error', 'Network error.');
     } finally {
       setSubmitting(false);
     }
@@ -190,18 +190,18 @@ export default function FlashSale() {
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={{ padding: 18, gap: 16, paddingBottom: 40 }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
         </TouchableOpacity>
 
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
-            FLASH-SALE
+            FLASH SALE
           </Text>
           <Text style={{ color: theme.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.6 }}>
-            🔥 Sofort-Aktion
+            🔥 Instant offer
           </Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 19 }}>
-            Wähle Posten aus deiner Karte. Die KI baut daraus dringliche Angebote für Kunden in der Nähe.
+            Pick items from your menu. The AI turns them into urgent offers for nearby customers.
           </Text>
         </View>
 
@@ -217,12 +217,12 @@ export default function FlashSale() {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>
-                  AKTIVE FLASH-DEALS · {current.flashes!.length}
+                  ACTIVE FLASH DEALS · {current.flashes!.length}
                 </Text>
                 {current.flashes!.length > 1 && (
                   <TouchableOpacity onPress={stopAllFlashes} hitSlop={8}>
                     <Text style={{ color: theme.danger, fontSize: 11, fontWeight: '900' }}>
-                      Alle beenden
+                      End all
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -248,14 +248,14 @@ export default function FlashSale() {
                         style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFF' }}
                       />
                       <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '900', letterSpacing: 1.2, flex: 1 }}>
-                        AKTIV · {f.pct} % · noch {f.minutes_left} Min
+                        ACTIVE · {f.pct} % · {f.minutes_left} min left
                       </Text>
                       <TouchableOpacity onPress={() => stopOneFlash(f.id)} hitSlop={8}
                         style={{
                           backgroundColor: '#FFFFFF', borderRadius: 8,
                           paddingHorizontal: 10, paddingVertical: 5,
                         }}>
-                        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '900' }}>Beenden</Text>
+                        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '900' }}>End</Text>
                       </TouchableOpacity>
                     </View>
                     {f.combos.length > 0 && (
@@ -265,7 +265,7 @@ export default function FlashSale() {
                         borderWidth: 1, borderColor: '#FFFFFF44',
                       }}>
                         <Text style={{ color: '#FFFFFFCC', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>
-                          🤖 KI WÄHLT JE NACH WETTER
+                          🤖 AI PICKS BY WEATHER
                         </Text>
                         {f.combos.map(co => (
                           <View key={co.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -306,15 +306,15 @@ export default function FlashSale() {
           <View style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
               <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1, flex: 1 }}>
-                COMBOS · KI WÄHLT JE NACH WETTER
+                COMBOS · AI PICKS BY WEATHER
               </Text>
               <Text style={{ color: theme.primary, fontSize: 10, fontWeight: '900' }}>
                 {selectedCombos.size}/{combos.length}
               </Text>
             </View>
             <Text style={{ color: theme.textMuted, fontSize: 11, lineHeight: 15 }}>
-              Wähle mehrere — die KI pitcht je Kunde die wetter-passende Combo
-              (z.B. heißer Kaffee bei Regen, Eis bei Sonne).
+              Pick several — the AI pitches each customer the weather-best combo
+              (e.g. hot coffee when raining, ice cream when sunny).
             </Text>
             <View style={{ gap: 8 }}>
               {combos.map(co => {
@@ -353,7 +353,7 @@ export default function FlashSale() {
                         fontSize: 11, fontWeight: '700',
                       }} numberOfLines={1}>
                         {co.items.map(it => it.name).join(' · ')}
-                        {co.savings_cents > 0 ? `  ·  spart ${fmtPrice(co.savings_cents)}` : ''}
+                        {co.savings_cents > 0 ? `  ·  saves ${fmtPrice(co.savings_cents)}` : ''}
                       </Text>
                     </MotiView>
                   </Pressable>
@@ -365,11 +365,11 @@ export default function FlashSale() {
 
         <View style={{ gap: 8 }}>
           <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
-            POSTEN AUSWÄHLEN
+            PICK ITEMS
           </Text>
           {loading ? (
             <Text style={{ color: theme.textMuted, fontSize: 13, paddingVertical: 12, textAlign: 'center' }}>
-              Lade Speisekarte…
+              Loading menu…
             </Text>
           ) : items.length === 0 ? (
             <View style={{
@@ -378,17 +378,17 @@ export default function FlashSale() {
             }}>
               <Text style={{ fontSize: 32 }}>📋</Text>
               <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700', textAlign: 'center' }}>
-                Noch keine Posten in der Karte
+                No items in your menu yet
               </Text>
               <Text style={{ color: theme.textMuted, fontSize: 12, textAlign: 'center', maxWidth: 260 }}>
-                Geh zur Speisekarte und scanne deine Karte mit der Kamera oder füge Posten manuell hinzu.
+                Go to the menu and scan it with the camera, or add items manually.
               </Text>
               <TouchableOpacity onPress={() => merchantId && router.push({ pathname: '/(merchant)/menu', params: { id: merchantId } })}
                 style={{
                   backgroundColor: theme.primary, borderRadius: 12,
                   paddingHorizontal: 20, paddingVertical: 10, marginTop: 4,
                 }}>
-                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>Zur Speisekarte</Text>
+                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>Open menu</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -458,7 +458,7 @@ export default function FlashSale() {
 
         <View style={{ gap: 10 }}>
           <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
-            RABATT — <Text style={{ color: theme.primary }}>{pct} %</Text>
+            DISCOUNT — <Text style={{ color: theme.primary }}>{pct} %</Text>
             <Text style={{ color: theme.textMuted, fontSize: 10 }}>  (max {maxDiscount} %)</Text>
           </Text>
           <Slider
@@ -475,7 +475,7 @@ export default function FlashSale() {
 
         <View style={{ gap: 10 }}>
           <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
-            DAUER — <Text style={{ color: theme.primary }}>{duration} Min</Text>
+            DURATION — <Text style={{ color: theme.primary }}>{duration} min</Text>
           </Text>
           <Slider
             minimumValue={15}
@@ -498,14 +498,14 @@ export default function FlashSale() {
         >
           <Text style={{ color: theme.textOnPrimary, fontSize: 16, fontWeight: '900', letterSpacing: 0.3 }}>
             {submitting
-              ? 'Wird gestartet…'
-              : `🔥 ${(current.flashes ?? []).length > 0 ? 'Weitere Flash hinzufügen' : 'Flash starten'} · ${selected.size + selectedCombos.size} Auswahl${selectedCombos.size > 0 ? ` (${selectedCombos.size} Combo)` : ''}`}
+              ? 'Starting…'
+              : `🔥 ${(current.flashes ?? []).length > 0 ? 'Add another flash' : 'Start flash'} · ${selected.size + selectedCombos.size} picked${selectedCombos.size > 0 ? ` (${selectedCombos.size} combo)` : ''}`}
           </Text>
         </TouchableOpacity>
 
         <Text style={{ color: theme.textMuted, fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
-          Die KI baut für Kunden in der Nähe ein dringliches Angebot mit dem ausgewählten Posten.
-          Du musst keinen Text schreiben.
+          The AI builds an urgent offer for nearby customers using your selection.
+          You don't need to write any copy.
         </Text>
       </ScrollView>
     </View>

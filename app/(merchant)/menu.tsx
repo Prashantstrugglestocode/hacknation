@@ -67,11 +67,11 @@ export default function MenuScreen() {
     // Always read the live merchant id — never trust possibly-stale state.
     const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? merchantId;
     if (!mid) {
-      setAddError('Kein Geschäft eingerichtet.');
+      setAddError('No shop set up.');
       return;
     }
     if (!newName.trim()) {
-      setAddError('Bitte einen Namen eingeben.');
+      setAddError('Please enter a name.');
       return;
     }
     setAdding(true);
@@ -144,10 +144,10 @@ export default function MenuScreen() {
   useFocusEffect(useCallback(() => { loadRef.current(); }, []));
 
   const onDelete = async (item: MenuItem) => {
-    Alert.alert('Löschen?', item.name, [
-      { text: 'Abbrechen', style: 'cancel' },
+    Alert.alert('Delete?', item.name, [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Löschen',
+        text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           // Use live merchant_id from AsyncStorage — state can be stale.
@@ -158,11 +158,11 @@ export default function MenuScreen() {
           try {
             const res = await fetch(`${API}/api/merchant/${mid}/menu/${item.id}`, { method: 'DELETE' });
             if (!res.ok) {
-              Alert.alert('Fehler', `Löschen fehlgeschlagen (${res.status})`);
+              Alert.alert('Error', `Delete failed (${res.status})`);
               load(); // re-sync to undo optimistic remove
             }
           } catch {
-            Alert.alert('Fehler', 'Netzwerkfehler beim Löschen');
+            Alert.alert('Error', 'Network error while deleting');
             load();
           }
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -173,29 +173,29 @@ export default function MenuScreen() {
 
   const onDeleteAll = async () => {
     Alert.alert(
-      'Alle Posten löschen?',
-      'Das löscht ALLE Speisekarte-Posten. Diese Aktion kann nicht rückgängig gemacht werden.',
+      'Delete all items?',
+      'This deletes ALL menu items. This action cannot be undone.',
       [
-        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Alle löschen',
+          text: 'Delete all',
           style: 'destructive',
           onPress: async () => {
             const mid = (await AsyncStorage.getItem(MERCHANT_ID_KEY)) ?? merchantId;
             if (!mid) return;
             const before = items;
-            setItems([]); // optimistic
+            setItems([]);
             try {
               const res = await fetch(`${API}/api/merchant/${mid}/menu`, { method: 'DELETE' });
               if (!res.ok) {
                 setItems(before);
-                Alert.alert('Fehler', `Konnte nicht löschen (${res.status})`);
+                Alert.alert('Error', `Could not delete (${res.status})`);
               } else {
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               }
             } catch {
               setItems(before);
-              Alert.alert('Fehler', 'Netzwerkfehler');
+              Alert.alert('Error', 'Network error');
             }
           },
         },
@@ -216,11 +216,11 @@ export default function MenuScreen() {
       <View style={{ flex: 1, backgroundColor: theme.bg, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <Text style={{ fontSize: 64 }}>📋</Text>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', textAlign: 'center' }}>
-          Erst Geschäft anlegen
+          Set up a shop first
         </Text>
         <TouchableOpacity onPress={() => router.replace('/(merchant)/setup')}
           style={{ backgroundColor: theme.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Zur Einrichtung</Text>
+          <Text style={{ color: theme.textOnPrimary, fontWeight: '800' }}>Open setup</Text>
         </TouchableOpacity>
       </View>
     );
@@ -237,21 +237,21 @@ export default function MenuScreen() {
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
         </TouchableOpacity>
         {items.length > 0 ? (
           <TouchableOpacity onPress={onDeleteAll} hitSlop={10}>
             <Text style={{ color: theme.danger, fontSize: 13, fontWeight: '700' }}>
-              🗑  Alle löschen
+              🗑  Delete all
             </Text>
           </TouchableOpacity>
         ) : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <View>
-          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>SPEISEKARTE</Text>
+          <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>MENU</Text>
           <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
-            {items.length} Posten
+            {items.length} items
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -266,7 +266,7 @@ export default function MenuScreen() {
               {addOpen ? '×' : '+'}
             </Text>
             <Text style={{ color: addOpen ? theme.textOnPrimary : theme.primary, fontWeight: '800', fontSize: 13 }}>
-              {addOpen ? 'Schließen' : 'Posten'}
+              {addOpen ? 'Close' : 'Item'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push(`/(merchant)/menu-scan?id=${merchantId}`)}
@@ -346,7 +346,7 @@ export default function MenuScreen() {
               borderRadius: 12, paddingVertical: 13, alignItems: 'center',
             }}>
             <Text style={{ color: theme.textOnPrimary, fontSize: 14, fontWeight: '900' }}>
-              {adding ? 'Wird gespeichert…' : '+ Posten hinzufügen'}
+              {adding ? 'Saving…' : '+ Add item'}
             </Text>
           </TouchableOpacity>
           {addError ? (
@@ -419,7 +419,7 @@ export default function MenuScreen() {
             Noch keine Speisekarte gescannt
           </Text>
           <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center', maxWidth: 260, lineHeight: 20 }}>
-            Fotografiere deine gedruckte Karte. KI erkennt Posten und Preise automatisch.
+            Photograph your printed menu. The AI extracts items and prices automatically.
           </Text>
         </View>
       ) : (

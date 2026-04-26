@@ -1,28 +1,20 @@
 import { I18n } from 'i18n-js';
-import * as Localization from 'expo-localization';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import de from './de.json';
 import en from './en.json';
 
-const i18n = new I18n({ de, en });
+// English-only build. The German locale + runtime toggle were removed
+// per product decision — keeping a single language drastically reduces
+// surface area for missing-translation bugs in a hackathon demo.
+const i18n = new I18n({ en });
 
-const detected = Localization.getLocales()[0]?.languageCode ?? 'de';
-i18n.locale = detected === 'en' ? 'en' : 'de';
-i18n.defaultLocale = 'de';
+i18n.locale = 'en';
+i18n.defaultLocale = 'en';
 i18n.enableFallback = true;
 
-const STORAGE_KEY = 'cw_locale_v1';
-
-// Restore saved override on boot (fire-and-forget; first read may use detected)
-AsyncStorage.getItem(STORAGE_KEY).then(v => {
-  if (v === 'de' || v === 'en') i18n.locale = v;
-}).catch(() => {});
-
 export default i18n;
-export type Locale = 'de' | 'en';
+export type Locale = 'en';
 
 export function getLocale(): Locale {
-  return i18n.locale === 'en' ? 'en' : 'de';
+  return 'en';
 }
 
 // Tiny pub/sub so React components can re-render when the locale flips at
@@ -36,16 +28,15 @@ function subscribeLocale(fn: Listener): () => void {
   return () => { listeners.delete(fn); };
 }
 
-// Hook: re-renders the calling component whenever locale changes.
-// Use in any component whose visible text depends on i18n.t().
-export function useLocaleVersion(): 'de' | 'en' {
+// Kept as a no-op so existing callers compile. With the language toggle
+// removed there's nothing to re-render; the hook just returns 'en'.
+export function useLocaleVersion(): 'en' {
   const [, bump] = useReducer((x: number) => x + 1, 0);
   useEffect(() => subscribeLocale(bump), []);
-  return getLocale();
+  return 'en';
 }
 
-export async function setLocale(locale: Locale) {
-  i18n.locale = locale;
-  await AsyncStorage.setItem(STORAGE_KEY, locale);
-  listeners.forEach(l => { try { l(); } catch {} });
+// No-op kept for caller compatibility; locale is fixed to 'en'.
+export async function setLocale(_locale: Locale) {
+  // Intentionally empty — the app is English-only.
 }

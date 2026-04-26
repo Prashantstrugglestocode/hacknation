@@ -25,8 +25,8 @@ export default function MerchantPreview() {
   const [iter, setIter] = useState(0);
   const [showBanner, setShowBanner] = useState(fromRules === '1' || fromSetup === '1');
   const bannerText = fromSetup === '1'
-    ? 'Geschäft gespeichert · Vorschau wird generiert'
-    : 'Neue Regeln aktiv · Vorschau neu generiert';
+    ? 'Shop saved · generating preview'
+    : 'New rules active · preview regenerated';
 
   const fetchPreview = useCallback(async () => {
     setLoading(true);
@@ -65,15 +65,15 @@ export default function MerchantPreview() {
           hitSlop={10}
         >
           <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>
-            {fromSetup === '1' || fromRules === '1' ? '→ Dashboard' : '← Zurück'}
+            {fromSetup === '1' || fromRules === '1' ? '→ Dashboard' : '← Back'}
           </Text>
         </TouchableOpacity>
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textAlign: 'right' }}>
-            VORSCHAU
+            PREVIEW
           </Text>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', letterSpacing: -0.3 }}>
-            So sehen Kunden dich
+            How customers see you
           </Text>
         </View>
       </View>
@@ -157,11 +157,11 @@ export default function MerchantPreview() {
         }}
       >
         <Text style={{ color: theme.textOnPrimary, fontSize: 16, fontWeight: '800', letterSpacing: 0.3 }}>
-          ↻ Anderes Beispiel generieren
+          ↻ Generate another example
         </Text>
       </TouchableOpacity>
       <Text style={{ color: theme.textMuted, fontSize: 11, textAlign: 'center', marginTop: 8 }}>
-        Beispiel wird nicht gespeichert. Echte Angebote nur, wenn ein Kunde in der Nähe ist.
+        This example isn't saved. Real offers only fire when a customer is nearby.
       </Text>
     </View>
   );

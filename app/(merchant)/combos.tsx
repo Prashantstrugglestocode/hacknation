@@ -31,7 +31,7 @@ interface Combo {
 }
 
 const fmt = (cents: number) =>
-  new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 
 export default function CombosScreen() {
   const insets = useSafeAreaInsets();
@@ -100,7 +100,7 @@ export default function CombosScreen() {
         }),
       });
       if (!r.ok) {
-        Alert.alert('Fehler', 'Combo konnte nicht erstellt werden.');
+        Alert.alert('Error', 'Combo could not be created.');
         return;
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -109,7 +109,7 @@ export default function CombosScreen() {
       setDraftPriceEur('');
       await load();
     } catch {
-      Alert.alert('Netzwerkfehler', 'Bitte erneut versuchen.');
+      Alert.alert('Network error', 'Please try again.');
     } finally {
       setCreating(false);
     }
@@ -147,18 +147,18 @@ export default function CombosScreen() {
           paddingVertical: space.sm, paddingHorizontal: space.md,
           marginLeft: -space.md,
         }}>
-        <Text style={{ color: theme.primary, fontSize: typo.bodyL, fontWeight: '800' }}>← Zurück</Text>
+        <Text style={{ color: theme.primary, fontSize: typo.bodyL, fontWeight: '800' }}>← Back</Text>
       </TouchableOpacity>
 
       <View>
         <Text style={{ color: theme.primary, fontSize: typo.caption, fontWeight: '900', letterSpacing: 1.2 }}>
-          BUNDLE-DEALS
+          BUNDLE DEALS
         </Text>
         <Text style={{ color: theme.text, fontSize: typo.display, fontWeight: '900', letterSpacing: -0.6 }}>
           🎁 Combos
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700', marginTop: space.xs }}>
-          Bündele 2-4 Posten zu einem Festpreis. Stadtpuls bevorzugt Combos beim Generieren.
+          Bundle 2–4 items at a fixed price. Stadtpuls prefers combos when generating offers.
         </Text>
       </View>
 
@@ -166,7 +166,7 @@ export default function CombosScreen() {
       {combos.length > 0 && (
         <View style={{ gap: space.sm }}>
           <Text style={{ color: theme.textMuted, fontSize: typo.caption, fontWeight: '900', letterSpacing: 1 }}>
-            AKTIVE COMBOS · {combos.length}
+            ACTIVE COMBOS · {combos.length}
           </Text>
           {combos.map(co => (
             <MotiView
@@ -196,14 +196,14 @@ export default function CombosScreen() {
                     borderWidth: 1, borderColor: theme.danger + '44',
                   }}>
                   <Text style={{ color: theme.danger, fontSize: typo.small, fontWeight: '900' }}>
-                    Löschen
+                    Delete
                   </Text>
                 </TouchableOpacity>
               </View>
               <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'baseline' }}>
                 <View>
                   <Text style={{ color: theme.textMuted, fontSize: typo.micro, fontWeight: '900', letterSpacing: 1 }}>
-                    EINZELN
+                    INDIVIDUAL
                   </Text>
                   <Text style={{ color: theme.textMuted, fontSize: typo.body, fontWeight: '700', textDecorationLine: 'line-through' }}>
                     {fmt(co.base_total_cents)}
@@ -219,7 +219,7 @@ export default function CombosScreen() {
                 </View>
                 <View style={{ marginLeft: 'auto' }}>
                   <Text style={{ color: theme.success, fontSize: typo.micro, fontWeight: '900', letterSpacing: 1 }}>
-                    KUNDE SPART
+                    CUSTOMER SAVES
                   </Text>
                   <Text style={{ color: theme.success, fontSize: typo.bodyL, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
                     {fmt(co.savings_cents)}
@@ -238,23 +238,23 @@ export default function CombosScreen() {
         borderWidth: 1, borderColor: theme.border,
       }}>
         <Text style={{ color: theme.textMuted, fontSize: typo.caption, fontWeight: '900', letterSpacing: 1 }}>
-          NEUE COMBO
+          NEW COMBO
         </Text>
 
         {menu.length < 2 ? (
           <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-            Mindestens 2 Posten in der Speisekarte nötig. Speisekarte verwalten ›
+            Need at least 2 menu items. Open the menu ›
           </Text>
         ) : (
           <>
             <View style={{ gap: 6 }}>
               <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-                Name (z.B. „Frühstücks-Set")
+                Name (e.g. "Breakfast set")
               </Text>
               <TextInput
                 value={draftName}
                 onChangeText={setDraftName}
-                placeholder="Frühstücks-Set"
+                placeholder="Breakfast set"
                 placeholderTextColor={theme.textMuted}
                 style={{
                   backgroundColor: theme.bg, borderRadius: radius.md, padding: space.md,
@@ -266,7 +266,7 @@ export default function CombosScreen() {
 
             <View style={{ gap: 6 }}>
               <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-                Posten wählen · {draftItems.length}/4
+                Pick items · {draftItems.length}/4
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
                 {menu.map(it => {
@@ -293,12 +293,12 @@ export default function CombosScreen() {
 
             <View style={{ gap: 6 }}>
               <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700' }}>
-                Combo-Preis (€)
+                Combo price (€)
               </Text>
               <TextInput
                 value={draftPriceEur}
                 onChangeText={setDraftPriceEur}
-                placeholder={draftBaseSum > 0 ? `weniger als ${fmt(draftBaseSum)}` : '4,50'}
+                placeholder={draftBaseSum > 0 ? `less than ${fmt(draftBaseSum)}` : '4.50'}
                 placeholderTextColor={theme.textMuted}
                 keyboardType="decimal-pad"
                 style={{
@@ -320,8 +320,8 @@ export default function CombosScreen() {
                   fontSize: typo.small, fontWeight: '900',
                 }}>
                   {draftValid
-                    ? `Kunde spart ${fmt(draftSavings)} (statt ${fmt(draftBaseSum)})`
-                    : `Combo-Preis muss kleiner sein als ${fmt(draftBaseSum)}`}
+                    ? `Customer saves ${fmt(draftSavings)} (vs ${fmt(draftBaseSum)})`
+                    : `Combo price must be lower than ${fmt(draftBaseSum)}`}
                 </Text>
               </View>
             )}
@@ -335,7 +335,7 @@ export default function CombosScreen() {
                 shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
               }}>
               <Text style={{ color: theme.textOnPrimary, fontSize: typo.body, fontWeight: '900' }}>
-                {creating ? 'Wird gespeichert...' : '✓ Combo erstellen'}
+                {creating ? 'Saving…' : '✓ Create combo'}
               </Text>
             </TouchableOpacity>
           </>

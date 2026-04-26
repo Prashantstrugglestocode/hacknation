@@ -93,8 +93,8 @@ export default function ScanScreen() {
               </Text>
               {result.offer?.discount_amount_cents && (
                 <Text style={{ color: theme.success, fontSize: 20, fontWeight: '800' }}>
-                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
-                    .format(result.offer.discount_amount_cents / 100)} Rabatt
+                  {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })
+                    .format(result.offer.discount_amount_cents / 100)} discount
                 </Text>
               )}
             </>
@@ -106,7 +106,7 @@ export default function ScanScreen() {
           onPress={() => router.back()}
           style={{ backgroundColor: theme.primary, borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14 }}
         >
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 16 }}>Zurück</Text>
+          <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 16 }}>Back</Text>
         </TouchableOpacity>
       </View>
     );

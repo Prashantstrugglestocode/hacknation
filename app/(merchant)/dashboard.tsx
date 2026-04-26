@@ -9,7 +9,6 @@ import { subscribeMerchantChannel, MerchantEvent } from '../../lib/supabase/real
 import Sparkline from '../../lib/components/Sparkline';
 import AnimatedNumber from '../../lib/components/AnimatedNumber';
 import RoleSwitch from '../../lib/components/RoleSwitch';
-import LangToggle from '../../lib/components/LangToggle';
 import FallbackImage from '../../lib/components/FallbackImage';
 import { shopImageUrl } from '../../lib/images';
 import i18n, { useLocaleVersion } from '../../lib/i18n';
@@ -51,19 +50,19 @@ interface Merchant {
 }
 
 function greetingFor(hour: number): { hi: string; emoji: string } {
-  if (hour < 5)  return { hi: 'Gute Nacht', emoji: '🌙' };
-  if (hour < 11) return { hi: 'Guten Morgen', emoji: '☀️' };
-  if (hour < 14) return { hi: 'Mahlzeit', emoji: '🥪' };
-  if (hour < 18) return { hi: 'Schönen Nachmittag', emoji: '☕' };
-  if (hour < 22) return { hi: 'Guten Abend', emoji: '🌆' };
-  return { hi: 'Späte Stunde', emoji: '🌙' };
+  if (hour < 5)  return { hi: 'Good night', emoji: '🌙' };
+  if (hour < 11) return { hi: 'Good morning', emoji: '☀️' };
+  if (hour < 14) return { hi: 'Lunchtime', emoji: '🥪' };
+  if (hour < 18) return { hi: 'Good afternoon', emoji: '☕' };
+  if (hour < 22) return { hi: 'Good evening', emoji: '🌆' };
+  return { hi: 'Late hour', emoji: '🌙' };
 }
 
 const eventLabel = (t: MerchantEvent['type']) => ({
-  'offer.shown': 'Angebot angezeigt',
-  'offer.accepted': 'Akzeptiert',
-  'offer.declined': 'Abgelehnt',
-  'offer.redeemed': 'Eingelöst',
+  'offer.shown': 'Offer shown',
+  'offer.accepted': 'Accepted',
+  'offer.declined': 'Declined',
+  'offer.redeemed': 'Redeemed',
 }[t]);
 
 const eventDot = (t: MerchantEvent['type']) => ({
@@ -271,7 +270,7 @@ export default function MerchantDashboard() {
               {eventToast.cents != null && eventToast.cents > 0 && (
                 <Text style={{ color: '#FFFFFF', fontSize: typeScale.body, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
                   {eventToast.type === 'offer.redeemed' ? ' +' : ' · '}
-                  {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(eventToast.cents / 100)}
+                  {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(eventToast.cents / 100)}
                 </Text>
               )}
             </View>
@@ -383,13 +382,13 @@ export default function MerchantDashboard() {
                 >
                   <AnimatedNumber
                     value={(stats.revenue_cents ?? 0) / 100}
-                    format={n => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)}
+                    format={n => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(n)}
                     style={{ color: '#fff', fontSize: typeScale.display - 4, fontWeight: '900', letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}
                   />
                 </MotiView>
                 {(stats.customer_savings_cents ?? 0) > 0 && (
                   <Text style={{ color: '#FFFFFF99', fontSize: typeScale.micro, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                    Kunden gespart {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format((stats.customer_savings_cents ?? 0) / 100)}
+                    Customers saved {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format((stats.customer_savings_cents ?? 0) / 100)}
                   </Text>
                 )}
               </View>
@@ -447,11 +446,10 @@ export default function MerchantDashboard() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.sm }}>
               {/* TODO: i18n key — merchant.top_items_title */}
               <Text style={{ color: theme.text, fontSize: typeScale.body, fontWeight: '900', letterSpacing: 0.4 }}>
-                🏆 TOP-POSTEN
+                🏆 TOP ITEMS
               </Text>
-              {/* TODO: i18n key — merchant.live_redeemed */}
               <Text style={{ color: theme.textMuted, fontSize: typeScale.caption, fontWeight: '700' }}>
-                live · eingelöst
+                live · redeemed
               </Text>
             </View>
             <View style={{ gap: space.sm }}>
@@ -484,7 +482,7 @@ export default function MerchantDashboard() {
                     </Text>
                     {item.price_cents != null && (
                       <Text style={{ color: theme.textMuted, fontSize: typeScale.caption, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 1 }}>
-                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(item.price_cents / 100)}
+                        {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(item.price_cents / 100)}
                       </Text>
                     )}
                   </View>
@@ -496,9 +494,8 @@ export default function MerchantDashboard() {
                     <Text style={{ color: theme.success, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
                       {item.redemptions}×
                     </Text>
-                    {/* TODO: i18n key — merchant.redeemed_short */}
                     <Text style={{ color: theme.success, fontSize: typeScale.caption, fontWeight: '700' }}>
-                      eingelöst
+                      redeemed
                     </Text>
                   </View>
                 </View>
@@ -557,26 +554,22 @@ export default function MerchantDashboard() {
               transition={{ type: 'timing', duration: 1100, loop: true }}
               style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: theme.success }}
             />
-            {/* TODO: i18n key — merchant.live_activity */}
             <Text style={{ color: theme.text, fontSize: typeScale.body, fontWeight: '700' }}>
-              Live · Aktivität
+              Live · Activity
             </Text>
-            {/* TODO: i18n key — merchant.feed_count */}
             <Text style={{ color: theme.textMuted, fontSize: typeScale.small, fontWeight: '700' }}>
-              {feed.length > 0 ? `${feed.length} aktuell` : '·'}
+              {feed.length > 0 ? `${feed.length} recent` : '·'}
             </Text>
           </View>
 
           {feed.length === 0 ? (
             <View style={{ paddingVertical: space['2xl'], alignItems: 'center', gap: space.xs + 2 }}>
               <Text style={{ fontSize: 36, opacity: 0.4 }}>👋</Text>
-              {/* TODO: i18n key — merchant.feed_empty_title */}
               <Text style={{ color: theme.textMuted, fontSize: typeScale.body, fontWeight: '700', textAlign: 'center' }}>
-                Warte auf den ersten Kunden.
+                Waiting for the first customer.
               </Text>
-              {/* TODO: i18n key — merchant.feed_empty_sub */}
               <Text style={{ color: theme.textMuted, fontSize: typeScale.small, fontWeight: '700', textAlign: 'center', maxWidth: 260 }}>
-                Sobald jemand in der Nähe das Angebot sieht, ploppt es hier auf.
+                As soon as someone nearby sees an offer, it pops up here.
               </Text>
             </View>
           ) : (
@@ -621,14 +614,14 @@ export default function MerchantDashboard() {
                         if (isRedeemed && typeof revenue === 'number' && revenue > 0) {
                           return (
                             <Text style={{ color: theme.success, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
-                              +{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(revenue / 100)}
+                              +{new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(revenue / 100)}
                             </Text>
                           );
                         }
                         if (!isRedeemed && item.discount_amount_cents) {
                           return (
                             <Text style={{ color: theme.textMuted, fontSize: typeScale.small, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
-                              {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(item.discount_amount_cents / 100)} Rabatt
+                              {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(item.discount_amount_cents / 100)} discount
                             </Text>
                           );
                         }

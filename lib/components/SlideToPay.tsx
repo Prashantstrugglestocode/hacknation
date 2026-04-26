@@ -174,7 +174,7 @@ export default function SlideToPay({
             color: theme.text, fontSize: typo.title, fontWeight: '900',
             fontVariant: ['tabular-nums'], letterSpacing: -0.6,
           }}>
-            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+            {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })
               .format(amountCents / 100)}
           </Text>
         </View>

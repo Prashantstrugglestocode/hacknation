@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Slider from '@react-native-community/slider';
 import { MotiView } from 'moti';
-import LangToggle from '../lib/components/LangToggle';
 import { forgetMe } from '../lib/privacy/intent-encoder';
 import { usePrefs } from '../lib/preferences';
 import { playChime } from '../lib/sounds';
@@ -50,7 +49,7 @@ export default function Settings() {
   const handleToggleTts = async () => {
     await toggleTts();
     // Demo the new state when turning ON.
-    if (!prefs.tts) speak('Vorlesen ist jetzt aktiv.', { force: true });
+    if (!prefs.tts) speak('Read-aloud is now active.', { force: true });
   };
 
   return (
@@ -77,17 +76,7 @@ export default function Settings() {
           </Text>
         </View>
 
-        {/* Language */}
-        <Section title={i18n.t('settings.language').toUpperCase()}>
-          <View style={{ alignItems: 'flex-start' }}>
-            <LangToggle variant="dark" />
-          </View>
-          <Text style={{ color: theme.textMuted, fontSize: type.small, marginTop: space.sm }}>
-            {i18n.t('settings.language_hint')}
-          </Text>
-        </Section>
-
-        {/* App-Verhalten */}
+        {/* App behavior — language toggle removed; English-only build. */}
         <Section title={i18n.t('settings.behavior').toUpperCase()}>
           <ToggleRow
             emoji="🔊"
@@ -111,7 +100,7 @@ export default function Settings() {
             onToggle={handleToggleTts}
           />
           <TouchableOpacity
-            onPress={() => speak('Stadtpuls vorlesen funktioniert. Dies ist ein Test der Sprachausgabe.', { force: true })}
+            onPress={() => speak('Stadtpuls read-aloud is working. This is a test of the voice output.', { force: true })}
             style={{
               alignSelf: 'flex-start', marginTop: -space.xs,
               backgroundColor: theme.bgMuted, borderRadius: 10,

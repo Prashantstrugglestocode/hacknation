@@ -223,7 +223,7 @@ export default function CustomerHome() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await generate();
     } catch (e) {
-      Alert.alert('Fehler', 'Demo-Geschäft konnte nicht erstellt werden');
+      Alert.alert('Error', 'Demo shop could not be created');
     } finally {
       setSeeding(false);
     }
@@ -750,7 +750,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 // in the current feed and by how much (in EUR). Computed from
 // offerSavingsCents() — deterministic math, runs locally.
 function BestDealBadge({ gapCents }: { gapCents: number }) {
-  const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+  const eur = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })
     .format(gapCents / 100);
   return (
     <MotiView

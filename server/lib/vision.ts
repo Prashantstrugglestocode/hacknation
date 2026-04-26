@@ -22,9 +22,11 @@ const openaiClient = process.env.OPENAI_API_KEY
   : null;
 
 const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava:7b';
-// Mistral vision-capable model. pixtral-12b is multimodal and roughly
-// matches gpt-4o-mini for menu OCR.
-const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-12b-2409';
+// Mistral vision-capable model. Pixtral Large (124B-class multimodal)
+// gives noticeably better OCR on printed café menus than the 12B variant —
+// fewer hallucinated prices, better umlaut handling, more reliable on
+// multi-column layouts. Override via MISTRAL_VISION_MODEL if needed.
+const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-large-2411';
 
 const MenuItem = z.object({
   name: z.string().min(1).max(80),
@@ -104,22 +106,23 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
 }
 
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
-  // Tier 1: OpenAI gpt-4o-mini if available — strongest OCR by a wide margin
-  // for printed menus with mixed fonts/layouts. Only used when key is set;
-  // otherwise we go straight to Mistral.
-  if (openaiClient) {
-    try {
-      return await tryVision(openaiClient, 'gpt-4o-mini', dataUrl);
-    } catch (e) {
-      console.warn('[vision] OpenAI gpt-4o-mini failed:', (e as Error).message);
-    }
-  }
-  // Tier 2: Mistral pixtral cloud — fast vision OCR.
+  // Tier 1: Mistral Pixtral cloud — preferred per project policy
+  // (EU-hosted, brief explicitly favours Mistral). Pixtral Large gives
+  // strong OCR on printed café menus with mixed fonts and umlauts.
   if (mistralClient) {
     try {
       return await tryVision(mistralClient, MISTRAL_VISION_MODEL, dataUrl);
     } catch (e) {
       console.warn(`[vision] Mistral (${MISTRAL_VISION_MODEL}) failed:`, (e as Error).message);
+    }
+  }
+  // Tier 2: OpenAI gpt-4o-mini fallback for the rare cases Mistral is
+  // unreachable (rate-limited / network blip). Skipped entirely if no key.
+  if (openaiClient) {
+    try {
+      return await tryVision(openaiClient, 'gpt-4o-mini', dataUrl);
+    } catch (e) {
+      console.warn('[vision] OpenAI gpt-4o-mini failed:', (e as Error).message);
     }
   }
   // Tier 3: on-device SLM (Ollama llava:7b) — local vision fallback.

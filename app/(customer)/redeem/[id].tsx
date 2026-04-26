@@ -149,7 +149,7 @@ export default function RedeemScreen() {
       const r = await fetch(`${API}/api/offer/${id}/confirm-payment`, { method: 'POST' });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        Alert.alert('Zahlung fehlgeschlagen', err.error ?? 'Bitte erneut versuchen.');
+        Alert.alert('Payment failed', err.error ?? 'Please try again.');
         return;
       }
       const data = await r.json().catch(() => ({}));
@@ -563,7 +563,7 @@ export default function RedeemScreen() {
                     lineHeight: typo.hero + 14,
                   }}>
                     {redemption.cents != null && redemption.cents > 0
-                      ? `+${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(redemption.cents / 100)}`
+                      ? `+${new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(redemption.cents / 100)}`
                       : discount?.kind === 'pct'
                         ? `−${discount.value}%`
                         : '✓'}

@@ -66,29 +66,29 @@ export default function MerchantPicker() {
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Back</Text>
         </TouchableOpacity>
 
         <View>
           <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>
-            DEINE GESCHÄFTE
+            YOUR SHOPS
           </Text>
           <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
-            🏪 Geschäft wählen
+            🏪 Pick a shop
           </Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>
-            Du kannst mehrere Geschäfte verwalten. Tippe eines an, um zu wechseln.
+            You can manage several shops. Tap one to switch.
           </Text>
         </View>
 
         {loading ? (
           <Text style={{ color: theme.textMuted, fontSize: 13, paddingVertical: 12, textAlign: 'center' }}>
-            Lade…
+            Loading…
           </Text>
         ) : merchants.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
             <Text style={{ fontSize: 36 }}>🆕</Text>
-            <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>Noch kein Geschäft</Text>
+            <Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>No shop yet</Text>
           </View>
         ) : (
           merchants.map((m, i) => {
@@ -126,7 +126,7 @@ export default function MerchantPicker() {
                       {m.name}
                     </Text>
                     <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
-                      {m.type || 'Geschäft'} · max {m.max_discount_pct ?? 0} % Rabatt
+                      {m.type || 'shop'} · max {m.max_discount_pct ?? 0} % off
                     </Text>
                   </View>
                   {active && (
@@ -135,7 +135,7 @@ export default function MerchantPicker() {
                       paddingHorizontal: 10, paddingVertical: 4,
                     }}>
                       <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.6 }}>
-                        AKTIV
+                        ACTIVE
                       </Text>
                     </View>
                   )}
@@ -161,10 +161,10 @@ export default function MerchantPicker() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '900' }}>
-              Neues Geschäft hinzufügen
+              Add a new shop
             </Text>
             <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
-              Einrichtung in unter 30 Sekunden
+              Setup in under 30 seconds
             </Text>
           </View>
         </TouchableOpacity>
