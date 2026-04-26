@@ -686,20 +686,10 @@ export default function RedeemScreen() {
                   </Text>
                 </View>
               ))}
-              {merchantPayone && (
-                <View style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: palette.fg + '1F',
-                  borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5,
-                }}>
-                  <Text style={{ fontSize: 11 }}>💳</Text>
-                  <Text style={{ color: palette.fg, fontSize: 11, fontWeight: '800', letterSpacing: 0.2 }}>
-                    Payone: {merchantPayone.density === 'low' ? (locale === 'en' ? 'quiet' : 'ruhig')
-                      : merchantPayone.density === 'high' ? (locale === 'en' ? 'busy' : 'voll')
-                      : (locale === 'en' ? 'normal' : 'normal')}
-                  </Text>
-                </View>
-              )}
+              {/* Payone density chip removed from the payment-flow screen.
+                  "Payone: busy" reads as a payment-service error here; the
+                  signal lives on the home / why screens where the foot-
+                  traffic context is actually useful. */}
             </View>
           </MotiView>
         );
