@@ -98,6 +98,18 @@ export default function Settings() {
             value={prefs.tts}
             onToggle={handleToggleTts}
           />
+          <TouchableOpacity
+            onPress={() => speak('Stadtpuls vorlesen funktioniert. Dies ist ein Test der Sprachausgabe.', { force: true })}
+            style={{
+              alignSelf: 'flex-start', marginTop: -space.xs,
+              backgroundColor: theme.bgMuted, borderRadius: 10,
+              paddingHorizontal: 12, paddingVertical: 6,
+              borderWidth: 1, borderColor: theme.border,
+            }}>
+            <Text style={{ color: theme.primary, fontSize: type.small, fontWeight: '800' }}>
+              ▶  Test Sprache
+            </Text>
+          </TouchableOpacity>
           <View style={{ gap: 6, marginTop: space.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ color: theme.text, fontSize: type.body, fontWeight: '700' }}>

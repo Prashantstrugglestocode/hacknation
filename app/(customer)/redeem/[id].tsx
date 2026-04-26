@@ -13,7 +13,7 @@ import i18n from '../../../lib/i18n';
 
 const { width } = Dimensions.get('window');
 const API = Constants.expoConfig?.extra?.apiUrl as string;
-const TTL_SECONDS = 300;
+const TTL_SECONDS = 600; // QR lifetime — 10 minutes
 
 interface OfferData {
   widget_spec?: {

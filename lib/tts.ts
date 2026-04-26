@@ -21,11 +21,18 @@ getPrefs().catch(() => {});
 
 export async function speak(text: string, opts: { force?: boolean } = {}) {
   if (!opts.force) {
-    const prefs = getCachedPrefs();
-    if (!(prefs as any).tts) return;
+    // Use the freshest prefs, not the possibly-empty cache.
+    const prefs = await getPrefs().catch(() => ({ tts: false } as any));
+    if (!prefs.tts) {
+      console.log('[tts] skipped — pref off');
+      return;
+    }
   }
   const m = ensureMod();
-  if (!m) return;
+  if (!m) {
+    console.warn('[tts] expo-speech module not available');
+    return;
+  }
   try {
     m.stop();
     m.speak(text, {
@@ -33,7 +40,10 @@ export async function speak(text: string, opts: { force?: boolean } = {}) {
       pitch: 1.0,
       rate: 1.0,
     });
-  } catch {}
+    console.log('[tts] speaking:', text.slice(0, 60));
+  } catch (e) {
+    console.warn('[tts] speak failed:', (e as Error).message);
+  }
 }
 
 export async function stop() {

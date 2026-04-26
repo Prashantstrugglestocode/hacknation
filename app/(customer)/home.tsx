@@ -212,6 +212,16 @@ export default function CustomerHome() {
       body: JSON.stringify({ decision: 'accepted' }),
     }).catch(() => {});
 
+    // Remove from saved list — once accepted, the offer is committed and
+    // shouldn't reappear in the saved-offers screen.
+    AsyncStorage.getItem('cw_saved_offers_v1').then(raw => {
+      const arr: string[] = raw ? JSON.parse(raw) : [];
+      const next = arr.filter(x => x !== offerId);
+      if (next.length !== arr.length) {
+        AsyncStorage.setItem('cw_saved_offers_v1', JSON.stringify(next)).catch(() => {});
+      }
+    }).catch(() => {});
+
     try {
       const amount_cents =
         spec.discount.kind === 'eur' ? Math.round(spec.discount.value * 100) :

@@ -246,6 +246,17 @@ merchant.delete('/:id/flash', (c) => {
   return c.json({ active: false });
 });
 
+// Wipe ALL offers + offer_item_links for a merchant (history reset).
+// Used by the merchant settings "Alle Angebote löschen" button.
+merchant.delete('/:id/offers', async (c) => {
+  const id = c.req.param('id');
+  // offer_item_links are foreign-keyed with on-delete cascade, so deleting
+  // offers takes the join rows with them.
+  const { error } = await supabase.from('offers').delete().eq('merchant_id', id);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ ok: true });
+});
+
 // Owned merchants for a device — multi-merchant picker on the client.
 merchant.get('s/owned', async (c) => {
   const device_id = c.req.query('device_id');

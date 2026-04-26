@@ -240,69 +240,77 @@ export default function MerchantDashboard() {
           <LinearGradient
             colors={[theme.primary + 'EE', theme.primaryDark + 'F2'] as any}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ padding: 22, gap: 18 }}
+            style={{ padding: 18, gap: 16 }}
           >
-            {/* Top row: greeting + role/avatar buttons */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Pressable onPress={() => router.push('/(merchant)/picker')} hitSlop={8} style={{ flex: 1 }}>
-                <Text style={{ color: '#FFFFFFCC', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>
-                  {greeting.hi} {greeting.emoji}
+            {/* Row 1 — greeting + merchant name (full width, no icons squeezing it) */}
+            <Pressable onPress={() => router.push('/(merchant)/picker')} hitSlop={8}>
+              <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>
+                {greeting.hi} {greeting.emoji}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                <Text
+                  style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', letterSpacing: -0.7, flexShrink: 1 }}
+                  numberOfLines={1}
+                >
+                  {merchant?.name ?? 'Dein Geschäft'}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.6 }} numberOfLines={1}>
-                    {merchant?.name ?? 'Dein Geschäft'}
-                  </Text>
-                  <Text style={{ color: '#FFFFFFCC', fontSize: 14, fontWeight: '900' }}>▾</Text>
-                </View>
-              </Pressable>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <LangToggle variant="light" />
-                <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
-                  hitSlop={8}
-                  style={{
-                    width: 38, height: 38, borderRadius: 19,
-                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                  <Text style={{ fontSize: 16 }}>📐</Text>
-                </Pressable>
-                <Pressable onPress={() => router.push('/(merchant)/settings')}
-                  hitSlop={8}
-                  style={{
-                    width: 38, height: 38, borderRadius: 19,
-                    backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                  <Text style={{ fontSize: 16 }}>⚙️</Text>
-                </Pressable>
+                <Text style={{ color: '#FFFFFFCC', fontSize: 16, fontWeight: '900' }}>▾</Text>
               </View>
+            </Pressable>
+
+            {/* Row 2 — action icons, separated from name with breathing room */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+              <LangToggle variant="light" />
+              <Pressable onPress={() => merchant && router.push('/(merchant)/rules')}
+                hitSlop={10}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
+                }}>
+                <Text style={{ fontSize: 14 }}>📐</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(merchant)/settings')}
+                hitSlop={10}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: '#FFFFFF22', alignItems: 'center', justifyContent: 'center',
+                }}>
+                <Text style={{ fontSize: 14 }}>⚙️</Text>
+              </Pressable>
             </View>
 
-            {/* Hero stat: today's redeemed + EUR moved */}
-            <View style={{ flexDirection: 'row', gap: 18, alignItems: 'baseline' }}>
-              <View>
-                <Text style={{ color: '#FFFFFFAA', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>HEUTE</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <MotiView
-                    key={`redeemed-${pulseKey}`}
-                    from={{ scale: 1.22 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', damping: 9, stiffness: 280 }}
-                  >
-                    <AnimatedNumber
-                      value={stats.redeemed}
-                      style={{ color: '#fff', fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 }}
-                    />
-                  </MotiView>
-                  <Text style={{ color: '#FFFFFFCC', fontSize: 14, fontWeight: '700' }}>eingelöst</Text>
-                </View>
+            {/* Row 3 — today / revenue stat columns */}
+            <View style={{ flexDirection: 'row', gap: 16, justifyContent: 'space-between' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#FFFFFFAA', fontSize: 10, fontWeight: '800', letterSpacing: 1.4 }}>
+                  HEUTE
+                </Text>
+                <MotiView
+                  key={`redeemed-${pulseKey}`}
+                  from={{ scale: 1.22 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', damping: 9, stiffness: 280 }}
+                  style={{ marginTop: 2 }}
+                >
+                  <AnimatedNumber
+                    value={stats.redeemed}
+                    style={{ color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1.6, lineHeight: 50 }}
+                  />
+                </MotiView>
+                <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700', marginTop: -2 }}>
+                  eingelöst
+                </Text>
               </View>
-              <View style={{ flex: 1 }} />
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: '#FFFFFFAA', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>UMSATZ</Text>
+                <Text style={{ color: '#FFFFFFAA', fontSize: 10, fontWeight: '800', letterSpacing: 1.4 }}>
+                  UMSATZ
+                </Text>
                 <MotiView
                   key={`eur-${pulseKey}`}
                   from={{ scale: 1.18 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', damping: 10, stiffness: 280 }}
+                  style={{ marginTop: 2 }}
                 >
                   <AnimatedNumber
                     value={stats.eur_moved / 100}

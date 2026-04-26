@@ -267,12 +267,12 @@ offer.post('/:id/qr', async (c) => {
   const jti = crypto.randomUUID();
   const token = await new SignJWT({ sub: id, jti })
     .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('5m')
+    .setExpirationTime('10m')
     .sign(JWT_SECRET);
 
   // Store QR value as "offerId|token" so scanner can extract both
   const qrValue = `${id}|${token}`;
-  return c.json({ token: qrValue, expires_in: 300 });
+  return c.json({ token: qrValue, expires_in: 600 });
 });
 
 offer.post('/:id/redeem-qr', async (c) => {

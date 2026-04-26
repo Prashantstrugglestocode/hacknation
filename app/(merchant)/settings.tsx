@@ -201,6 +201,45 @@ export default function MerchantSettings() {
           <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
         </Pressable>
       </Section>
+
+      {/* Danger zone */}
+      <Section title="GEFAHRENZONE">
+        <Pressable
+          onPress={() => Alert.alert(
+            'Alle Angebote löschen?',
+            'Das löscht ALLE Angebote dieses Geschäfts (gezeigt, akzeptiert, eingelöst). Statistik startet bei 0. Diese Aktion kann nicht rückgängig gemacht werden.',
+            [
+              { text: 'Abbrechen', style: 'cancel' },
+              {
+                text: 'Alle löschen',
+                style: 'destructive',
+                onPress: async () => {
+                  if (!merchantId) return;
+                  try {
+                    const r = await fetch(`${API}/api/merchant/${merchantId}/offers`, { method: 'DELETE' });
+                    if (r.ok) {
+                      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      Alert.alert('Erledigt', 'Alle Angebote gelöscht.');
+                    } else {
+                      Alert.alert('Fehler', 'Konnte nicht löschen.');
+                    }
+                  } catch {
+                    Alert.alert('Fehler', 'Netzwerkfehler.');
+                  }
+                },
+              },
+            ]
+          )}
+          style={{
+            backgroundColor: theme.danger + '11', borderRadius: radius.md,
+            paddingVertical: space.md, alignItems: 'center',
+            borderWidth: 1, borderColor: theme.danger + '44',
+          }}>
+          <Text style={{ color: theme.danger, fontSize: typo.body, fontWeight: '900' }}>
+            🗑  Alle Angebote löschen
+          </Text>
+        </Pressable>
+      </Section>
     </ScrollView>
   );
 }
