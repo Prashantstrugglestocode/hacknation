@@ -28,9 +28,31 @@ const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava:7b';
 // MISTRAL_VISION_MODEL=pixtral-large-latest to opt in.
 const MISTRAL_VISION_MODEL = process.env.MISTRAL_VISION_MODEL ?? 'pixtral-12b-2409';
 
+// Coerce price input into a number. Mistral occasionally returns strings
+// like "3,50" or "3,-" instead of a JS number — without this the row is
+// dropped at schema-parse time and the price silently goes missing.
+const PriceCoerce = z.preprocess((v) => {
+  if (v == null || v === '' || v === false) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const cleaned = v
+      .replace(/€|EUR|eur/gi, '')
+      .replace(/[\s.](?=\d{3}(\D|$))/g, '') // thousands separator (rare)
+      .replace(',', '.')                    // German decimal → JS decimal
+      .replace(/[^0-9.\-]/g, '')            // strip stray chars / dot leaders
+      .replace(/-+$/, '')                   // "3.-" → "3."
+      .trim();
+    if (cleaned === '' || cleaned === '.' || cleaned === '-') return null;
+    const n = parseFloat(cleaned);
+    if (!Number.isFinite(n) || n <= 0 || n > 500) return null;
+    return n;
+  }
+  return null;
+}, z.number().positive().nullable());
+
 const MenuItem = z.object({
   name: z.string().min(1).max(80),
-  price_eur: z.number().nullable().optional(),
+  price_eur: PriceCoerce.optional(),
   category: z.enum(['drink', 'food', 'dessert', 'special']).default('food'),
   tags: z.array(z.string()).default([]),
 });
@@ -53,11 +75,19 @@ NAME — verbatim, complete
 - Strip leading bullets, numbers like "1.", "•", "-", "*", or stars.
 - Skip section headings (single short words like "GETRÄNKE", "DRINKS", "DESSERTS", "FOOD", "STARTERS").
 
-PRICE
-- Set price_eur from numbers visually adjacent to the item (same line or directly under). Patterns: "3,50 €", "3.50€", "EUR 3.50", "€3.50", "3.50".
-- "from 3,50" / "ab 3,50" / "kl 2,50 / gr 4,00" → set price_eur to the LOWEST visible number, add tag "from".
-- If you genuinely cannot see a price for an item, set price_eur: null. Don't invent prices.
-- Skip obvious non-prices (page numbers, phone numbers, allergen codes).
+PRICE — capture aggressively, this is the single most important field
+- On most café/restaurant menus, prices are RIGHT-ALIGNED in a column separated from the name. The price for "Cappuccino" sits at the far right of that row, possibly with leading dots, dashes, or whitespace. Scan the rightmost ~30% of each row for a number — that IS the price.
+- Accept ALL of these patterns as a valid price for the item on that row:
+    "3,50 €"   "3.50€"   "EUR 3.50"   "€3.50"
+    "3,50"     "3.50"    "3,-"        "3 50"     (just the number is fine; assume euros)
+    "3"        "3.0"     "10,-"       "10.-"
+- If a row has dot leaders ("Cappuccino .......... 3,50"), the number after the dots IS the price.
+- If you see two prices on one row ("Cappuccino  3,00  3,50" for small/large) — pick the FIRST one and add tag "from".
+- Comma vs period: German menus use "," as decimal (3,50 = €3.50). Convert to a JS number with "." (price_eur: 3.5).
+- "3,-" or "3.-" means €3.00 (whole euros). Convert to 3.0.
+- Range 0.30 – 200.0 is a valid menu price. Anything outside that range is likely a phone, page number, or allergen code — set null.
+- Only set price_eur: null when you are certain no number is associated with that item (e.g. "ask staff", "market price", or genuinely missing). Empty/null prices should be the EXCEPTION, not the rule.
+- Better to capture an approximately-right price than to leave it null. The merchant can correct one wrong digit faster than they can type the whole price.
 
 COVERAGE — extract everything
 - Default to MORE items, not fewer. If you see 15 items on the menu, return 15.
