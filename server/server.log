@@ -1,0 +1,49 @@
+$ bun run --watch index.ts
+[offer-engine] Mistral client initialized
+[insights] Mistral client initialized
+City Wallet server starting on port 3001
+Started development server: http://localhost:3001
+<-- POST /api/offer/generate
+[overpass] failed: The operation timed out.
+--> POST /api/offer/generate [32m204[0m 7s
+<-- POST /api/merchant
+--> POST /api/merchant [32m201[0m 141ms
+<-- HEAD /api/merchant
+--> HEAD /api/merchant [33m404[0m 2ms
+<-- POST /api/offer/generate
+Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.
+--> POST /api/offer/generate [32m200[0m 4s
+<-- POST /api/merchant
+--> POST /api/merchant [32m201[0m 188ms
+<-- GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/stats
+--> GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/stats [32m200[0m 72ms
+<-- GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/insights
+<-- GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu
+--> GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/insights [32m200[0m 110ms
+--> GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu [32m200[0m 106ms
+<-- POST /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu
+--> POST /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu [32m201[0m 59ms
+<-- POST /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu/scan
+[vision] Running Mistral OCR API...
+[vision] Mistral OCR successful. Parsing markdown with LLM...
+--> POST /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu/scan [32m201[0m 2s
+<-- GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu
+<-- GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/insights
+--> GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/menu [32m200[0m 71ms
+--> GET /api/merchant/6e053074-5d44-4336-abfa-39d7d4ff6462/insights [32m200[0m 111ms
+<-- POST /api/offer/generate
+Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.
+--> POST /api/offer/generate [32m200[0m 3s
+<-- POST /api/offer/generate
+Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.
+--> POST /api/offer/generate [32m200[0m 3s
+<-- POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/decision
+Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.
+--> POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/decision [32m200[0m 116ms
+<-- POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/qr
+--> POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/qr [32m200[0m 15ms
+<-- POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/redeem-cashback
+Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.
+--> POST /api/offer/4828f1eb-e636-46c7-8d24-c08d3f198db0/redeem-cashback [32m200[0m 282ms
+<-- GET /api/offer/aca07c83-045b-41c1-a4b2-8df0fdb40a44
+--> GET /api/offer/aca07c83-045b-41c1-a4b2-8df0fdb40a44 [32m200[0m 59ms

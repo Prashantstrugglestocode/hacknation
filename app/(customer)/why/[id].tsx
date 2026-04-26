@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { MotiView } from 'moti';
 import Constants from 'expo-constants';
 import { forgetMe } from '../../../lib/privacy/intent-encoder';
 import { PRIVACY_DISCLOSURE } from '../../../lib/privacy/disclosure';
@@ -38,15 +39,15 @@ export default function WhyScreen() {
         <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '700' }}>← Zurück</Text>
       </TouchableOpacity>
 
-      <View>
+      <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400 }}>
         <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>TRANSPARENZ</Text>
         <Text style={{ color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
           {i18n.t('customer.why')}
         </Text>
-      </View>
+      </MotiView>
 
       {chips.length > 0 && (
-        <View>
+        <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400, delay: 100 }}>
           <Text style={{ color: theme.textMuted, fontSize: 12, marginBottom: 10, fontWeight: '800', letterSpacing: 1 }}>
             SIGNALE
           </Text>
@@ -61,11 +62,11 @@ export default function WhyScreen() {
               </View>
             ))}
           </View>
-        </View>
+        </MotiView>
       )}
 
       {reasoning ? (
-        <View style={{
+        <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400, delay: 200 }} style={{
           backgroundColor: theme.bgMuted, borderRadius: 16, padding: 16,
           borderWidth: 1, borderColor: theme.border,
         }}>
@@ -73,10 +74,10 @@ export default function WhyScreen() {
             {i18n.t('customer.reasoning_title').toUpperCase()}
           </Text>
           <Text style={{ color: theme.text, fontSize: 15, lineHeight: 22 }}>{reasoning}</Text>
-        </View>
+        </MotiView>
       ) : null}
 
-      <View>
+      <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400, delay: 300 }}>
         <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 10 }}>
           {i18n.t('customer.what_we_sent').toUpperCase()}
         </Text>
@@ -87,9 +88,9 @@ export default function WhyScreen() {
             {JSON.stringify(contextState, null, 2)}
           </Text>
         </View>
-      </View>
+      </MotiView>
 
-      <View style={{
+      <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400, delay: 400 }} style={{
         backgroundColor: theme.surface, borderRadius: 16, padding: 16, gap: 8,
         borderWidth: 1, borderColor: theme.border,
       }}>
@@ -97,30 +98,32 @@ export default function WhyScreen() {
         <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 20 }}>{disclosure.body}</Text>
         <Text style={{ color: theme.success, fontSize: 12, marginTop: 4, fontWeight: '700' }}>✓ {disclosure.what_stays}</Text>
         <Text style={{ color: theme.textMuted, fontSize: 12 }}>↑ {disclosure.what_sent}</Text>
-      </View>
+      </MotiView>
 
       {forgotDone ? (
-        <View style={{
+        <MotiView from={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{
           backgroundColor: theme.primaryWash, padding: 14, borderRadius: 14, alignItems: 'center',
           borderWidth: 1, borderColor: theme.primary + '66',
         }}>
           <Text style={{ color: theme.primaryDark, textAlign: 'center', fontSize: 14, fontWeight: '700' }}>
             ✓ Verlauf gelöscht. Gerätekennzeichen rotiert.
           </Text>
-        </View>
+        </MotiView>
       ) : (
-        <TouchableOpacity
-          onPress={handleForgetMe}
-          style={{
-            backgroundColor: theme.danger + '11', borderRadius: 14,
-            paddingVertical: 15, alignItems: 'center',
-            borderWidth: 1, borderColor: theme.danger + '44',
-          }}
-        >
-          <Text style={{ color: theme.danger, fontSize: 15, fontWeight: '800' }}>
-            {i18n.t('customer.forget_me')}
-          </Text>
-        </TouchableOpacity>
+        <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 400, delay: 500 }}>
+          <TouchableOpacity
+            onPress={handleForgetMe}
+            style={{
+              backgroundColor: theme.danger + '11', borderRadius: 14,
+              paddingVertical: 15, alignItems: 'center',
+              borderWidth: 1, borderColor: theme.danger + '44',
+            }}
+          >
+            <Text style={{ color: theme.danger, fontSize: 15, fontWeight: '800' }}>
+              {i18n.t('customer.forget_me')}
+            </Text>
+          </TouchableOpacity>
+        </MotiView>
       )}
     </ScrollView>
   );

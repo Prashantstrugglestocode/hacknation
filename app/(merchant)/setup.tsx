@@ -31,7 +31,6 @@ export default function MerchantSetup() {
   const [goal, setGoal] = useState<'fill_quiet_hours' | 'move_slow_stock' | 'build_loyalty'>('fill_quiet_hours');
   const [maxDiscount, setMaxDiscount] = useState(15);
   const [timeWindows, setTimeWindows] = useState<string[]>(['lunch']);
-  const [tags, setTags] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const toggleWindow = (w: string) => {
@@ -58,7 +57,7 @@ export default function MerchantSetup() {
         goal,
         max_discount_pct: maxDiscount,
         time_windows: timeWindows,
-        inventory_tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        inventory_tags: [],
         locale: getLocale(),
       };
 
@@ -195,16 +194,7 @@ export default function MerchantSetup() {
         </View>
       </View>
 
-      <View style={{ gap: 8 }}>
-        <Text style={labelStyle}>{i18n.t('merchant.inventory_tags').toUpperCase()}</Text>
-        <TextInput
-          value={tags}
-          onChangeText={setTags}
-          placeholder="coffee, sandwich, cake"
-          placeholderTextColor={theme.textMuted}
-          style={{ ...inputStyle, fontSize: 15 }}
-        />
-      </View>
+
 
       <TouchableOpacity
         onPress={handleSubmit}

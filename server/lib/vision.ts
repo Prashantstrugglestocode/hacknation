@@ -1,16 +1,21 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { Mistral } from '@mistralai/mistralai';
 
-const ollama = new OpenAI({
-  baseURL: 'http://localhost:11434/v1',
-  apiKey: 'ollama',
-});
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({
+    baseURL: 'https://api.mistral.ai/v1',
+    apiKey: process.env.MISTRAL_API_KEY,
+  })
+  : null;
+
+const mistralOcrClient = process.env.MISTRAL_API_KEY
+  ? new Mistral({ apiKey: process.env.MISTRAL_API_KEY })
+  : null;
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
-
-const VISION_MODEL = process.env.OLLAMA_VISION_MODEL ?? 'llava:7b';
 
 const MenuItem = z.object({
   name: z.string().min(1).max(80),
@@ -61,14 +66,48 @@ async function tryVision(client: OpenAI, model: string, dataUrl: string): Promis
   const parsed = JSON.parse(cleaned);
   return MenuExtract.parse(parsed).items;
 }
-
 export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
-  // Try local vision model first (llava via Ollama)
-  try {
-    return await tryVision(ollama, VISION_MODEL, dataUrl);
-  } catch (e) {
-    console.warn('[vision] Ollama vision failed:', (e as Error).message);
+  // Use Mistral OCR API
+  if (mistralOcrClient && mistralClient) {
+    try {
+      console.log('[vision] Running Mistral OCR API...');
+      const ocrResponse = await mistralOcrClient.ocr.process({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: 'image_url',
+          imageUrl: dataUrl,
+        }
+      });
+      
+      const markdown = ocrResponse.pages[0]?.markdown;
+      if (!markdown) {
+        throw new Error('No markdown_result from Mistral OCR');
+      }
+
+      console.log('[vision] Mistral OCR successful. Parsing markdown with LLM...');
+      const res = await mistralClient.chat.completions.create({
+        model: 'mistral-small-latest',
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: VISION_PROMPT },
+          {
+            role: 'user',
+            content: `Here is the OCR text of the menu:\n\n${markdown}\n\nExtract the menu items as JSON.`,
+          },
+        ],
+      });
+
+      const raw = res.choices[0]?.message?.content;
+      if (!raw) throw new Error('empty LLM response');
+      const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      return MenuExtract.parse(parsed).items;
+    } catch (e) {
+      console.error('[vision] Mistral OCR pipeline failed:', (e as Error).message);
+    }
   }
+
   // Fallback OpenAI
   if (openaiClient) {
     try {
@@ -77,13 +116,8 @@ export async function extractMenu(dataUrl: string): Promise<ExtractedItem[]> {
       console.warn('[vision] OpenAI gpt-4o-mini failed:', (e as Error).message);
     }
   }
-  // Demo fallback — return a small canned menu so the flow never breaks
-  return [
-    { name: 'Cappuccino', price_eur: 3.5, category: 'drink', tags: ['hot'] },
-    { name: 'Espresso', price_eur: 2.5, category: 'drink', tags: ['hot'] },
-    { name: 'Sandwich Caprese', price_eur: 6.9, category: 'food', tags: ['vegetarisch'] },
-    { name: 'Croissant', price_eur: 2.2, category: 'food', tags: [] },
-    { name: 'Apfelstrudel', price_eur: 4.5, category: 'dessert', tags: ['hausgemacht'] },
-    { name: 'Tagessuppe', price_eur: 5.5, category: 'special', tags: ['seasonal'] },
-  ];
+
+  // All vision backends failed — return empty so the user knows the scan failed
+  console.error('[vision] All vision backends failed. Returning empty.');
+  return [];
 }

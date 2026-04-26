@@ -114,24 +114,23 @@ export default function ScanScreen() {
         facing="back"
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-      >
-        {/* Scan overlay */}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{
-            width: 240, height: 240, borderRadius: 20,
-            borderWidth: 3, borderColor: theme.primary,
-            backgroundColor: 'transparent',
-          }} />
-          <Text style={{ color: '#fff', marginTop: 24, fontSize: 15, fontWeight: '600' }}>
-            QR-Code des Kunden scannen
-          </Text>
-        </View>
-        <View style={{ padding: 24 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ alignItems: 'center' }}>
-            <Text style={{ color: '#ffffff88', fontSize: 15 }}>Abbrechen</Text>
-          </TouchableOpacity>
-        </View>
-      </CameraView>
+      />
+      {/* Scan overlay — positioned outside CameraView to avoid children warning */}
+      <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          width: 240, height: 240, borderRadius: 20,
+          borderWidth: 3, borderColor: theme.primary,
+          backgroundColor: 'transparent',
+        }} />
+        <Text style={{ color: '#fff', marginTop: 24, fontSize: 15, fontWeight: '600' }}>
+          QR-Code des Kunden scannen
+        </Text>
+      </View>
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ alignItems: 'center' }}>
+          <Text style={{ color: '#ffffff88', fontSize: 15 }}>Abbrechen</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

@@ -37,6 +37,29 @@ menu.post('/:id/menu/scan', async (c) => {
   return c.json({ items: data ?? [] }, 201);
 });
 
+// POST /api/merchant/:id/menu
+menu.post('/:id/menu', async (c) => {
+  const merchantId = c.req.param('id');
+  const body = await c.req.json() as { name: string; price_cents: number | null; category: string; tags: string[] };
+  
+  if (!body.name) return c.json({ error: 'name required' }, 400);
+
+  const { data, error } = await supabase
+    .from('menu_items')
+    .insert([{
+      merchant_id: merchantId,
+      name: body.name,
+      price_cents: body.price_cents,
+      category: body.category ?? 'food',
+      tags: body.tags ?? [],
+    }])
+    .select()
+    .single();
+
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data, 201);
+});
+
 // GET /api/merchant/:id/menu
 menu.get('/:id/menu', async (c) => {
   const merchantId = c.req.param('id');

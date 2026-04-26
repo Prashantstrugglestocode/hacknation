@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
+import { setDemoMode } from '../lib/context/demo-mode';
 import { theme } from '../lib/theme';
 import i18n from '../lib/i18n';
 
@@ -38,7 +39,10 @@ export default function RolePicker() {
         style={{ width: '100%', gap: 14 }}
       >
         <TouchableOpacity
-          onPress={() => router.replace('/(customer)/home')}
+          onPress={async () => {
+            await setDemoMode(false);
+            router.replace('/(customer)/home');
+          }}
           style={{
             backgroundColor: theme.primary,
             borderRadius: 18, paddingVertical: 20,
@@ -68,6 +72,27 @@ export default function RolePicker() {
           </Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 3, fontWeight: '600' }}>
             Geschäft einrichten · 30 Sek.
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={async () => {
+            await setDemoMode(true);
+            router.replace('/(customer)/home');
+          }}
+          style={{
+            alignSelf: 'center',
+            marginTop: 20,
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            backgroundColor: theme.surface,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+            🎯 Start Demo Mode
           </Text>
         </TouchableOpacity>
       </MotiView>

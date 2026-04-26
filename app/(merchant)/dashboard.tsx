@@ -17,12 +17,21 @@ interface Stats {
   redeemed: number;
   accept_rate: number;
   eur_moved: number;
+  delta?: {
+    generated: number;
+    accepted: number;
+    redeemed: number;
+    accept_rate: number;
+    eur_moved: number;
+  };
 }
 
 interface FeedItem {
   type: MerchantEvent['type'];
   ts: string;
   discount_amount_cents?: number;
+  headline?: string;
+  context_summary?: string;
 }
 
 export default function MerchantDashboard() {
@@ -50,6 +59,8 @@ export default function MerchantDashboard() {
           type: event.type,
           ts: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
           discount_amount_cents: event.discount_amount_cents,
+          headline: event.headline,
+          context_summary: event.context_summary,
         }, ...prev].slice(0, 10));
         setPulseKey(k => k + 1);
         fetchStats(id!);
@@ -78,11 +89,38 @@ export default function MerchantDashboard() {
   };
 
   const statCards = [
-    { label: i18n.t('merchant.generated'), value: stats.generated },
-    { label: i18n.t('merchant.accepted'), value: stats.accepted },
-    { label: i18n.t('merchant.redeemed'), value: stats.redeemed },
-    { label: i18n.t('merchant.accept_rate'), value: `${Math.round(stats.accept_rate * 100)} %` },
-    { label: i18n.t('merchant.eur_moved'), value: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(stats.eur_moved / 100) },
+    { 
+      label: i18n.t('merchant.generated'), 
+      value: stats.generated,
+      delta: stats.delta?.generated,
+      isPositiveGood: true
+    },
+    { 
+      label: i18n.t('merchant.accepted'), 
+      value: stats.accepted,
+      delta: stats.delta?.accepted,
+      isPositiveGood: true
+    },
+    { 
+      label: i18n.t('merchant.redeemed'), 
+      value: stats.redeemed,
+      delta: stats.delta?.redeemed,
+      isPositiveGood: true
+    },
+    { 
+      label: i18n.t('merchant.accept_rate'), 
+      value: `${Math.round(stats.accept_rate * 100)} %`,
+      delta: stats.delta?.accept_rate !== undefined ? `${stats.delta.accept_rate > 0 ? '+' : ''}${Math.round(stats.delta.accept_rate * 100)}%` : undefined,
+      isPositiveGood: true,
+      rawDelta: stats.delta?.accept_rate
+    },
+    { 
+      label: i18n.t('merchant.eur_moved'), 
+      value: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(stats.eur_moved / 100),
+      delta: stats.delta?.eur_moved !== undefined ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', signDisplay: 'always' }).format(stats.delta.eur_moved / 100) : undefined,
+      isPositiveGood: true,
+      rawDelta: stats.delta?.eur_moved
+    },
   ];
 
   return (
@@ -139,9 +177,24 @@ export default function MerchantDashboard() {
                   borderWidth: 1, borderColor: theme.border,
                 }}
               >
-                <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
-                  {card.label.toUpperCase()}
-                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
+                    {card.label.toUpperCase()}
+                  </Text>
+                  {card.delta !== undefined && card.delta !== 0 && card.rawDelta !== 0 && (
+                    <View style={{ 
+                      backgroundColor: ((card.rawDelta ?? card.delta) as number) > 0 ? theme.success + '22' : theme.danger + '22',
+                      paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4
+                    }}>
+                      <Text style={{ 
+                        color: ((card.rawDelta ?? card.delta) as number) > 0 ? theme.success : theme.danger, 
+                        fontSize: 10, fontWeight: '800' 
+                      }}>
+                        {typeof card.delta === 'number' ? (card.delta > 0 ? `+${card.delta}` : card.delta) : card.delta}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={{ color: theme.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>
                   {card.value}
                 </Text>
@@ -175,16 +228,24 @@ export default function MerchantDashboard() {
                 style={{
                   backgroundColor: theme.surface, borderRadius: 12,
                   paddingHorizontal: 14, paddingVertical: 12,
-                  flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                  flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
                   borderWidth: 1, borderColor: theme.border,
                   borderLeftWidth: 4, borderLeftColor: eventColor(item.type),
                 }}
               >
-                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{eventLabel(item.type)}</Text>
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{eventLabel(item.type)}</Text>
+                  {item.headline ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 2 }} numberOfLines={1}>{item.headline}</Text>
+                  ) : null}
+                  {item.context_summary ? (
+                    <Text style={{ color: theme.textMuted, fontSize: 11, marginTop: 2, fontStyle: 'italic' }}>{item.context_summary}</Text>
+                  ) : null}
+                </View>
+                <View style={{ alignItems: 'flex-end', minWidth: 60 }}>
                   <Text style={{ color: theme.textMuted, fontSize: 12 }}>{item.ts}</Text>
                   {item.discount_amount_cents ? (
-                    <Text style={{ color: theme.success, fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: theme.success, fontSize: 12, fontWeight: '800', marginTop: 2 }}>
                       {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
                         .format(item.discount_amount_cents / 100)}
                     </Text>

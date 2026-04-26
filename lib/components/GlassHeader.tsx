@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
+import { Ionicons } from '@expo/vector-icons';
 import { SavingsStats } from '../savings';
 import { theme } from '../theme';
 
@@ -61,7 +62,7 @@ export default function GlassHeader({ stats }: Props) {
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16 }}>❤️</Text>
+              <Ionicons name="heart" size={18} color={theme.primary} />
             </TouchableOpacity>
           </View>
         </View>

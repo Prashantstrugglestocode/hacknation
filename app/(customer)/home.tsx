@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, TouchableOpacity, Dimensions, Alert,
 } from 'react-native';
@@ -12,14 +12,19 @@ import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
 import { WidgetSpecType } from '../../lib/generative/widget-spec';
 import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
+import { isDemoMode, getDemoOverrides } from '../../lib/context/demo-mode';
 import { detectMovement } from '../../lib/context/movement';
+import { getClientWeather } from '../../lib/context/weather';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import GlassHeader from '../../lib/components/GlassHeader';
 import ShimmerCard from '../../lib/components/Shimmer';
 import FreshnessChip from '../../lib/components/FreshnessChip';
+import CountdownChip from '../../lib/components/CountdownChip';
 import Confetti from '../../lib/components/Confetti';
 import { theme } from '../../lib/theme';
 import i18n from '../../lib/i18n';
+import { showOfferNotification } from '../../lib/notifications';
+import { getPayoneSignal } from '../../lib/context/payone-mock';
 
 const { height } = Dimensions.get('window');
 const API = Constants.expoConfig?.extra?.apiUrl as string;
@@ -29,7 +34,7 @@ type State =
   | { status: 'location_denied' }
   | { status: 'loading' }
   | { status: 'no_merchant'; lastLat: number; lastLng: number }
-  | { status: 'offer'; offer: { id: string; widget_spec: WidgetSpecType }; payload: object; generatedAt: number }
+  | { status: 'offer'; offer: { id: string; widget_spec: WidgetSpecType }; payload: object; generatedAt: number; contextSignals: any }
   | { status: 'declined' }
   | { status: 'expired' }
   | { status: 'error'; message: string };
@@ -42,6 +47,7 @@ export default function CustomerHome() {
   const [stats, setStats] = useState<SavingsStats>(EMPTY_STATS);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [seeding, setSeeding] = useState(false);
+  const decisionLock = useRef(false);
 
   const refreshStats = useCallback(async () => {
     setStats(await getStats());
@@ -65,14 +71,24 @@ export default function CustomerHome() {
       ]);
       const { latitude: lat, longitude: lng } = loc.coords;
 
+      const weather = await getClientWeather(lat, lng);
+      const demo = await isDemoMode();
+      const overrides = demo ? getDemoOverrides() : null;
+
+      const finalWeather = overrides?.weatherCondition ?? weather.condition;
+      const finalTemp = overrides?.tempC ?? weather.tempC;
+      const finalMovement = overrides?.movement ?? movement;
+      const finalDensity = demo ? 'low' : getPayoneSignal().density;
+
       const payload = encodeIntent({
         lat, lng,
-        weatherCondition: 'unknown',
-        tempC: 15,
+        weatherCondition: finalWeather,
+        tempC: finalTemp,
         locale: i18n.locale,
         deviceHash,
-        movement,
+        movement: finalMovement,
       });
+      const contextSignals = { weatherCondition: finalWeather, tempC: finalTemp, movement: finalMovement, density: finalDensity };
 
       const res = await fetch(`${API}/api/offer/generate`, {
         method: 'POST',
@@ -84,7 +100,9 @@ export default function CustomerHome() {
       if (!res.ok) { setState({ status: 'error', message: i18n.t('errors.generation_failed') }); return; }
 
       const data = await res.json();
-      setState({ status: 'offer', offer: data, payload, generatedAt: Date.now() });
+      decisionLock.current = false;
+      setState({ status: 'offer', offer: data, payload, generatedAt: Date.now(), contextSignals });
+      showOfferNotification(data.widget_spec.headline, data.widget_spec.merchant.name);
     } catch (e) {
       setState({ status: 'error', message: i18n.t('errors.generation_failed') });
     }
@@ -140,7 +158,8 @@ export default function CustomerHome() {
   };
 
   const handleAccept = async () => {
-    if (state.status !== 'offer') return;
+    if (state.status !== 'offer' || decisionLock.current) return;
+    decisionLock.current = true;
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setConfettiTrigger(t => t + 1);
 
@@ -167,7 +186,8 @@ export default function CustomerHome() {
   };
 
   const handleDecline = async () => {
-    if (state.status !== 'offer') return;
+    if (state.status !== 'offer' || decisionLock.current) return;
+    decisionLock.current = true;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetch(`${API}/api/offer/${state.offer.id}/decision`, {
       method: 'POST',
@@ -210,6 +230,8 @@ export default function CustomerHome() {
               transition={{ type: 'spring', damping: 18, stiffness: 180 }}
               style={{ flex: 1, gap: 8 }}
             >
+              <ContextSignalBar signals={state.contextSignals} />
+              
               <View style={{ flex: 1, minHeight: height * 0.58 }}>
                 <WidgetRenderer
                   spec={state.offer.widget_spec}
@@ -218,11 +240,15 @@ export default function CustomerHome() {
                   onDecline={handleDecline}
                 />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <FreshnessChip generatedAt={state.generatedAt} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8, flex: 1, flexShrink: 1, overflow: 'hidden' }}>
+                  <FreshnessChip generatedAt={state.generatedAt} />
+                  <CountdownChip generatedAt={state.generatedAt} validityMinutes={state.offer.widget_spec.validity_minutes} />
+                </View>
                 <TouchableOpacity
                   onPress={() => router.push(`/(customer)/why/${state.offer.id}`)}
                   hitSlop={12}
+                  style={{ flexShrink: 0 }}
                 >
                   <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
                     {i18n.t('customer.why')}  ›
@@ -233,6 +259,26 @@ export default function CustomerHome() {
           ) : null}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function ContextSignalBar({ signals }: { signals: any }) {
+  const weatherIcon = signals.weatherCondition === 'Rain' ? '🌧️' : signals.weatherCondition === 'Clear' ? '☀️' : '☁️';
+  const movementIcon = signals.movement === 'stationary' ? '🧍' : signals.movement === 'walking' ? '🚶' : signals.movement === 'browsing' ? '🛍️' : '🚗';
+  const densityIcon = signals.density === 'low' ? '🤫' : signals.density === 'high' ? '🔥' : '👥';
+  
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>{weatherIcon} {signals.tempC}°</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>{densityIcon} {signals.density}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.border }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>{movementIcon} {signals.movement}</Text>
+      </View>
     </View>
   );
 }

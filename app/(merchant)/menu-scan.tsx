@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-na
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { MotiView } from 'moti';
 import { theme } from '../../lib/theme';
@@ -12,6 +13,7 @@ const API = Constants.expoConfig?.extra?.apiUrl as string;
 export default function MenuScan() {
   const params = useLocalSearchParams<{ id: string }>();
   const merchantId = params.id;
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const [capturing, setCapturing] = useState(false);
@@ -21,7 +23,7 @@ export default function MenuScan() {
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6, skipProcessing: false });
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6, skipProcessing: true });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       setExtracting(true);
       const dataUrl = `data:image/jpeg;base64,${photo.base64}`;
@@ -37,7 +39,7 @@ export default function MenuScan() {
       Alert.alert('Erkannt', `${count} Menüposten extrahiert.`, [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Fehler', 'Karte konnte nicht erkannt werden. Versuch noch mal mit besserem Licht.');
+      Alert.alert('Fehler', 'Karte konnte nicht erkannt werden. Versuche es erneut.');
     } finally {
       setCapturing(false);
       setExtracting(false);
@@ -70,14 +72,11 @@ export default function MenuScan() {
       <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
 
       {/* Top bar */}
-      <View style={{ position: 'absolute', top: 16, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <View style={{ position: 'absolute', top: insets.top + 8, left: 16, right: 16, flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center' }}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}
           style={{ backgroundColor: '#00000088', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>Abbrechen</Text>
         </TouchableOpacity>
-        <View style={{ backgroundColor: theme.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}>
-          <Text style={{ color: theme.textOnPrimary, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>SPEISEKARTE</Text>
-        </View>
       </View>
 
       {/* Frame guide */}
@@ -95,7 +94,7 @@ export default function MenuScan() {
       </View>
 
       {/* Capture button */}
-      <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' }}>
+      <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 0, right: 0, alignItems: 'center' }}>
         {extracting ? (
           <MotiView
             from={{ opacity: 0, scale: 0.9 }}

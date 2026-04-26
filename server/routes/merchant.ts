@@ -102,23 +102,43 @@ merchant.get('/:id/stats', async (c) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
   const { data: offers } = await supabase
     .from('offers')
-    .select('status, discount_amount_cents')
+    .select('status, discount_amount_cents, generated_at')
     .eq('merchant_id', id)
-    .gte('generated_at', today.toISOString());
+    .gte('generated_at', yesterday.toISOString());
 
   const rows = offers ?? [];
-  const generated = rows.length;
-  const accepted = rows.filter(o => ['accepted','redeemed'].includes(o.status)).length;
-  const redeemed = rows.filter(o => o.status === 'redeemed').length;
-  const declined = rows.filter(o => o.status === 'declined').length;
-  const accept_rate = generated > 0 ? accepted / generated : 0;
-  const eur_moved = rows
-    .filter(o => o.status === 'redeemed')
-    .reduce((sum, o) => sum + (o.discount_amount_cents ?? 0), 0);
+  const todayRows = rows.filter(o => new Date(o.generated_at) >= today);
+  const yesterdayRows = rows.filter(o => new Date(o.generated_at) >= yesterday && new Date(o.generated_at) < today);
 
-  return c.json({ generated, accepted, redeemed, declined, accept_rate, eur_moved });
+  const calcStats = (arr: any[]) => {
+    const generated = arr.length;
+    const accepted = arr.filter(o => ['accepted','redeemed'].includes(o.status)).length;
+    const redeemed = arr.filter(o => o.status === 'redeemed').length;
+    const declined = arr.filter(o => o.status === 'declined').length;
+    const accept_rate = generated > 0 ? accepted / generated : 0;
+    const eur_moved = arr
+      .filter(o => o.status === 'redeemed')
+      .reduce((sum, o) => sum + (o.discount_amount_cents ?? 0), 0);
+    return { generated, accepted, redeemed, declined, accept_rate, eur_moved };
+  };
+
+  const todayStats = calcStats(todayRows);
+  const yesterdayStats = calcStats(yesterdayRows);
+
+  const delta = {
+    generated: todayStats.generated - yesterdayStats.generated,
+    accepted: todayStats.accepted - yesterdayStats.accepted,
+    redeemed: todayStats.redeemed - yesterdayStats.redeemed,
+    accept_rate: todayStats.accept_rate - yesterdayStats.accept_rate,
+    eur_moved: todayStats.eur_moved - yesterdayStats.eur_moved,
+  };
+
+  return c.json({ ...todayStats, delta });
 });
 
 merchant.get('s/nearby', async (c) => {

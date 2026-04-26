@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { createClient } from '@supabase/supabase-js';
 import { SignJWT } from 'jose';
-import { getWeather } from '../lib/weather.ts';
-import { getNearbyEvents } from '../lib/events.ts';
-import { getPayoneDensity } from '../lib/payone-mock.ts';
-import { getNearbyPOIs } from '../lib/pois.ts';
-import { center, neighbors, distanceMeters } from '../lib/geohash.ts';
-import { firedTriggers, scoreMerchant } from '../lib/composite.ts';
-import { generateOffer } from '../lib/openai.ts';
+import { getWeather } from '../lib/weather';
+import { getNearbyEvents } from '../lib/events';
+import { getPayoneDensity } from '../lib/payone-mock';
+import { getNearbyPOIs } from '../lib/pois';
+import { center, neighbors, distanceMeters } from '../lib/geohash';
+import { firedTriggers, scoreMerchant } from '../lib/composite';
+import { generateOffer } from '../lib/openai';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -47,7 +47,7 @@ offer.post('/generate', async (c) => {
     payone,
     hour,
     locale,
-    weather_source: weather.source, // 'owm' | 'dwd' — shown in transparency UI
+    weather_source: weather.source, // always 'open-meteo' — shown in transparency UI
     sent_at: new Date().toISOString(),
   };
 
@@ -150,7 +150,13 @@ offer.post('/generate', async (c) => {
   await supabase.channel(`merchant:${best.merchant.id}`).send({
     type: 'broadcast',
     event: 'offer.shown',
-    payload: { type: 'offer.shown', offer_id: offerRow.id, ts: new Date().toISOString() },
+    payload: { 
+      type: 'offer.shown', 
+      offer_id: offerRow.id, 
+      headline: widgetSpec.headline,
+      context_summary: `${contextState.weather.condition}, ${contextState.weather.temp_c}°C, ${contextState.intent.browsing ? 'Browsing' : 'Transit'}`,
+      ts: new Date().toISOString() 
+    },
   });
 
   return c.json({ id: offerRow.id, widget_spec: widgetSpec }, 200);
@@ -174,7 +180,7 @@ offer.post('/:id/decision', async (c) => {
     .from('offers')
     .update({ status: decision === 'accepted' ? 'accepted' : 'declined' })
     .eq('id', id)
-    .select('merchant_id, discount_amount_cents')
+    .select('merchant_id, discount_amount_cents, widget_spec, context_state')
     .single();
 
   if (error) return c.json({ error: error.message }, 500);
@@ -187,6 +193,8 @@ offer.post('/:id/decision', async (c) => {
       type: eventType,
       offer_id: id,
       discount_amount_cents: data.discount_amount_cents,
+      headline: data.widget_spec?.headline,
+      context_summary: `${data.context_state?.weather?.condition ?? '?'}, ${data.context_state?.weather?.temp_c ?? '?'}°C`,
       ts: new Date().toISOString(),
     },
   });
@@ -242,7 +250,7 @@ offer.post('/:id/redeem-qr', async (c) => {
     .from('offers')
     .update({ status: 'redeemed' })
     .eq('id', id)
-    .select('merchant_id, discount_amount_cents')
+    .select('merchant_id, discount_amount_cents, widget_spec, context_state')
     .single();
 
   if (offerData) {
@@ -253,6 +261,8 @@ offer.post('/:id/redeem-qr', async (c) => {
         type: 'offer.redeemed',
         offer_id: id,
         discount_amount_cents: offerData.discount_amount_cents,
+        headline: offerData.widget_spec?.headline,
+        context_summary: `${offerData.context_state?.weather?.condition ?? '?'}, ${offerData.context_state?.weather?.temp_c ?? '?'}°C`,
         ts: new Date().toISOString(),
       },
     });
@@ -277,7 +287,7 @@ offer.post('/:id/redeem-cashback', async (c) => {
     .from('offers')
     .update({ status: 'redeemed', redemption_kind: 'cashback' })
     .eq('id', id)
-    .select('merchant_id, discount_amount_cents')
+    .select('merchant_id, discount_amount_cents, widget_spec, context_state')
     .single();
 
   if (offerData) {
@@ -288,6 +298,8 @@ offer.post('/:id/redeem-cashback', async (c) => {
         type: 'offer.redeemed',
         offer_id: id,
         discount_amount_cents: offerData.discount_amount_cents,
+        headline: offerData.widget_spec?.headline,
+        context_summary: `${offerData.context_state?.weather?.condition ?? '?'}, ${offerData.context_state?.weather?.temp_c ?? '?'}°C`,
         ts: new Date().toISOString(),
       },
     });

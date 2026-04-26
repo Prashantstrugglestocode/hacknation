@@ -4,6 +4,8 @@ export type MerchantEvent = {
   type: 'offer.shown' | 'offer.accepted' | 'offer.declined' | 'offer.redeemed';
   offer_id: string;
   discount_amount_cents?: number;
+  headline?: string;
+  context_summary?: string;
   ts: string;
 };
 

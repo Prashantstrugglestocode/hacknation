@@ -1,4 +1,14 @@
 import OpenAI from 'openai';
+import { scrubPII } from './pii-scrubber';
+
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({ 
+      baseURL: 'https://api.mistral.ai/v1', 
+      apiKey: process.env.MISTRAL_API_KEY,
+    })
+  : null;
+
+if (mistralClient) console.log('[insights] Mistral client initialized');
 
 const ollama = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
@@ -9,6 +19,7 @@ const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+const MISTRAL_MODEL = 'mistral-small-latest';
 const TEXT_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
 
 interface ItemPerf {
@@ -54,13 +65,14 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
   });
 
   const tryRun = async (client: OpenAI, model: string): Promise<Insight[]> => {
+    const sanitizedMessage = scrubPII(userMessage);
     const res = await client.chat.completions.create({
       model,
       temperature: 0.4,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYS },
-        { role: 'user', content: userMessage },
+        { role: 'user', content: sanitizedMessage },
       ],
     });
     const raw = res.choices[0]?.message?.content ?? '{}';
@@ -75,14 +87,22 @@ export async function generateInsights(merchant: any, items: ItemPerf[]): Promis
     }));
   };
 
+  if (mistralClient) {
+    try { return await tryRun(mistralClient, MISTRAL_MODEL); } catch (e) {
+      console.error('[insights] Mistral failed:', e);
+    }
+  }
+
   try { return await tryRun(ollama, TEXT_MODEL); } catch (e) {
     console.warn('[insights] Ollama failed:', (e as Error).message);
   }
+  
   if (openaiClient) {
     try { return await tryRun(openaiClient, 'gpt-4o-mini'); } catch (e) {
       console.warn('[insights] OpenAI failed:', (e as Error).message);
     }
   }
+  
   // Deterministic fallback
   return ranked.slice(0, 2).map(i => ({
     item_id: i.item_id,

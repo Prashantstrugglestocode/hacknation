@@ -3,86 +3,57 @@ export interface WeatherData {
   condition: string;
   description: string;
   icon: string;
-  source: 'owm' | 'dwd';
+  source: 'open-meteo';
 }
 
-// DWD via Brightsky (no key, GDPR-friendly, wraps DWD open data)
-// https://brightsky.dev/docs/
-async function getWeatherDWD(lat: number, lng: number): Promise<WeatherData | null> {
-  try {
-    const url = `https://api.brightsky.dev/current_weather?lat=${lat}&lon=${lng}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    const w = data.weather;
-    if (!w) return null;
-
-    // Map DWD condition codes to OWM-style condition strings
-    const condition = mapDWDCondition(w.condition ?? w.icon ?? 'dry');
-
-    return {
-      temp_c: Math.round(w.temperature ?? 15),
-      condition,
-      description: w.condition ?? condition,
-      icon: w.icon ?? '',
-      source: 'dwd',
-    };
-  } catch {
-    return null;
-  }
+function mapWMOCodeToCondition(code: number): string {
+  if (code === 0) return 'Clear';
+  if (code === 1 || code === 2 || code === 3) return 'Clouds';
+  if (code === 45 || code === 48) return 'Fog';
+  if (code >= 51 && code <= 57) return 'Drizzle';
+  if (code >= 61 && code <= 67) return 'Rain';
+  if (code >= 71 && code <= 77) return 'Snow';
+  if (code >= 80 && code <= 82) return 'Rain';
+  if (code >= 85 && code <= 86) return 'Snow';
+  if (code >= 95 && code <= 99) return 'Thunderstorm';
+  return 'Clear';
 }
 
-function mapDWDCondition(dwdCondition: string): string {
-  const map: Record<string, string> = {
-    dry: 'Clear',
-    fog: 'Fog',
-    rain: 'Rain',
-    sleet: 'Sleet',
-    snow: 'Snow',
-    hail: 'Hail',
-    thunderstorm: 'Thunderstorm',
-    'partly-cloudy': 'Clouds',
-    cloudy: 'Clouds',
-    night: 'Clear',
-    'partly-cloudy-night': 'Clouds',
-    overcast: 'Clouds',
-    drizzle: 'Drizzle',
-    mist: 'Mist',
-  };
-  return map[dwdCondition.toLowerCase()] ?? 'Clear';
-}
-
-// OpenWeatherMap (primary when key available)
-async function getWeatherOWM(lat: number, lng: number, key: string): Promise<WeatherData | null> {
-  try {
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${key}&units=metric`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    return {
-      temp_c: Math.round(data.main.temp),
-      condition: data.weather[0]?.main ?? 'Clear',
-      description: data.weather[0]?.description ?? '',
-      icon: data.weather[0]?.icon ?? '',
-      source: 'owm',
-    };
-  } catch {
-    return null;
-  }
+function mapWMOCodeToDescription(code: number): string {
+  if (code === 0) return 'Clear sky';
+  if (code === 1) return 'Mainly clear';
+  if (code === 2) return 'Partly cloudy';
+  if (code === 3) return 'Overcast';
+  if (code === 45 || code === 48) return 'Fog';
+  if (code >= 51 && code <= 57) return 'Drizzle';
+  if (code >= 61 && code <= 67) return 'Rain';
+  if (code >= 71 && code <= 77) return 'Snow';
+  if (code >= 80 && code <= 82) return 'Rain showers';
+  if (code >= 85 && code <= 86) return 'Snow showers';
+  if (code >= 95 && code <= 99) return 'Thunderstorm';
+  return 'Clear sky';
 }
 
 export async function getWeather(lat: number, lng: number): Promise<WeatherData> {
-  const key = process.env.OPENWEATHER_API_KEY;
-
-  // Try OWM first if key provided, fall back to DWD Brightsky
-  if (key) {
-    const owm = await getWeatherOWM(lat, lng, key);
-    if (owm) return owm;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error('Weather API error');
+    const data = await res.json() as any;
+    
+    if (!data.current) throw new Error('Invalid response');
+    
+    const condition = mapWMOCodeToCondition(data.current.weather_code);
+    
+    return {
+      temp_c: Math.round(data.current.temperature_2m),
+      condition,
+      description: mapWMOCodeToDescription(data.current.weather_code),
+      icon: '',
+      source: 'open-meteo',
+    };
+  } catch (err) {
+    console.warn('Failed to fetch weather from Open-Meteo:', err);
+    return { temp_c: 15, condition: 'Clear', description: 'clear sky', icon: '', source: 'open-meteo' };
   }
-
-  const dwd = await getWeatherDWD(lat, lng);
-  if (dwd) return dwd;
-
-  // Last resort: neutral default so generation still proceeds
-  return { temp_c: 15, condition: 'Clear', description: 'clear sky', icon: '', source: 'dwd' };
 }

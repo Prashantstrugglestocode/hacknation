@@ -1,18 +1,30 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { WidgetSpec } from './widget-spec.ts';
+import { WidgetSpec } from './widget-spec';
+import { scrubPII } from './pii-scrubber';
 
-// Ollama runs locally on port 11434 with an OpenAI-compatible API
-// Falls back to OpenAI API if OPENAI_API_KEY is set and Ollama fails
+// Mistral AI (Primary)
+const mistralClient = process.env.MISTRAL_API_KEY
+  ? new OpenAI({ 
+      baseURL: 'https://api.mistral.ai/v1', 
+      apiKey: process.env.MISTRAL_API_KEY,
+    })
+  : null;
+
+if (mistralClient) console.log('[offer-engine] Mistral client initialized');
+
+// Ollama (Secondary fallback, runs locally)
 const ollamaClient = new OpenAI({
   baseURL: 'http://localhost:11434/v1',
   apiKey: 'ollama', // required by SDK but ignored by Ollama
 });
 
+// OpenAI (Tertiary fallback)
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+const MISTRAL_MODEL = 'mistral-small-latest';
 const LOCAL_MODEL = process.env.OLLAMA_MODEL ?? 'gemma3:4b';
 
 const SYSTEM_PROMPT = `You are City Wallet's hyperlocal offer generator for the DSV Gruppe / Sparkassen network. Given a merchant and the current real-world context, produce a single offer as a JSON object. Rules:
@@ -85,13 +97,15 @@ async function tryGenerate(
   merchant: any,
   distance_m: number,
 ): Promise<any> {
+  const sanitizedMessage = scrubPII(userMessage);
+
   const response = await client.chat.completions.create({
     model,
     temperature: 0.8,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
+      { role: 'user', content: sanitizedMessage },
     ],
   });
 
@@ -102,7 +116,6 @@ async function tryGenerate(
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
-    // Some models wrap JSON in code blocks
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim();
     parsed = JSON.parse(cleaned);
   }
@@ -135,14 +148,23 @@ export async function generateOffer(params: {
   const m = params.merchant;
   const d = params.distance_m;
 
-  // Try Ollama (gemma3:4b) first — local, free, no API key
+  // Try Mistral AI first (OpenAI-compatible)
+  if (mistralClient) {
+    try {
+      return await tryGenerate(mistralClient, MISTRAL_MODEL, userMessage, params.locale, m, d);
+    } catch (e) {
+      console.error('[offer-engine] Mistral AI failed:', e);
+    }
+  }
+
+  // Try Ollama local
   try {
     return await tryGenerate(ollamaClient, LOCAL_MODEL, userMessage, params.locale, m, d);
   } catch (e) {
     console.warn(`[offer-engine] Ollama (${LOCAL_MODEL}) failed:`, (e as Error).message);
   }
 
-  // Fallback: OpenAI API if key is set
+  // Try OpenAI API
   if (openaiClient) {
     try {
       return await tryGenerate(openaiClient, 'gpt-4o-mini', userMessage, params.locale, m, d);
@@ -152,7 +174,7 @@ export async function generateOffer(params: {
     }
   }
 
-  // Last-resort: synthesize a deterministic offer so demo never breaks
+  // Last-resort fallback
   console.warn('[offer-engine] All AI backends failed, returning deterministic fallback');
   return fillDefaults({}, params.locale, m, d);
 }

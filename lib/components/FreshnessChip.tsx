@@ -26,7 +26,7 @@ export default function FreshnessChip({ generatedAt }: { generatedAt: number }) 
         style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary }}
       />
       <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>
-        Live · KI-generiert {label}
+        aktualisiert {label}
       </Text>
     </View>
   );
