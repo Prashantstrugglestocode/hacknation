@@ -132,9 +132,20 @@ export default function SlideToPay({
     outputRange: [0, 12],
     extrapolate: 'clamp',
   });
-  const fillWidth = translateX.interpolate({
+  // Animate the fill via transform: scaleX (native-supported) instead of
+  // `width` (layout-only). Animating `width` on a value derived from a
+  // native-driven Animated.Value triggers RN's "child property width is not
+  // supported" warning every render — and it's pointless because the fill
+  // can be expressed as a scaleX of a full-width bar with origin: left.
+  // We pre-compute scale so that at maxX the bar covers the whole track
+  // (THUMB + 6 + maxX) ÷ trackWidth → ~1.0.
+  const fullFillPx = THUMB + 6 + maxX;
+  const safeTrackW = Math.max(1, trackWidth);
+  const targetScale = Math.min(1, fullFillPx / safeTrackW);
+  const minScale = Math.min(targetScale, (THUMB + 6) / safeTrackW);
+  const fillScaleX = translateX.interpolate({
     inputRange: [0, Math.max(1, maxX)],
-    outputRange: [THUMB + 6, THUMB + 6 + maxX],
+    outputRange: [minScale, targetScale],
     extrapolate: 'clamp',
   });
   // Track tint deepens as the thumb advances — a visible "you're getting there".
@@ -178,12 +189,15 @@ export default function SlideToPay({
           overflow: 'hidden', position: 'relative',
         }}
       >
-        {/* Filled track behind the thumb — opacity also rises with travel. */}
+        {/* Filled track behind the thumb — opacity also rises with travel.
+            Anchored to the left edge so scaleX grows rightward (matching the
+            thumb travel direction). transformOrigin requires RN >= 0.74. */}
         <Animated.View
           pointerEvents="none"
           style={{
-            position: 'absolute', top: 0, bottom: 0, left: 0,
-            width: fillWidth,
+            position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+            transformOrigin: 'left center' as any,
+            transform: [{ scaleX: fillScaleX }],
             backgroundColor: accent + '2E',
             opacity: fillOpacity,
           }}
