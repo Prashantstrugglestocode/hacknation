@@ -1,21 +1,24 @@
+// Sparkassen-Rot brand palette. The primary is the official DSV/Sparkasse
+// red (#FF0000 in their style guide); we use #E60000 on screen for slightly
+// better contrast comfort while staying visually identical at thumbnail size.
 export const theme = {
   // Surfaces
   bg: '#FFFFFF',
-  bgMuted: '#FFF1F2',     // rose-50
+  bgMuted: '#FFF5F5',     // very light red wash
   surface: '#FFFFFF',
-  surfaceAlt: '#FEE2E2',  // rose-100
-  border: '#FECACA',      // rose-200
+  surfaceAlt: '#FFE5E5',
+  border: '#FFCCCC',
 
   // Text
   text: '#1F1F23',
-  textMuted: '#71717A',
+  textMuted: '#666670',
   textOnPrimary: '#FFFFFF',
 
-  // Brand
-  primary: '#E11D48',     // rose-600
-  primaryDark: '#9F1239', // rose-800
-  primaryLight: '#FB7185',// rose-400
-  primaryWash: '#FFE4E6', // rose-100
+  // Brand — Sparkassen-Rot
+  primary: '#E60000',     // Sparkasse red (#FF0000 in print, slightly toned for screen)
+  primaryDark: '#A00000',
+  primaryLight: '#FF4D4D',
+  primaryWash: '#FFE5E5',
 
   // Semantic
   success: '#16A34A',
@@ -23,7 +26,7 @@ export const theme = {
   danger: '#DC2626',
 
   // Accents (for confetti / chips)
-  accents: ['#E11D48', '#FB7185', '#FFFFFF', '#1F1F23', '#FECACA', '#9F1239'],
+  accents: ['#E60000', '#FF4D4D', '#FFFFFF', '#1F1F23', '#FFCCCC', '#A00000'],
 } as const;
 
 // 8pt spacing grid — use these everywhere instead of arbitrary numbers.

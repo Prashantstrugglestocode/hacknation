@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
@@ -133,10 +133,15 @@ export default function MenuScreen() {
       .catch(() => {});
   }, [params.id]);
 
-  useEffect(() => { load(); }, [load]);
+  // Keep a stable ref to load so neither effect re-registers when load
+  // identity changes (which previously caused repeated re-fetches).
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
+  useEffect(() => { loadRef.current(); }, []);
 
   // Re-fetch on focus so a merchant switch (via picker) shows the right list.
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { loadRef.current(); }, []));
 
   const onDelete = async (item: MenuItem) => {
     Alert.alert('Löschen?', item.name, [
