@@ -386,11 +386,9 @@ export default function MerchantDashboard() {
                     style={{ color: '#fff', fontSize: typeScale.display - 4, fontWeight: '900', letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}
                   />
                 </MotiView>
-                {(stats.customer_savings_cents ?? 0) > 0 && (
-                  <Text style={{ color: '#FFFFFF99', fontSize: typeScale.micro, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                    Customers saved {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format((stats.customer_savings_cents ?? 0) / 100)}
-                  </Text>
-                )}
+                {/* "Customers saved €X" subline removed — the revenue
+                    number is the only metric the merchant cares about
+                    on their own dashboard. */}
               </View>
             </View>
 

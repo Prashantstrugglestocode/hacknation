@@ -351,7 +351,7 @@ export default function RedeemScreen() {
                 color: theme.text, fontSize: typo.title, fontWeight: '900',
                 letterSpacing: -0.4, textAlign: 'center',
               }}>
-                {redemption.merchantName ? `${redemption.merchantName} hat gescannt` : 'Händler hat gescannt'}
+                {redemption.merchantName ? `${redemption.merchantName} scanned you` : 'Merchant scanned'}
               </Text>
               <Text style={{
                 color: theme.textMuted, fontSize: typo.small, fontWeight: '700',
@@ -636,10 +636,10 @@ export default function RedeemScreen() {
             <Text style={{ fontSize: 18 }}>📷</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontSize: typo.small, fontWeight: '900', letterSpacing: 0.4 }}>
-                Warten auf Händler-Scan
+                Waiting for merchant scan
               </Text>
               <Text style={{ color: theme.textMuted, fontSize: typo.small, fontWeight: '700', marginTop: 2 }}>
-                Zeige dem Händler den QR-Code oben. Danach erscheint hier dein Bezahl-Slider.
+                Show the merchant the QR code above. Your pay slider opens once they scan.
               </Text>
             </View>
           </View>

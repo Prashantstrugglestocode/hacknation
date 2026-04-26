@@ -128,12 +128,12 @@ export default function ScanScreen() {
             backgroundColor: 'transparent',
           }} />
           <Text style={{ color: '#fff', marginTop: 24, fontSize: 15, fontWeight: '600' }}>
-            QR-Code des Kunden scannen
+            Scan customer QR code
           </Text>
         </View>
         <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 24, paddingTop: 24 }}>
           <TouchableOpacity onPress={() => router.back()} style={{ alignItems: 'center' }}>
-            <Text style={{ color: '#ffffff88', fontSize: 15 }}>Abbrechen</Text>
+            <Text style={{ color: '#ffffff88', fontSize: 15 }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </CameraView>

@@ -218,7 +218,7 @@ export default function CustomerHome() {
       });
       if (!res.ok) throw new Error('seed failed');
       const created = await res.json();
-      // Take ownership: save merchant_id locally so Händler tab works
+      // Take ownership: save merchant_id locally so the Merchant tab works
       if (created?.id) await addMerchantId(created.id);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await generate();

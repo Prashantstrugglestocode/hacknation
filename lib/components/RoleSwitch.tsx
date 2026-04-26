@@ -10,7 +10,7 @@ interface Props {
   active: 'customer' | 'merchant';
 }
 
-// Segmented Kunde / Händler control — required by brief.
+// Segmented Customer / Merchant control — required by brief.
 // Tap switches role + persists preference + routes (state in AsyncStorage survives).
 export default function RoleSwitch({ active }: Props) {
   const switchTo = async (role: 'customer' | 'merchant') => {
@@ -57,7 +57,7 @@ export default function RoleSwitch({ active }: Props) {
                 fontSize: 13, fontWeight: isActive ? '800' : '700',
                 letterSpacing: 0.3,
               }}>
-                {r === 'customer' ? 'Kunde' : 'Händler'}
+                {r === 'customer' ? 'Customer' : 'Merchant'}
               </Text>
             </MotiView>
           </Pressable>

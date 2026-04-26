@@ -16,8 +16,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "cc.viss.citywallet",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "City Wallet braucht deinen ungefähren Standort, um lokale Angebote zu finden. Wir senden nur eine grobe 1,2 km Zelle.",
-        "NSCameraUsageDescription": "Zum Scannen von Kunden-QR-Codes."
+        "NSLocationWhenInUseUsageDescription": "Stadtpuls uses your approximate location to find nearby offers.",
+        "NSCameraUsageDescription": "Used to scan customer QR codes."
       }
     },
     "android": {
@@ -39,7 +39,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "City Wallet braucht deinen ungefähren Standort, um lokale Angebote zu finden. Wir senden nur eine grobe 1,2 km Zelle."
+          "locationWhenInUsePermission": "Stadtpuls uses your approximate location to find nearby offers."
         }
       ]
     ],

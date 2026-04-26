@@ -238,7 +238,7 @@ export default function MapScreen() {
           <Text style={{ fontSize: 40 }}>🗺️</Text>
           <Text style={{ color: theme.text, fontWeight: '700', marginTop: 8 }}>No shops within 500 m</Text>
           <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center', maxWidth: 280 }}>
-            Werde Händler oder bewege dich in der Stadt — neue Angebote tauchen automatisch auf.
+            Become a merchant or move around the city — new offers appear automatically.
           </Text>
         </View>
       ) : (
