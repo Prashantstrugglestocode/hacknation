@@ -306,19 +306,32 @@ offer.post('/feed', async (c) => {
     return c.json({ offers: [] });
   }
 
-  // Once-per-day claim rule: a customer can only redeem (or actively
-  // claim — accepted / scan_pending / redeemed) ONE offer per merchant
-  // per local day. Filter those merchants out of the candidate pool so
-  // they don't re-appear in the feed even on pull-to-refresh.
+  // Per-flash / per-combo claim rule (replaces the old per-merchant rule).
+  // A customer can only claim each SPECIFIC flash or combo once per day, but
+  // different flashes from the same merchant remain independently claimable.
+  // Bare offers (no flash, no combo) still fall back to the per-merchant rule
+  // because there's no narrower handle to dedupe on.
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const { data: claimedToday } = await supabase
-    .from('offers').select('merchant_id, status')
+    .from('offers').select('merchant_id, status, widget_spec')
     .eq('customer_device_hash', device_hash)
     .gte('generated_at', startOfToday.toISOString())
     .in('status', ['accepted', 'scan_pending', 'redeemed']);
-  const claimedSet = new Set((claimedToday ?? []).map(r => r.merchant_id));
-  const merchantRows = allNearby.filter(m => !claimedSet.has(m.id));
+  const claimedFlashIds = new Set<string>();
+  const claimedComboIds = new Set<string>();
+  const claimedBareMerchantIds = new Set<string>();
+  for (const row of (claimedToday ?? [])) {
+    const spec = (row as any).widget_spec ?? {};
+    const fid = spec.flash_id;
+    const cid = spec.combo_id;
+    if (typeof fid === 'string' && fid.length > 0) claimedFlashIds.add(fid);
+    if (typeof cid === 'string' && cid.length > 0) claimedComboIds.add(cid);
+    if (!fid && !cid) claimedBareMerchantIds.add((row as any).merchant_id);
+  }
+  // No merchant-level pre-filter anymore — every merchant stays in the pool;
+  // we filter at the candidate-tuple level a few lines below.
+  const merchantRows = allNearby;
   if (merchantRows.length === 0) {
     return c.json({ offers: [] });
   }
@@ -392,9 +405,16 @@ offer.post('/feed', async (c) => {
   type Candidate = typeof viable[number] & { pinnedFlashId?: string };
   const candidates: Candidate[] = [];
   for (const entry of viable) {
-    const flashes = listFlash(entry.merchant.id).slice(0, FLASH_CARDS_PER_MERCHANT);
+    const flashes = listFlash(entry.merchant.id)
+      // Per-flash claim filter: skip flashes this device already claimed today.
+      .filter(f => !claimedFlashIds.has(f.id))
+      .slice(0, FLASH_CARDS_PER_MERCHANT);
     if (flashes.length === 0) {
-      candidates.push(entry);
+      // No flashes available — emit a bare candidate UNLESS this merchant was
+      // already bare-claimed today (in which case there's nothing new to show).
+      if (!claimedBareMerchantIds.has(entry.merchant.id)) {
+        candidates.push(entry);
+      }
     } else {
       for (const f of flashes) {
         candidates.push({ ...entry, pinnedFlashId: f.id });
@@ -501,10 +521,16 @@ offer.post('/feed', async (c) => {
       const flashCtx = enrichedFlashes.length > 0 ? enrichedFlashes[0] : undefined;
 
       // Combos: enriched bundles the LLM can pitch as a single offer.
-      // Filter out combos already pitched to this device (last 30 min) so
-      // pull-to-refresh surfaces a different bundle when one is available.
+      // Filter out:
+      //   - combos already pitched to this device in the last 30 min (diversity)
+      //   - combos already CLAIMED by this device today (per-combo daily rule)
+      //   - combos pitched by an earlier-resolving sibling in this same feed
       const combosForMerchant = listCombos(entry.merchant.id)
-        .filter(co => !recentlyPitchedComboIds.has(co.id) && !inFeedComboIds.has(co.id));
+        .filter(co =>
+          !recentlyPitchedComboIds.has(co.id)
+          && !inFeedComboIds.has(co.id)
+          && !claimedComboIds.has(co.id)
+        );
       // Fallback: if dedupe wiped everything, surface the original list rather
       // than starve the LLM of combo context entirely.
       const combosPool = combosForMerchant.length > 0
@@ -557,6 +583,12 @@ offer.post('/feed', async (c) => {
         name: entry.merchant.name,
         distance_m: Math.round(entry.dist),
       };
+      // Persist the pinned flash id on the spec so the daily-claim rule can
+      // dedupe per-flash (not per-merchant). Without this, every flash on
+      // the same shop counts as one redemption.
+      if (entry.pinnedFlashId) {
+        widgetSpec.flash_id = entry.pinnedFlashId;
+      }
       // Track what we just pitched so other siblings in this Promise.all
       // batch can avoid duplicating it. Best-effort under parallelism.
       if (typeof widgetSpec.headline === 'string') {
@@ -794,17 +826,36 @@ offer.post('/:id/redeem-qr', async (c) => {
     .single();
   if (!offerLookup) return c.json({ error: 'Offer not found' }, 404);
 
-  // Once-per-day at this merchant for this customer.
+  // Per-flash / per-combo daily-claim rule. Different flash deals from the
+  // same merchant are independently redeemable; each individual flash or
+  // combo is single-use per customer per day. Bare offers (no flash/combo)
+  // fall back to the per-merchant rule.
+  const lookupSpec = (offerLookup.widget_spec as any) ?? {};
+  const lookupFlashId: string | null = typeof lookupSpec.flash_id === 'string' ? lookupSpec.flash_id : null;
+  const lookupComboId: string | null = typeof lookupSpec.combo_id === 'string' ? lookupSpec.combo_id : null;
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-  const { data: priorClaims } = await supabase
-    .from('offers').select('id, status')
+  const { data: sameDayClaims } = await supabase
+    .from('offers').select('id, status, widget_spec, merchant_id')
     .eq('customer_device_hash', offerLookup.customer_device_hash)
-    .eq('merchant_id', offerLookup.merchant_id)
     .gte('generated_at', startOfToday.toISOString())
     .in('status', ['scan_pending', 'redeemed'])
     .neq('id', id);
-  if ((priorClaims ?? []).length > 0) {
-    return c.json({ error: 'Already claimed today at this merchant', code: 'DAILY_LIMIT' }, 429);
+  const conflicts = (sameDayClaims ?? []).filter(r => {
+    const s = (r as any).widget_spec ?? {};
+    if (lookupFlashId && s.flash_id === lookupFlashId) return true;
+    if (lookupComboId && s.combo_id === lookupComboId) return true;
+    if (!lookupFlashId && !lookupComboId
+        && !s.flash_id && !s.combo_id
+        && r.merchant_id === offerLookup.merchant_id) return true;
+    return false;
+  });
+  if (conflicts.length > 0) {
+    const reason = lookupFlashId
+      ? 'Diese Flash-Aktion hast du heute schon eingelöst'
+      : lookupComboId
+      ? 'Diese Combo hast du heute schon eingelöst'
+      : 'Already claimed today at this merchant';
+    return c.json({ error: reason, code: 'DAILY_LIMIT' }, 429);
   }
 
   const { data: offerData } = await supabase
@@ -888,20 +939,31 @@ offer.post('/:id/redeem-cashback', async (c) => {
 
   if (existing) return c.json({ error: 'Already redeemed' }, 409);
 
-  // Once-per-day per-merchant guard (mirrors /redeem-qr).
+  // Per-flash / per-combo daily guard (mirrors /redeem-qr).
   const { data: cashLookup } = await supabase
-    .from('offers').select('merchant_id, customer_device_hash').eq('id', id).single();
+    .from('offers').select('merchant_id, customer_device_hash, widget_spec').eq('id', id).single();
   if (cashLookup) {
+    const cashSpec = (cashLookup.widget_spec as any) ?? {};
+    const cashFlashId: string | null = typeof cashSpec.flash_id === 'string' ? cashSpec.flash_id : null;
+    const cashComboId: string | null = typeof cashSpec.combo_id === 'string' ? cashSpec.combo_id : null;
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-    const { data: priorClaims } = await supabase
-      .from('offers').select('id, status')
+    const { data: sameDayClaims } = await supabase
+      .from('offers').select('id, status, widget_spec, merchant_id')
       .eq('customer_device_hash', cashLookup.customer_device_hash)
-      .eq('merchant_id', cashLookup.merchant_id)
       .gte('generated_at', startOfToday.toISOString())
       .in('status', ['scan_pending', 'redeemed'])
       .neq('id', id);
-    if ((priorClaims ?? []).length > 0) {
-      return c.json({ error: 'Already claimed today at this merchant', code: 'DAILY_LIMIT' }, 429);
+    const conflicts = (sameDayClaims ?? []).filter(r => {
+      const s = (r as any).widget_spec ?? {};
+      if (cashFlashId && s.flash_id === cashFlashId) return true;
+      if (cashComboId && s.combo_id === cashComboId) return true;
+      if (!cashFlashId && !cashComboId
+          && !s.flash_id && !s.combo_id
+          && r.merchant_id === cashLookup.merchant_id) return true;
+      return false;
+    });
+    if (conflicts.length > 0) {
+      return c.json({ error: 'Already claimed today (this flash/combo)', code: 'DAILY_LIMIT' }, 429);
     }
   }
 

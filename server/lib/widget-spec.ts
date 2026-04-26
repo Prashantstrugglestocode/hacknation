@@ -42,8 +42,12 @@ export const WidgetSpec = z.object({
   base_amount_cents: z.number().int().positive().optional(),
   // Set when the LLM picked a combo from a list (esp. flash_sale.combos with
   // multiple options). Used by /feed dedupe + merchant dashboard "AI is pushing
-  // [Combo X]" surface.
+  // [Combo X]" surface + per-combo daily-claim rule.
   combo_id: z.string().optional().nullable(),
+  // Set when the offer was generated from a specific pinned flash deal.
+  // Used by per-flash daily-claim rule so different flashes from the same
+  // merchant remain independently redeemable.
+  flash_id: z.string().optional().nullable(),
 });
 
 export type WidgetSpecType = z.infer<typeof WidgetSpec>;
