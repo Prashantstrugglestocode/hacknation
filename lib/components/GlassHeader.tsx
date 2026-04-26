@@ -52,18 +52,6 @@ export default function GlassHeader({ stats }: Props) {
               </MotiView>
             )}
             <TouchableOpacity
-              onPress={() => router.push('/(customer)/saved')}
-              hitSlop={10}
-              style={{
-                width: 36, height: 36, borderRadius: 18,
-                backgroundColor: theme.primaryWash,
-                borderWidth: 1, borderColor: theme.primary + '44',
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>❤️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               onPress={() => router.replace('/role')}
               hitSlop={10}
               style={{

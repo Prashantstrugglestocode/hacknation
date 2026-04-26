@@ -24,7 +24,7 @@ interface Props {
 }
 
 function fmtEur(eur: number): string {
-  return eur.toFixed(2).replace('.', ',') + ' €';
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(eur);
 }
 
 function conditionEmoji(c: string): string {
@@ -91,8 +91,8 @@ export default function LiveHeader({ stats }: Props) {
           numberOfLines={1}
         >
           {live
-            ? `${i18n.t('common.live')} · ${live.city ?? '·'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
-            : `${i18n.t('common.live')} · ${i18n.t('common.loading')}`}
+            ? `LIVE · ${live.city ?? '—'} · ${conditionEmoji(live.weather.condition)} ${live.weather.temp_c}°C · ${String(live.hour).padStart(2,'0')}:${String(live.minute).padStart(2,'0')}`
+            : `LIVE · syncing context…`}
         </Text>
       </View>
 
@@ -141,20 +141,6 @@ export default function LiveHeader({ stats }: Props) {
               </Text>
             </MotiView>
           )}
-          <Pressable
-            onPress={() => router.push('/(customer)/saved')}
-            hitSlop={12}
-            style={{
-              width: 44, height: 44, borderRadius: 22,
-              backgroundColor: theme.surface,
-              borderWidth: 1, borderColor: theme.primary + '22',
-              alignItems: 'center', justifyContent: 'center',
-              shadowColor: theme.primary, shadowOpacity: 0.06,
-              shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-            }}
-          >
-            <Text style={{ fontSize: type.bodyL }}>❤️</Text>
-          </Pressable>
           <Pressable
             onPress={() => router.push('/settings' as any)}
             hitSlop={12}

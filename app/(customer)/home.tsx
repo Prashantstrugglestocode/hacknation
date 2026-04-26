@@ -418,16 +418,6 @@ export default function CustomerHome() {
       body: JSON.stringify({ decision: 'accepted' }),
     }).catch(() => {});
 
-    // Remove from saved list — once accepted, the offer is committed and
-    // shouldn't reappear in the saved-offers screen.
-    AsyncStorage.getItem('cw_saved_offers_v1').then(raw => {
-      const arr: string[] = raw ? JSON.parse(raw) : [];
-      const next = arr.filter(x => x !== offerId);
-      if (next.length !== arr.length) {
-        AsyncStorage.setItem('cw_saved_offers_v1', JSON.stringify(next)).catch(() => {});
-      }
-    }).catch(() => {});
-
     try {
       const amount_cents =
         spec.discount.kind === 'eur' ? Math.round(spec.discount.value * 100) :
@@ -600,7 +590,7 @@ export default function CustomerHome() {
                     color: theme.textMuted, fontSize: type.caption, fontWeight: '800',
                     letterSpacing: 1.4, marginLeft: space.xs,
                   }}>
-                    MEHR IN DER NÄHE · {state.extras.length}
+                    MORE NEARBY · {state.extras.length}
                   </Text>
                   {state.extras.map(extra => (
                     <ExtraOfferRow

@@ -4,7 +4,6 @@ import { MotiView } from 'moti';
 import { WidgetSpecType } from '../widget-spec';
 import { entryTransition, chipDelay, pressTransition, ctaPulseConfig } from '../mood';
 import HeroVisual from './HeroVisual';
-import SaveHeart from '../../components/SaveHeart';
 import i18n from '../../i18n';
 import { space, radius, type as typo } from '../../theme';
 
@@ -50,13 +49,12 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
         {offerId && (
           <View style={{
             position: 'absolute', top: space.md, right: space.md, zIndex: 2,
-            flexDirection: 'row', gap: space.xs,
           }}>
             <Pressable
               onPress={async () => {
                 try {
                   await Share.share({
-                    message: `${headline} bei ${merchant.name} — ${discount.kind === 'pct' ? `${discount.value} % Rabatt` : 'spar dir was'} · Stadtpuls\ncitywallet://offer/${offerId}`,
+                    message: `${headline} at ${merchant.name} — ${discount.kind === 'pct' ? `${discount.value}% off` : 'save with Stadtpuls'}\ncitywallet://offer/${offerId}`,
                   });
                 } catch {}
               }}
@@ -68,7 +66,6 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
             >
               <Text style={{ fontSize: typo.bodyL }}>↗</Text>
             </Pressable>
-            <SaveHeart offerId={offerId} />
           </View>
         )}
 
