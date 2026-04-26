@@ -358,6 +358,17 @@ offer.post('/feed', async (c) => {
     return false;
   });
   const usableMerchants = merchantsWithLiveOffers;
+
+  // Diagnostic: surface every stage of the funnel so we can see exactly
+  // where a phone-B flash gets dropped before reaching phone A's feed.
+  console.log(
+    `[feed] device=${device_hash.slice(0, 8)} `
+    + `nearby=${allNearby.length} `
+    + `withLiveOffers=${usableMerchants.length} `
+    + `flashesPerMerchant=[${usableMerchants.map(m => `${m.name}:${listFlash(m.id).length}`).join(', ')}] `
+    + `claimedFlashes=${claimedFlashIds.size} claimedCombos=${claimedComboIds.size}`,
+  );
+
   if (usableMerchants.length === 0) {
     return c.json({ offers: [] });
   }
@@ -665,7 +676,12 @@ offer.post('/feed', async (c) => {
     }
   }));
 
-  return c.json({ offers: results.filter(Boolean) });
+  const finalOffers = results.filter(Boolean);
+  console.log(
+    `[feed] returned ${finalOffers.length} offers `
+    + `[${finalOffers.map((o: any) => `${o?.widget_spec?.merchant?.name}${o?.widget_spec?.flash_id ? ' (flash)' : ''}`).join(', ')}]`,
+  );
+  return c.json({ offers: finalOffers });
 });
 
 offer.get('/:id', async (c) => {

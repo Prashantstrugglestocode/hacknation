@@ -267,23 +267,32 @@ export default function CustomerHome() {
         const data = await r.json();
         const offers: OfferEntry[] = Array.isArray(data?.offers) ? data.offers : [];
 
-        // Stale-offer cleanup: if the visible offer's merchant is no longer
-        // in the feed (menu deleted / flash ended / merchant gone), the card
-        // is showing data the server has already invalidated. Drop it.
         if (state.status === 'offer') {
-          const stillThere = offers.some(o =>
-            o.widget_spec.merchant.id === state.offer.widget_spec.merchant.id
-          );
+          const visibleOfferId = state.offer.id;
+          const stillThere = offers.some(o => o.id === visibleOfferId);
           if (!stillThere) {
+            // The current visible offer dropped out of the feed (claimed
+            // elsewhere / merchant deleted menu / flash ended). Replace it.
             if (offers.length === 0) {
-              // Nothing nearby anymore — go to empty state.
               setState({ status: 'no_merchant', lastLat: loc.coords.latitude, lastLng: loc.coords.longitude });
             } else {
-              // Swap in the new top offer; preserve the rest as extras.
               const { winner, rest } = pickBestDeal(offers);
               setState({ status: 'offer', offer: winner, extras: rest, payload, generatedAt: Date.now() });
             }
             return;
+          }
+          // The visible offer is still in the feed — but a NEW flash on
+          // the same merchant (or any new offer) might also be in there.
+          // Swap if a higher-savings offer just appeared.
+          const { winner } = pickBestDeal(offers);
+          if (winner.id !== visibleOfferId) {
+            const newSavings = offerSavingsCents(winner);
+            const oldSavings = offerSavingsCents(state.offer);
+            if (newSavings > oldSavings) {
+              const rest = offers.filter(o => o.id !== winner.id);
+              setState({ status: 'offer', offer: winner, extras: rest, payload, generatedAt: Date.now() });
+              return;
+            }
           }
         }
 

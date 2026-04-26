@@ -178,7 +178,7 @@ export default function HeroLayout({ spec, offerId, onAccept, onDecline }: Props
               <Text style={{
                 color: palette.fg, fontSize: 9, fontWeight: '900', letterSpacing: 0.6,
               }}>
-                GDPR · 1,2 km
+                GDPR · 1.2 km
               </Text>
             </View>
           </View>

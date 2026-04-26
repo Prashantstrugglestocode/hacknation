@@ -251,65 +251,9 @@ export default function MerchantSettings() {
         </TouchableOpacity>
       </Section>
 
-      {/* Quick links to other merchant tools */}
-      <Section title="GOAL & DISCOUNTS">
-        <Pressable onPress={() => router.push('/(merchant)/rules')}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: space.md,
-            paddingVertical: space.sm,
-          }}>
-          <Text style={{ fontSize: typo.bodyL }}>📐</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Edit rules</Text>
-            <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Tune your goal and max discount
-            </Text>
-          </View>
-          <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/(merchant)/menu')}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: space.md,
-            paddingVertical: space.sm,
-          }}>
-          <Text style={{ fontSize: typo.bodyL }}>📋</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Manage menu</Text>
-            <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Add items, scan, see insights
-            </Text>
-          </View>
-          <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/(merchant)/flash-sale')}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: space.md,
-            paddingVertical: space.sm,
-          }}>
-          <Text style={{ fontSize: typo.bodyL }}>🔥</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Start a flash sale</Text>
-            <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Instant offer on selected items
-            </Text>
-          </View>
-          <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/(merchant)/combos')}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: space.md,
-            paddingVertical: space.sm,
-          }}>
-          <Text style={{ fontSize: typo.bodyL }}>🎁</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontSize: typo.body, fontWeight: '700' }}>Manage combos</Text>
-            <Text style={{ color: theme.textMuted, fontSize: typo.small }}>
-              Bundle 2–4 items at a fixed price
-            </Text>
-          </View>
-          <Text style={{ color: theme.primary, fontSize: typo.bodyL }}>›</Text>
-        </Pressable>
-      </Section>
+      {/* Quick-links section removed — these tools are reachable directly
+          from the merchant dashboard, no need to duplicate the menu in
+          settings. Keeps this screen focused on shop-config only. */}
 
       {/* Danger zone */}
       <Section title="DANGER ZONE">

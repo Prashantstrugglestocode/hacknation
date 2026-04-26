@@ -70,7 +70,7 @@ export function encodeIntent(params: {
   return {
     geohash6: encodeGeohash6(lat, lng),
     intent: { rainy, cold, hungry_likely, browsing, time_bucket, movement },
-    locale: locale === 'en' ? 'en' : 'de',
+    locale: 'en',
     device_hash: deviceHash,
   };
 }

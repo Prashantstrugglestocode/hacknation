@@ -77,16 +77,16 @@ function buildSignalRows(ctx: any): SignalRow[] {
     rows.push({
       icon: '🕐',
       source: 'Lokale Zeit',
-      label: bucket ? `Tageszeit · ${bucket}` : 'Tageszeit',
+      label: bucket ? `Time of day · ${bucket}` : 'Time of day',
       value: `${String(ctx.hour).padStart(2, '0')}:00`,
     });
   }
   if (ctx?.geohash6) {
     rows.push({
       icon: '📍',
-      source: 'Standort (anonymisiert)',
-      label: 'Geohash-Zelle ~1,2 km',
-      detail: 'Exakte Position bleibt auf deinem Gerät',
+      source: 'Location (anonymised)',
+      label: 'Geohash cell ~1.2 km',
+      detail: 'Exact position stays on your device',
       value: ctx.geohash6,
     });
   }
@@ -229,7 +229,7 @@ export default function WhyScreen() {
           Warum dieses Angebot?
         </Text>
         <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 19 }}>
-          Diese Signale haben das Angebot ausgelöst. Du siehst genau, was wir wissen.
+          These signals triggered the offer. You see exactly what we know.
         </Text>
       </View>
 
@@ -242,17 +242,17 @@ export default function WhyScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ fontSize: 16 }}>🔒</Text>
           <Text style={{ color: theme.success, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-            ON-DEVICE INTENT-ENCODER
+            ON-DEVICE INTENT ENCODER
           </Text>
         </View>
         <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19, fontWeight: '600' }}>
-          Deine echte Position bleibt auf dem Gerät. An den Server geht nur
-          eine 1,2 km Geohash-Zelle und ein abstrakter Intent-Vektor
-          (z.B. „kalt", „regnerisch", „Mittagszeit") — berechnet lokal,
-          niemals dein Bewegungsprofil.
+          Your real position never leaves your phone. The server receives only
+          a 1.2 km geohash cell and an abstract intent vector
+          (e.g. "cold", "rainy", "lunchtime") — computed locally,
+          never your movement profile.
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-          {['Geohash-6', 'Intent-Flags', 'Rotierender Hash', 'Kein Profil'].map(t => (
+          {['Geohash-6', 'Intent flags', 'Rotating hash', 'No profile'].map(t => (
             <View key={t} style={{
               backgroundColor: theme.success + '22', borderRadius: 8,
               paddingHorizontal: 8, paddingVertical: 3,
