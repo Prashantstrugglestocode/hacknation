@@ -1,34 +1,25 @@
 # Stadtpuls — Generative City Wallet
 
-> **Hyperpersonalized local offers, generated in the moment.**
-> Built for the **Hacknation × MIT Club of Northern California / MIT Club of Germany** hackathon —
-> Challenge 01: *Generative City-Wallet*, powered by **DSV Gruppe** (Deutscher Sparkassenverlag).
+> **Hyperpersonalised local offers, generated in the moment.**
+> Built for the **Hacknation × MIT Club of Northern California / MIT Club of Germany** hackathon — Challenge 01 *Generative City-Wallet*, powered by **DSV Gruppe** (Deutscher Sparkassenverlag).
 
-Mia is on a 12-minute Stuttgart lunch break. It's 11°C, the café 80m away has been quiet
-all morning, and she's been browsing — not commuting. Today's apps would push her a generic
-"10% off, valid for 30 days." Stadtpuls instead generates *this café, this cappuccino, right
-now* — because the moment is right.
+It's 11°C, raining, 12:40. Mia is on a 12-minute lunch break. The café 80m away has been quiet all morning. Today's apps would push her a generic "10% off, valid 30 days." Stadtpuls instead generates *this café, this cappuccino, right now* — because the moment is right, and disappears the moment it isn't.
 
 ---
 
-## What's in the box
+## What it does
 
-A working end-to-end MVP with all three required modules:
+| Surface | Capability |
+| --- | --- |
+| **Customer** | Live home feed of context-aware offers, "Why this offer?" transparency screen, 10-minute QR voucher, in-app **Sparkasse Pay** sheet, savings tracker, history. |
+| **Merchant** | Realtime dashboard (accept/redeem sparklines), QR scanner, menu manager, **flash-sale composer**, **combo builder**, daily-rules editor. |
+| **Server** | Composite-trigger context engine, LLM offer generator (OpenAI + Ollama tiers + safety fallback), signed-JWT QR redemption, Supabase Realtime fanout. |
 
-1. **Context Sensing Layer** — composite triggers from weather (DWD Brightsky, GDPR-friendly),
-   time-of-day, geofenced location (1.2 km cell, never raw GPS), local events
-   (Ticketmaster, optional), and a simulated **Payone** transaction-density feed for
-   detecting quiet hours.
-2. **Generative Offer Engine** — the merchant sets a goal ("fill 3pm slump, max 20% off");
-   an LLM (Mistral primary, OpenAI fallback, on-device Ollama / `gemma3:4b` as the
-   privacy tier) generates the headline, body, image hint, and discount within those
-   guard-rails. Streaming GenUI widgets, not template-fill.
-3. **Seamless Checkout & Redemption** — dynamic 10-min QR token validated server-side.
-   Customer card morphs into a payment receipt the instant the merchant scans, via a
-   Supabase Realtime broadcast. Cashback fallback for the no-QR path.
+Three required modules from the brief, end-to-end:
 
-Plus a merchant dashboard (live accept/decline rates, sparkline, redemption history,
-menu management, flash-sale composer, combo builder).
+1. **Context Sensing** — DWD Brightsky weather (no key, GDPR-friendly), Ticketmaster events, time-of-day, geocell location (1.2 km, never raw GPS), per-merchant Payone density signal, POI foot-traffic proxy.
+2. **Generative Offer Engine** — merchant sets goal + guard-rails ("fill 3pm slump, max 20% off"); LLM generates headline, body, image hint, discount, and **layout choice** (Hero / Compact / Split / Fullbleed / Sticker). GenUI widgets, not template fill.
+3. **Seamless Checkout** — 10-minute signed-JWT QR. Merchant scans → customer's QR card morphs into a slide-to-pay sheet via Supabase broadcast. Customer slides → receipt lands on both phones in real time.
 
 ---
 
@@ -37,32 +28,101 @@ menu management, flash-sale composer, combo builder).
 ```
 ┌─────────────────────────┐         ┌──────────────────────────┐
 │  Expo / React Native    │  HTTPS  │  Bun + Hono server       │
-│  (customer + merchant)  │ ──────▶ │  /api/offer, /merchant   │
-│  expo-router, NativeWind│         │  /context, /menu         │
+│  customer + merchant    │ ──────▶ │  /api/offer  /merchant   │
+│  expo-router · NativeWind│        │  /context  /menu         │
 └──────────┬──────────────┘         └────────┬─────────────────┘
            │                                  │
            │ Realtime broadcast               │  ┌─────────────────────┐
-           │ (offer.shown / accepted /        │  │  LLM tier ladder    │
-           │  redeemed)                       ├─▶│  Mistral → OpenAI   │
-           │                                  │  │  → Ollama (gemma3)  │
+           │ offer.shown · scan_pending       ├─▶│  LLM tier ladder    │
+           │ offer.redeemed                   │  │  OpenAI → Ollama    │
            ▼                                  │  │  → fillDefaults     │
 ┌─────────────────────────┐                   │  └─────────────────────┘
 │  Supabase               │                   │
 │  Postgres + RLS + RT    │ ◀─────────────────┤  ┌─────────────────────┐
-│  (merchants, offers,    │   service-role    │  │  Context signals    │
-│   menu_items, events)   │   writes          ├─▶│  DWD Brightsky      │
+│  merchants · offers     │   service-role    │  │  Context signals    │
+│  menu_items · events    │   writes          ├─▶│  DWD Brightsky      │
 └─────────────────────────┘                   │  │  Ticketmaster       │
-                                              │  │  Payone-mock        │
-                                              │  │  POI / geohash      │
+                                              │  │  Payone (mock)      │
+                                              │  │  POI · geohash      │
                                               │  └─────────────────────┘
 ```
 
-### Why this shape
-- **Bun/Hono** keeps the LLM-orchestrating server tiny and cold-starts fast on Render.
-- **Supabase Realtime** is the connective tissue — the QR-to-receipt morph is one broadcast.
-- **GDPR-by-design**: only an abstract intent + 1.2km geocell ever leaves the device.
-  PII scrubber on every LLM input. Ollama tier means the "spirit" of on-device SLMs
-  is demonstrable even though the demo runs against a hosted server.
+**Why this shape**
+- Bun + Hono keeps the LLM-orchestrating server tiny; cold-starts fast on Render.
+- Supabase Realtime is the connective tissue — the QR-to-receipt morph is one broadcast.
+- GDPR-by-design: only an abstract intent + 1.2 km geocell ever leaves the device. PII scrubber on every LLM input. The on-device Ollama tier shows the no-cloud-inference path the brief encourages.
+
+---
+
+## Quick start
+
+### Prereqs
+- **Bun** ≥ 1.1, **Node 20+**, **Expo Go** on a phone (or simulator)
+- A Supabase project (free tier)
+- One LLM key: **OpenAI** *or* a local **Ollama** with `llama3.2` pulled
+
+### 1. Clone & install
+```bash
+git clone https://github.com/Prashantstrugglestocode/hacknation.git
+cd hacknation/city-wallet
+npm install --legacy-peer-deps
+cd server && bun install && cd ..
+```
+
+### 2. Supabase migrations
+Run in order in the SQL editor:
+```
+supabase/migrations/001_initial.sql
+supabase/migrations/002_menu.sql
+supabase/migrations/003_auth.sql
+supabase/migrations/004_address.sql
+```
+
+### 3. Configure
+```bash
+cp server/.env.example server/.env
+# Fill in SUPABASE_URL, SUPABASE_SERVICE_KEY, OPENAI_API_KEY (or OLLAMA_MODEL),
+# and a JWT_SECRET (any 32-byte hex).
+```
+In `app.json` → `expo.extra`, set your project's `supabaseUrl`, the **publishable** `supabaseAnonKey` (`sb_publishable_…`, not the service key), and `apiUrl` for the backend (localhost or tunnel URL).
+
+### 4. Run
+```bash
+# terminal 1 — backend
+cd server && bun run dev
+
+# terminal 2 — Expo
+npx expo start
+# scan the QR with Expo Go
+```
+
+### 5. Optional — on-device LLM
+```bash
+brew install ollama
+ollama pull llama3.2
+ollama serve
+# the server's tier ladder picks Ollama up automatically
+```
+
+---
+
+## Two-phone demo
+
+Stadtpuls is meant to be shown on **two real phones** — one customer, one merchant — sharing one backend.
+
+```bash
+# expose backend so phones can reach it
+cloudflared tunnel --url http://localhost:3000
+# update app.json → expo.extra.apiUrl with the public URL
+
+# expose Metro for phones off LAN
+cloudflared tunnel --url http://localhost:8081
+# start Expo with the proxy URL so the manifest points at the tunnel:
+EXPO_PACKAGER_PROXY_URL=https://<your-metro-tunnel>.trycloudflare.com \
+  npx expo start --host lan
+```
+
+Both phones scan the Expo Go QR. One picks the **customer** role on the role screen; the other picks **merchant**. Pull-to-refresh on the customer home generates a fresh offer — tap to accept, show the QR. The merchant scans, the customer slides to pay, both phones see the receipt land in real time.
 
 ---
 
@@ -70,220 +130,75 @@ menu management, flash-sale composer, combo builder).
 
 ```
 city-wallet/
-├── app/                      # Expo Router screens
-│   ├── (customer)/           # home, redeem, why, map, history, saved, menu
-│   ├── (merchant)/           # dashboard, setup, menu, combos, flash-sale, scan, …
-│   ├── role.tsx              # role picker
-│   └── settings.tsx          # global settings (lang, location, logout)
+├── app/                       # Expo Router screens
+│   ├── (customer)/            # home · redeem · pay · why · map · menu · history
+│   ├── (merchant)/            # dashboard · scan · menu · combos · flash-sale · rules
+│   ├── role.tsx               # role picker
+│   └── settings.tsx
 ├── lib/
-│   ├── supabase/             # client + realtime channels
-│   ├── generative/           # GenUI widget spec + layouts (Hero, etc.)
-│   ├── components/           # SlideToPay, Confetti, FreshnessChip, LiveHeader, …
-│   ├── i18n/                 # de + en
-│   └── notifications.ts      # expo-notifications wiring
-├── server/                   # Bun + Hono backend
-│   ├── index.ts              # entry — `bun run dev`
-│   ├── routes/               # offer, merchant, menu, context
-│   └── lib/                  # openai (LLM ladder), composite (triggers),
-│                             # weather, events, payone-mock, pii-scrubber, …
-├── supabase/migrations/      # 001 schema, 002 menu, 003 auth
-├── config/default.json       # trigger rules (no code changes per city)
-├── render.yaml               # one-click server deploy on Render
-├── app.json                  # Expo config (publishable Supabase key only)
-└── .env.example / server/.env.example
-```
-
----
-
-## Quick start
-
-### Prereqs
-- **Bun** ≥ 1.1 (server) and **Node 20+** (Expo CLI)
-- An **Expo Go** app on your phone (or an iOS/Android simulator)
-- A Supabase project (free tier is fine)
-- API keys for one of: **Mistral**, **OpenAI**. Plus optional: **OpenWeather**,
-  **Ticketmaster**. Or just run **Ollama** locally with `gemma3:4b` pulled.
-
-### 1. Clone & install
-```bash
-git clone https://github.com/Prashantstrugglestocode/hacknation.git
-cd hacknation/city-wallet
-bun install                    # or npm install
-cd server && bun install && cd ..
-```
-
-### 2. Supabase
-```bash
-# In the Supabase SQL editor, run the three migrations in order:
-#   supabase/migrations/001_initial.sql
-#   supabase/migrations/002_menu.sql
-#   supabase/migrations/003_auth.sql
-```
-
-### 3. Configure env
-```bash
-cp .env.example .env                 # client-side reference
-cp server/.env.example server/.env   # server-side
-# Fill in real values — see "Environment variables" below.
-```
-
-Update `app.json` → `expo.extra.supabaseUrl` and `expo.extra.supabaseAnonKey`
-with **your** project's URL and the **publishable** (`sb_publishable_…`) anon key.
-Never put a `service_role` key here — it goes in `server/.env` only.
-
-### 4. Run
-```bash
-# Terminal 1 — backend
-cd server && bun run dev
-
-# Terminal 2 — Expo
-bunx expo start
-# Scan the QR with Expo Go.
-```
-
-For phone-on-LAN demos, expose the server via a tunnel and update
-`app.json` → `expo.extra.apiUrl`:
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-### 5. Optional: on-device SLM tier (Ollama)
-```bash
-brew install ollama
-ollama pull gemma3:4b
-ollama serve   # listens on http://localhost:11434
-# Server picks it up via OLLAMA_HOST + OLLAMA_MODEL.
+│   ├── supabase/              # client + realtime channels
+│   ├── generative/            # GenUI widget specs + layouts
+│   ├── components/            # SlideToPay · Confetti · LiveHeader · …
+│   ├── i18n/                  # de + en
+│   └── privacy/               # geocell + intent encoder
+├── server/                    # Bun + Hono backend
+│   ├── routes/                # offer · merchant · menu · context
+│   └── lib/                   # openai (tier ladder) · composite (triggers)
+│                              # weather · events · payone-mock · pii-scrubber
+├── supabase/migrations/       # 001 schema · 002 menu · 003 auth · 004 address
+├── config/default.json        # trigger rules (no code change per city)
+├── render.yaml                # one-click server deploy
+└── app.json                   # Expo config
 ```
 
 ---
 
 ## Environment variables
 
-**Never commit `.env` files.** Both `.env` and `server/.env` are gitignored.
-
-### Client (`.env` + `app.json`)
-| Var | Purpose |
-| --- | --- |
-| `SUPABASE_URL` | Project URL (public) |
-| `SUPABASE_ANON_KEY` | **Publishable** anon key (`sb_publishable_…`) — RLS-protected, safe in client |
+`.env` files are gitignored — never commit secrets.
 
 ### Server (`server/.env`)
 | Var | Purpose |
 | --- | --- |
-| `SUPABASE_URL` | Same project URL |
-| `SUPABASE_SERVICE_KEY` | **Service-role** key — server-only, never ship to client |
-| `MISTRAL_API_KEY` | Primary LLM (preferred for EU-hosted compliance) |
-| `OPENAI_API_KEY` | Fallback LLM |
-| `OLLAMA_HOST` / `OLLAMA_MODEL` | On-device tier (defaults: `http://localhost:11434`, `gemma3:4b`) |
-| `OPENWEATHER_API_KEY` | *Optional* — DWD Brightsky is the default and needs no key |
-| `TICKETMASTER_API_KEY` | *Optional* — events trigger degrades gracefully if absent |
-| `JWT_SECRET` | Signing secret for redemption tokens |
+| `SUPABASE_URL` | Project URL |
+| `SUPABASE_SERVICE_KEY` | **Service-role** key — server only |
+| `OPENAI_API_KEY` | Primary LLM (optional if Ollama is running) |
+| `OLLAMA_MODEL` | On-device tier model (e.g. `llama3.2`) |
+| `OLLAMA_HOST` | Defaults to `http://localhost:11434` |
+| `OPENWEATHER_API_KEY` | Optional — DWD Brightsky is the keyless default |
+| `TICKETMASTER_API_KEY` | Optional — events trigger degrades gracefully |
+| `JWT_SECRET` | QR-token signing secret |
 | `PORT` | Defaults to 3000 |
 
----
-
-## How we hit the brief's rubric
-
-**1. Real context in action — concrete scenario, plausible offer.**
-The composite trigger engine in `server/lib/composite.ts` reads live signals
-every request: DWD Brightsky weather (no key needed, GDPR-friendly),
-Ticketmaster events, time-of-day, a per-merchant Payone density signal
-(`server/lib/payone-mock.ts`) that varies by merchant type and hour, and a
-foot-traffic proxy from POI density. A demo trigger like
-**`COZY_QUIET_NEARBY`** fires when `temp_c ≤ 14 + condition ∈ {rain,drizzle,
-mist,clouds} + merchant_quiet=true + merchant.type ∈ {café, bakery}` — at
-which point the LLM receives that exact composite state and is told (in the
-system prompt) to reason about what a customer in that weather/hour actually
-wants right now, then pick a real menu item from `menu_items` to feature.
-Same trigger on a sunny day produces a different offer; same trigger at 3pm
-vs. 9am produces a different item. The `Why this offer?` screen on the
-customer side surfaces the actual fired triggers + signals so judges can
-inspect the reasoning chain end-to-end.
-
-**2. 3-second comprehension.**
-Layout hierarchy on the hero card (`lib/generative/layouts/Hero.tsx`):
-discount value (largest number on screen — eye lands here first) → headline
-(named menu item, ≤8 words) → 2 signal chips capped (anything beyond 2
-breaks the read) → CTA. Subline + merchant name + distance collapsed to one
-body row to stop the eye fragmenting. Pressure cue (`Noch 8 Min`) and EU/
-GDPR trust mark sit below the fold so they don't compete with the headline.
-Generative layout choice is tuned to mood (cozy → hero/sticker, urgent →
-fullbleed) — same data, different presentation per situation. `LiveHeader`
-streams a typing-cursor "AI is generating…" pill so the user understands
-the card is being made for them in this moment, not pulled from a list.
-
-**3. Closed loop — context → generation → display → accept → checkout.**
-The full path is real, not stubbed. Server-side: `/api/offer/feed` runs
-context fetch → trigger composition → top-N merchant scoring → parallel LLM
-generation (Mistral primary, OpenAI fallback, on-device Ollama tier, then
-deterministic safety fallback) → persist to `offers` + broadcast `offer.shown`
-on the merchant's Supabase Realtime channel. Customer accepts → `/decision`
-+ card morphs into a QR (10-min signed JWT). Merchant scans → `/redeem-qr`
-flips status to `scan_pending` and broadcasts on `offer:{id}` so the
-customer's QR card morphs into a slide-to-pay confirmation in real time.
-Customer slides → `/confirm-payment` writes a `redemptions` row, broadcasts
-`offer.redeemed` to BOTH the merchant dashboard (sparkline ticks) and the
-customer card (savings tile updates). Cashback path is the alternate route
-when the merchant doesn't have a scanner.
-
-**4. GDPR — privacy by design.**
-Location never leaves the device as a raw lat/lng — it's reduced to a
-6-character geohash (~1.2 km cell) by `lib/privacy/intent-encoder.ts` before
-any network request. Every prompt the server sends to a hosted LLM passes
-through `server/lib/pii-scrubber.ts` which strips emails, phones, IBANs, and
-IPs. The on-device Ollama tier (`gemma3:4b`) demonstrates the
-no-cloud-inference path the brief encourages — only an abstract `intent`
-signal would need to leave the device. Supabase RLS is enforced and the
-client only carries the publishable `sb_publishable_*` anon key — the
-`service_role` key lives in `server/.env` and is never shipped. The trust
-mark `🇪🇺 GDPR · 1,2 km` is on every offer card so the privacy story is
-visible, not hidden.
+### Client (`app.json` → `expo.extra`)
+| Key | Purpose |
+| --- | --- |
+| `apiUrl` | Backend URL (localhost or tunnel) |
+| `supabaseUrl` | Same project URL |
+| `supabaseAnonKey` | **Publishable** key (`sb_publishable_…`) — RLS-protected |
 
 ---
 
-## The four UX questions, answered
+## Privacy by design
 
-- **Where?** In-app live card on the customer home tab, plus a foreground push
-  notification when the composite trigger fires while the app is backgrounded.
-  Lock-screen-friendly copy.
-- **How does it address the user?** Emotional-situational by default
-  ("Cold outside? Your cappuccino is waiting"), with a factual sub-line
-  ("80m · €3.20 · 15% off until 13:30"). LLM tone is governed by the merchant goal.
-- **First 3 seconds?** Hero image, one-line headline, distance + discount chip,
-  and a single primary action — no scrolling required. Generative layouts
-  pick a Hero variant tuned to the trigger (cozy/urgent/festive).
-- **How does it end?** A countdown ring on the card; expiry fades the card and
-  removes the notification. Acceptance morphs the card into a QR. Dismissal is a
-  swipe — the offer is immediately re-suppressed for that trigger context for 30
-  minutes so the user doesn't see it again.
+- Location is reduced to a 6-character geohash (~1.2 km cell) before any network call (`lib/privacy/intent-encoder.ts`).
+- `server/lib/pii-scrubber.ts` strips emails, phones, IBANs, and IPs from every prompt before it reaches a hosted LLM.
+- Supabase RLS is enforced; the client only carries the publishable anon key — `service_role` lives in `server/.env` and is never bundled.
+- The Ollama tier exists so you can demo a no-cloud-inference path: only an abstract intent leaves the device.
+- The 🇪🇺 GDPR · 1,2 km trust mark is on every offer card so the privacy story is visible, not buried.
 
 ---
 
-## Privacy (GDPR)
+## Tech stack
 
-- Location is reduced to a 6-char geohash (~1.2 km cell) before leaving the device.
-- A PII scrubber runs on every prompt before it touches a hosted LLM.
-- The Ollama tier exists specifically so demos can show a path where **no user
-  signal leaves the device** — only an abstract intent does.
-- Supabase RLS is enforced; the publishable anon key cannot read other users' data.
-- The `service_role` key lives only in the server's environment; it's never bundled.
-
----
-
-## Demo script
-
-1. Open the customer app — splash warms the LLM in the background.
-2. Pick a Stuttgart location on the map (or use real GPS).
-3. The home tab shows a live, generated offer triggered by *current* weather +
-   simulated Payone quiet-hour signal at the nearest café.
-4. Tap → hero detail → "Why this offer?" explains the trigger transparently.
-5. Accept → card morphs into a QR (10-min validity, signed JWT).
-6. Switch to the merchant role → scan → customer card morphs into a payment
-   receipt in real time. Dashboard updates the accept/redeem sparkline live.
+**Mobile** Expo SDK 54 · React Native 0.81 · expo-router · NativeWind · Moti · react-native-reanimated
+**Backend** Bun · Hono · Supabase (Postgres + Realtime + Auth) · jose (JWT)
+**LLM** OpenAI · Ollama (`llama3.2`) · deterministic safety fallback
+**Context** DWD Brightsky · Ticketmaster · ngeohash · Payone-mock
 
 ---
 
 ## Credits
 
-Built for the DSV Gruppe / MIT Clubs hackathon, 2026.
+Built for the DSV Gruppe / MIT Clubs Hacknation, 2026.
 Challenge contact: Tim Heuschele (tim.heuschele@dsv-gruppe.de).
