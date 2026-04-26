@@ -1,13 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, RefreshControl, TouchableOpacity, Dimensions, Alert,
+  View, Text, ScrollView, RefreshControl, TouchableOpacity, Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { addMerchantId } from '../../lib/merchant-store';
 import { MotiView, AnimatePresence } from 'moti';
 import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
@@ -87,7 +86,6 @@ export default function CustomerHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<SavingsStats>(EMPTY_STATS);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
-  const [seeding, setSeeding] = useState(false);
   const [milestone, setMilestone] = useState<number | null>(null);
   const [morph, setMorph] = useState<{ bg: string; fg: string; accent: string } | null>(null);
   const [advisor, setAdvisor] = useState<AdvisorState>({ winnerId: null, explanation: '' });
@@ -198,35 +196,8 @@ export default function CustomerHome() {
     }
   }, []);
 
-  const seedDemoMerchant = useCallback(async () => {
-    if (state.status !== 'no_merchant' && state.status !== 'idle') return;
-    setSeeding(true);
-    try {
-      let lat: number, lng: number;
-      if (state.status === 'no_merchant') {
-        lat = state.lastLat; lng = state.lastLng;
-      } else {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        lat = loc.coords.latitude; lng = loc.coords.longitude;
-      }
-      const deviceHash = await getDeviceHash();
-      const res = await fetch(`${API}/api/merchant/seed-demo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, owner_device_id: deviceHash }),
-      });
-      if (!res.ok) throw new Error('seed failed');
-      const created = await res.json();
-      // Take ownership: save merchant_id locally so the Merchant tab works
-      if (created?.id) await addMerchantId(created.id);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await generate();
-    } catch (e) {
-      Alert.alert('Error', 'Demo shop could not be created');
-    } finally {
-      setSeeding(false);
-    }
-  }, [state, generate]);
+  // Demo-merchant seeding removed — judges should see only real shops the
+  // teammate actually sets up on the second phone. No fake data anywhere.
 
   useEffect(() => { refreshStats(); generate(); }, []);
 
@@ -512,7 +483,7 @@ export default function CustomerHome() {
           ) : state.status === 'location_denied' ? (
             <LocationDeniedState onRetry={generate} />
           ) : state.status === 'no_merchant' ? (
-            <NoMerchantState onSeed={seedDemoMerchant} seeding={seeding} />
+            <NoMerchantState />
           ) : state.status === 'error' ? (
             <ErrorState message={state.message} onRetry={generate} />
           ) : state.status === 'declined' ? (
@@ -692,7 +663,7 @@ function LocationDeniedState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function NoMerchantState({ onSeed: _onSeed, seeding: _seeding }: { onSeed: () => void; seeding: boolean }) {
+function NoMerchantState() {
   // Demo-merchant seed button intentionally hidden — judges should see only
   // real merchants set up on a second phone. Empty state guides toward the
   // 2-phone flow instead of a synthetic shop.
