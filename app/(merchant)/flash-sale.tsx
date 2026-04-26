@@ -31,8 +31,19 @@ interface ComboLite {
   savings_cents: number;
 }
 
+interface FlashEntry {
+  id: string;
+  menu_item_ids: string[];
+  items: MenuItem[];
+  combo_ids: string[];
+  combos: ComboLite[];
+  pct: number;
+  minutes_left: number;
+}
 interface FlashState {
   active: boolean;
+  flashes?: FlashEntry[];
+  // Legacy single-flash fields (back-compat; not relied on by new UI).
   menu_item_ids?: string[];
   items?: MenuItem[];
   combo_ids?: string[];
@@ -126,6 +137,9 @@ export default function FlashSale() {
     }
     setSubmitting(true);
     try {
+      // POST adds a new flash (does not replace existing). Reload the full
+      // list afterwards so the active-flash banner shows everything that's
+      // currently running.
       const res = await fetch(`${API}/api/merchant/${merchantId}/flash`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,9 +152,9 @@ export default function FlashSale() {
       });
       if (res.ok) {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setCurrent(await res.json());
         setSelected(new Set());
         setSelectedCombos(new Set());
+        await loadCurrent(merchantId); // refresh full list
       } else {
         Alert.alert('Fehler', 'Konnte nicht gestartet werden.');
       }
@@ -151,11 +165,25 @@ export default function FlashSale() {
     }
   };
 
-  const stopFlash = async () => {
+  // Stop a single flash by id (when there are multiple active).
+  const stopOneFlash = async (flashId: string) => {
     if (!merchantId) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const r = await fetch(`${API}/api/merchant/${merchantId}/flash/${flashId}`, { method: 'DELETE' });
+      if (r.ok) setCurrent(await r.json());
+      else await loadCurrent(merchantId);
+    } catch {
+      await loadCurrent(merchantId);
+    }
+  };
+
+  // Stop ALL active flashes (legacy "Flash beenden").
+  const stopAllFlashes = async () => {
+    if (!merchantId) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     await fetch(`${API}/api/merchant/${merchantId}/flash`, { method: 'DELETE' }).catch(() => {});
-    setCurrent({ active: false });
+    setCurrent({ active: false, flashes: [] });
   };
 
   return (
@@ -178,80 +206,98 @@ export default function FlashSale() {
         </View>
 
         <AnimatePresence>
-          {current.active && (
+          {current.active && (current.flashes ?? []).length > 0 && (
             <MotiView
-              key="active"
+              key="active-list"
               from={{ opacity: 0, translateY: -10 }}
               animate={{ opacity: 1, translateY: 0 }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring' }}
-              style={{ borderRadius: 18, overflow: 'hidden' }}
+              style={{ gap: 10 }}
             >
-              <LinearGradient
-                colors={[theme.primary, theme.primaryDark] as any}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ padding: 16, gap: 10 }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <MotiView
-                    from={{ scale: 0.9, opacity: 0.6 }}
-                    animate={{ scale: 1.3, opacity: 1 }}
-                    transition={{ type: 'timing', duration: 800, loop: true }}
-                    style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFF' }}
-                  />
-                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.2 }}>
-                    AKTIV · {current.pct} % · noch {current.minutes_left} Min
-                  </Text>
-                </View>
-                <View style={{ gap: 4 }}>
-                  {(current.combos ?? []).length > 0 && (
-                    <View style={{
-                      backgroundColor: '#FFFFFF14', borderRadius: 10,
-                      paddingHorizontal: 10, paddingVertical: 8, gap: 4,
-                      borderWidth: 1, borderColor: '#FFFFFF44',
-                    }}>
-                      <Text style={{ color: '#FFFFFFCC', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>
-                        🤖 KI WÄHLT JE NACH WETTER
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>
+                  AKTIVE FLASH-DEALS · {current.flashes!.length}
+                </Text>
+                {current.flashes!.length > 1 && (
+                  <TouchableOpacity onPress={stopAllFlashes} hitSlop={8}>
+                    <Text style={{ color: theme.danger, fontSize: 11, fontWeight: '900' }}>
+                      Alle beenden
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {current.flashes!.map(f => (
+                <MotiView
+                  key={f.id}
+                  from={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', damping: 16 }}
+                  style={{ borderRadius: 18, overflow: 'hidden' }}
+                >
+                  <LinearGradient
+                    colors={[theme.primary, theme.primaryDark] as any}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ padding: 14, gap: 8 }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <MotiView
+                        from={{ scale: 0.9, opacity: 0.6 }}
+                        animate={{ scale: 1.3, opacity: 1 }}
+                        transition={{ type: 'timing', duration: 800, loop: true }}
+                        style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFF' }}
+                      />
+                      <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '900', letterSpacing: 1.2, flex: 1 }}>
+                        AKTIV · {f.pct} % · noch {f.minutes_left} Min
                       </Text>
-                      {(current.combos ?? []).map(co => (
-                        <View key={co.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                            🎁 {co.name}
-                          </Text>
-                          <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700' }}>
-                            {fmtPrice(co.combo_price_cents)}
-                          </Text>
-                        </View>
-                      ))}
+                      <TouchableOpacity onPress={() => stopOneFlash(f.id)} hitSlop={8}
+                        style={{
+                          backgroundColor: '#FFFFFF', borderRadius: 8,
+                          paddingHorizontal: 10, paddingVertical: 5,
+                        }}>
+                        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '900' }}>Beenden</Text>
+                      </TouchableOpacity>
                     </View>
-                  )}
-                  {(current.items ?? []).map(it => (
-                    <View key={it.id} style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 8,
-                      backgroundColor: '#FFFFFF22', borderRadius: 10,
-                      paddingHorizontal: 10, paddingVertical: 6,
-                    }}>
-                      <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800', flex: 1 }} numberOfLines={1}>
-                        {it.name}
-                      </Text>
-                      {it.price_cents != null && (
-                        <Text style={{ color: '#FFFFFFCC', fontSize: 12, fontWeight: '700' }}>
-                          {fmtPrice(it.price_cents)}
+                    {f.combos.length > 0 && (
+                      <View style={{
+                        backgroundColor: '#FFFFFF14', borderRadius: 10,
+                        paddingHorizontal: 10, paddingVertical: 6, gap: 3,
+                        borderWidth: 1, borderColor: '#FFFFFF44',
+                      }}>
+                        <Text style={{ color: '#FFFFFFCC', fontSize: 9, fontWeight: '900', letterSpacing: 1 }}>
+                          🤖 KI WÄHLT JE NACH WETTER
                         </Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-                <TouchableOpacity onPress={stopFlash}
-                  style={{
-                    backgroundColor: '#FFFFFF', borderRadius: 12,
-                    paddingVertical: 10, alignItems: 'center', marginTop: 4,
-                  }}>
-                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '900' }}>
-                    Flash beenden
-                  </Text>
-                </TouchableOpacity>
-              </LinearGradient>
+                        {f.combos.map(co => (
+                          <View key={co.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                              🎁 {co.name}
+                            </Text>
+                            <Text style={{ color: '#FFFFFFCC', fontSize: 11, fontWeight: '700' }}>
+                              {fmtPrice(co.combo_price_cents)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {f.items.map(it => (
+                      <View key={it.id} style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 8,
+                        backgroundColor: '#FFFFFF22', borderRadius: 10,
+                        paddingHorizontal: 10, paddingVertical: 5,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '800', flex: 1 }} numberOfLines={1}>
+                          {it.name}
+                        </Text>
+                        {it.price_cents != null && (
+                          <Text style={{ color: '#FFFFFFCC', fontSize: 11, fontWeight: '700' }}>
+                            {fmtPrice(it.price_cents)}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </LinearGradient>
+                </MotiView>
+              ))}
             </MotiView>
           )}
         </AnimatePresence>
@@ -453,7 +499,7 @@ export default function FlashSale() {
           <Text style={{ color: theme.textOnPrimary, fontSize: 16, fontWeight: '900', letterSpacing: 0.3 }}>
             {submitting
               ? 'Wird gestartet…'
-              : `🔥 Flash starten · ${selected.size + selectedCombos.size} Auswahl${selectedCombos.size > 0 ? ` (${selectedCombos.size} Combo)` : ''}`}
+              : `🔥 ${(current.flashes ?? []).length > 0 ? 'Weitere Flash hinzufügen' : 'Flash starten'} · ${selected.size + selectedCombos.size} Auswahl${selectedCombos.size > 0 ? ` (${selectedCombos.size} Combo)` : ''}`}
           </Text>
         </TouchableOpacity>
 

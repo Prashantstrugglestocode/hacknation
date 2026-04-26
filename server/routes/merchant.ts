@@ -4,7 +4,7 @@ import ngeohash from 'ngeohash';
 import { generateOffer } from '../lib/openai.ts';
 import { getWeather } from '../lib/weather.ts';
 import { getPayoneDensity, getMerchantPayoneSignal } from '../lib/payone-mock.ts';
-import { setFlash, getFlash, clearFlash } from '../lib/flash.ts';
+import { setFlash, getFlash, clearFlash, listFlash, addFlash, removeFlash } from '../lib/flash.ts';
 import { listCombos, addCombo, deleteCombo } from '../lib/combos.ts';
 
 const supabase = createClient(
@@ -253,12 +253,10 @@ merchant.get('/:id/payone', async (c) => {
 
 // Flash-sale: merchant-managed boost on specific menu_items.
 // Read by /api/offer/generate so the LLM prioritizes the flagged items.
-merchant.get('/:id/flash', async (c) => {
-  const id = c.req.param('id');
-  const sale = getFlash(id);
-  if (!sale) return c.json({ active: false });
+// Multi-flash support: a merchant can run several active flash deals at once.
+// Each has its own id and is enriched independently with items+combos.
+async function enrichFlash(merchantId: string, sale: import('../lib/flash.ts').FlashSale) {
   const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
-  // Enrich with actual menu_item rows so the client can show names + prices.
   let items: any[] = [];
   if (sale.menu_item_ids.length > 0) {
     const { data } = await supabase
@@ -267,11 +265,9 @@ merchant.get('/:id/flash', async (c) => {
       .in('id', sale.menu_item_ids);
     items = data ?? [];
   }
-  // Enrich combo_ids with full combo + item info so the merchant UI can
-  // render "🔥 AI is pushing [Combo X]" without a second roundtrip.
   let combos: any[] = [];
   if (sale.combo_ids.length > 0) {
-    const all = listCombos(id).filter(co => sale.combo_ids.includes(co.id));
+    const all = listCombos(merchantId).filter(co => sale.combo_ids.includes(co.id));
     const ids = [...new Set(all.flatMap(co => co.menu_item_ids))];
     const { data: rows } = ids.length > 0
       ? await supabase.from('menu_items').select('id, name, price_cents, category').in('id', ids)
@@ -289,17 +285,42 @@ merchant.get('/:id/flash', async (c) => {
       };
     });
   }
-  return c.json({
-    active: true,
+  return {
+    id: sale.id,
     menu_item_ids: sale.menu_item_ids,
     items,
     combo_ids: sale.combo_ids,
     combos,
     pct: sale.pct,
     minutes_left,
+  };
+}
+
+// Returns the FULL list of active flashes. Back-compat shape: when at least
+// one is active, include the legacy single-flash fields populated from the
+// most-recent flash so older clients keep working.
+merchant.get('/:id/flash', async (c) => {
+  const id = c.req.param('id');
+  const list = listFlash(id);
+  if (list.length === 0) return c.json({ active: false, flashes: [] });
+  const enriched = await Promise.all(list.map(s => enrichFlash(id, s)));
+  const top = enriched[0]; // most recent (sorted desc by created_at in listFlash)
+  return c.json({
+    active: true,
+    flashes: enriched,
+    // Legacy single-flash fields — first item, for old clients still on /flash.
+    id: top.id,
+    menu_item_ids: top.menu_item_ids,
+    items: top.items,
+    combo_ids: top.combo_ids,
+    combos: top.combos,
+    pct: top.pct,
+    minutes_left: top.minutes_left,
   });
 });
 
+// POST creates a NEW flash (does not replace existing). Multiple may run
+// concurrently. Returns the newly-created flash enriched.
 merchant.post('/:id/flash', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -312,50 +333,28 @@ merchant.post('/:id/flash', async (c) => {
   if (menu_item_ids.length === 0 && combo_ids.length === 0) {
     return c.json({ error: 'menu_item_ids or combo_ids required' }, 400);
   }
-  const sale = setFlash(id, menu_item_ids, pct, duration_min, combo_ids);
-  const minutes_left = Math.max(0, Math.round((sale.until - Date.now()) / 60000));
-  let items: any[] = [];
-  if (sale.menu_item_ids.length > 0) {
-    const { data } = await supabase
-      .from('menu_items')
-      .select('id, name, price_cents, category')
-      .in('id', sale.menu_item_ids);
-    items = data ?? [];
-  }
-  let combos: any[] = [];
-  if (sale.combo_ids.length > 0) {
-    const all = listCombos(id).filter(co => sale.combo_ids.includes(co.id));
-    const ids = [...new Set(all.flatMap(co => co.menu_item_ids))];
-    const { data: rows } = ids.length > 0
-      ? await supabase.from('menu_items').select('id, name, price_cents, category').in('id', ids)
-      : { data: [] as any[] };
-    const itemMap = new Map((rows ?? []).map(it => [it.id, it]));
-    combos = all.map(co => {
-      const resolved = co.menu_item_ids.map(iid => itemMap.get(iid)).filter(Boolean) as any[];
-      const baseSum = resolved.reduce((s, it) => s + (it.price_cents ?? 0), 0);
-      return {
-        id: co.id, name: co.name,
-        items: resolved,
-        combo_price_cents: co.combo_price_cents,
-        base_total_cents: baseSum,
-        savings_cents: Math.max(0, baseSum - co.combo_price_cents),
-      };
-    });
-  }
-  return c.json({
-    active: true,
-    menu_item_ids: sale.menu_item_ids,
-    items,
-    combo_ids: sale.combo_ids,
-    combos,
-    pct: sale.pct,
-    minutes_left,
-  });
+  const sale = addFlash(id, menu_item_ids, pct, duration_min, combo_ids);
+  const enriched = await enrichFlash(id, sale);
+  return c.json({ active: true, ...enriched });
 });
 
+// DELETE without flashId → clear ALL active flashes for the merchant
+// (legacy "Flash beenden" affordance still maps here so old clients work).
 merchant.delete('/:id/flash', (c) => {
   clearFlash(c.req.param('id'));
-  return c.json({ active: false });
+  return c.json({ active: false, flashes: [] });
+});
+
+// DELETE a SPECIFIC flash by id — used when a merchant ends one of several
+// concurrently-running flashes. Returns the remaining list.
+merchant.delete('/:id/flash/:flashId', async (c) => {
+  const id = c.req.param('id');
+  const flashId = c.req.param('flashId');
+  const removed = removeFlash(id, flashId);
+  if (!removed) return c.json({ error: 'flash not found' }, 404);
+  const remaining = listFlash(id);
+  const enriched = await Promise.all(remaining.map(s => enrichFlash(id, s)));
+  return c.json({ active: enriched.length > 0, flashes: enriched });
 });
 
 // Wipe ALL offers + offer_item_links for a merchant (history reset).

@@ -8,7 +8,7 @@ import { getNearbyPOIs } from '../lib/pois.ts';
 import { center, neighbors, distanceMeters } from '../lib/geohash.ts';
 import { firedTriggers, scoreMerchant, footTrafficFromPOI } from '../lib/composite.ts';
 import { generateOffer, explainBestOffer } from '../lib/openai.ts';
-import { getFlash } from '../lib/flash.ts';
+import { getFlash, listFlash } from '../lib/flash.ts';
 import { listCombos } from '../lib/combos.ts';
 
 const supabase = createClient(
@@ -282,8 +282,26 @@ offer.post('/feed', async (c) => {
   };
 
   const geohashes = neighbors(geohash6);
-  const { data: allNearby } = await supabase
+  let { data: allNearby } = await supabase
     .from('merchants').select('*').in('geohash6', geohashes);
+  // Wider-radius fallback. geohash6 cells are ~1.2km wide, so
+  // neighbors() is roughly a 3.6km box. For a two-phone demo where
+  // phones may be across town, pull ALL merchants and rank by raw
+  // distance up to 25km when the local search yields nothing useful.
+  // Keeps proximity scoring intact (closer merchants still score higher)
+  // but prevents the empty-feed footgun.
+  if (!allNearby || allNearby.length < 3) {
+    const { data: wider } = await supabase.from('merchants').select('*');
+    if (wider && wider.length > 0) {
+      const local = new Set((allNearby ?? []).map(m => m.id));
+      const extra = wider.filter(m => {
+        if (local.has(m.id)) return false;
+        const d = distanceMeters(lat, lng, m.lat, m.lng);
+        return d <= 25_000;
+      });
+      allNearby = [...(allNearby ?? []), ...extra];
+    }
+  }
   if (!allNearby || allNearby.length === 0) {
     return c.json({ offers: [] });
   }
@@ -305,6 +323,25 @@ offer.post('/feed', async (c) => {
     return c.json({ offers: [] });
   }
 
+  // Skip merchants whose menu was just deleted — the LLM falls back to
+  // generic copy and the customer keeps seeing stale "offers" for a shop
+  // with nothing to sell. Pull merchant_id → has-menu in one query so we
+  // can filter the candidate pool before LLM round-trips.
+  const merchantIds = merchantRows.map(m => m.id);
+  const { data: menuMap } = await supabase
+    .from('menu_items')
+    .select('merchant_id')
+    .in('merchant_id', merchantIds)
+    .eq('active', true);
+  const merchantsWithMenu = new Set((menuMap ?? []).map(r => r.merchant_id));
+  const candidates = merchantRows.filter(m => merchantsWithMenu.has(m.id));
+  // Don't fall back to merchants with no menu — show empty feed instead
+  // (better than ghost offers from a shop that was just emptied).
+  const usableMerchants = candidates.length > 0 ? candidates : [];
+  if (usableMerchants.length === 0) {
+    return c.json({ offers: [] });
+  }
+
   const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { data: recentOffers } = await supabase
     .from('offers').select('merchant_id, generated_at')
@@ -316,7 +353,7 @@ offer.post('/feed', async (c) => {
     recentMap.set(o.merchant_id, Math.round(minutesAgo));
   }
 
-  const scored = merchantRows.map(m => {
+  const scored = usableMerchants.map(m => {
     const dist = distanceMeters(lat, lng, m.lat, m.lng);
     const merchantPayone = getMerchantPayoneSignal(m.id, m.type, hour);
     const triggers = firedTriggers(
@@ -392,34 +429,39 @@ offer.post('/feed', async (c) => {
         .eq('merchant_id', entry.merchant.id).eq('active', true);
       const menuItems = menuItemRows ?? [];
 
-      const flash = getFlash(entry.merchant.id);
-      // Resolve combo IDs in the flash to enriched combo records the LLM can
-      // pitch from. Multiple flash combos = the LLM picks the weather-fit one.
-      const flashCombos = flash && flash.combo_ids.length > 0
-        ? listCombos(entry.merchant.id)
-            .filter(co => flash.combo_ids.includes(co.id))
-            .map(co => {
-              const items = co.menu_item_ids
-                .map(iid => menuItems.find(it => it.id === iid))
-                .filter(Boolean) as any[];
-              const baseSum = items.reduce((s, it) => s + (it?.price_cents ?? 0), 0);
-              return {
-                id: co.id,
-                name: co.name,
-                items,
-                combo_price_cents: co.combo_price_cents,
-                base_total_cents: baseSum,
-                savings_cents: Math.max(0, baseSum - co.combo_price_cents),
-              };
-            })
-        : [];
-      const flashCtx = flash ? {
-        items: menuItems.filter(it => flash.menu_item_ids.includes(it.id)),
-        menu_item_ids: flash.menu_item_ids,
-        combos: flashCombos,
-        pct: flash.pct,
-        minutes_left: Math.max(0, Math.round((flash.until - Date.now()) / 60000)),
-      } : undefined;
+      // Multi-flash: gather every active flash for this merchant. Each is
+      // enriched with its menu_items + combos so the LLM has enough context
+      // to pick the weather/time-best fit.
+      const allFlashes = listFlash(entry.merchant.id);
+      const enrichedFlashes = allFlashes.map(f => {
+        const flashCombos = f.combo_ids.length > 0
+          ? listCombos(entry.merchant.id)
+              .filter(co => f.combo_ids.includes(co.id))
+              .map(co => {
+                const items = co.menu_item_ids
+                  .map(iid => menuItems.find(it => it.id === iid))
+                  .filter(Boolean) as any[];
+                const baseSum = items.reduce((s, it) => s + (it?.price_cents ?? 0), 0);
+                return {
+                  id: co.id, name: co.name, items,
+                  combo_price_cents: co.combo_price_cents,
+                  base_total_cents: baseSum,
+                  savings_cents: Math.max(0, baseSum - co.combo_price_cents),
+                };
+              })
+          : [];
+        return {
+          id: f.id,
+          items: menuItems.filter(it => f.menu_item_ids.includes(it.id)),
+          menu_item_ids: f.menu_item_ids,
+          combos: flashCombos,
+          pct: f.pct,
+          minutes_left: Math.max(0, Math.round((f.until - Date.now()) / 60000)),
+        };
+      });
+      // Back-compat single flashCtx (for callers/prompt rules still on the
+      // legacy "flash_sale" field). Picks the most-recently-created.
+      const flashCtx = enrichedFlashes.length > 0 ? enrichedFlashes[0] : undefined;
 
       // Combos: enriched bundles the LLM can pitch as a single offer.
       // Filter out combos already pitched to this device (last 30 min) so
@@ -456,6 +498,7 @@ offer.post('/feed', async (c) => {
           fired_triggers: entry.triggers,
           previous_layout: previousLayout,
           flash_sale: flashCtx,
+          flash_sales: enrichedFlashes.length > 0 ? enrichedFlashes : undefined,
           combos: combosCtx,
           menu_items: menuItems.length > 0 ? menuItems : undefined,
           // Diversity hints — see comment block above the Promise.all().

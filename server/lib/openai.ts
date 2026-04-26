@@ -73,13 +73,15 @@ DIVERSITY (context.recently_shown_item_names + context.recently_pitched_combo_id
   → Avoid these combo ids; pick a different combo from context.combos if available.
   → If the only combo is on this list, pitch a single item instead.
 
-FLASH-SALE OVERRIDE (highest priority — context.flash_sale)
-- Build the offer around flash_sale.items[0]: headline names it.
-- discount.kind="pct", value=flash_sale.pct (do not change).
+FLASH-SALE OVERRIDE (highest priority — context.flash_sale + context.flash_sales)
+- If context.flash_sales is an ARRAY with multiple entries: pick the ONE flash whose items/combos best fit the current weather + time-of-day. Apply the same weather rules as below (cold→hot, hot→cold, morning→breakfast etc.). Then proceed as if context.flash_sale was that chosen flash.
+- Build the offer around the chosen flash's items[0] (or a combo — see next block): headline names it.
+- discount.kind="pct", value=flash_sale.pct (do not change) — unless pitching a combo, in which case use eur=savings.
 - mood="urgent", layout="fullbleed" or "split", short factual CTA.
 - pressure={kind:"time", value:"Noch <minutes_left> Min"} from flash_sale.minutes_left.
 - signal_chips must include "🔥 Flash" + item name.
 - featured_item_ids must include the flash item ids.
+- reasoning MUST mention which flash was chosen and why ("flash A picked over B because rain → hot Cappuccino fits better than iced coffee").
 
 FLASH-SALE COMBOS (context.flash_sale.combos — even higher priority when present)
 - If flash_sale.combos has >=1 entries, IGNORE flash_sale.items and pitch ONE combo.

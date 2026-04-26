@@ -266,6 +266,27 @@ export default function CustomerHome() {
         if (!r.ok) return;
         const data = await r.json();
         const offers: OfferEntry[] = Array.isArray(data?.offers) ? data.offers : [];
+
+        // Stale-offer cleanup: if the visible offer's merchant is no longer
+        // in the feed (menu deleted / flash ended / merchant gone), the card
+        // is showing data the server has already invalidated. Drop it.
+        if (state.status === 'offer') {
+          const stillThere = offers.some(o =>
+            o.widget_spec.merchant.id === state.offer.widget_spec.merchant.id
+          );
+          if (!stillThere) {
+            if (offers.length === 0) {
+              // Nothing nearby anymore — go to empty state.
+              setState({ status: 'no_merchant', lastLat: loc.coords.latitude, lastLng: loc.coords.longitude });
+            } else {
+              // Swap in the new top offer; preserve the rest as extras.
+              const { winner, rest } = pickBestDeal(offers);
+              setState({ status: 'offer', offer: winner, extras: rest, payload, generatedAt: Date.now() });
+            }
+            return;
+          }
+        }
+
         if (offers.length === 0) return;
         const newOnes = offers.filter(o => !seenOfferIds.current.has(o.id));
         for (const o of offers) seenOfferIds.current.add(o.id);
