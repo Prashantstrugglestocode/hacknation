@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Slider from '@react-native-community/slider';
 import { MotiView } from 'moti';
 import LangToggle from '../lib/components/LangToggle';
 import { forgetMe } from '../lib/privacy/intent-encoder';
+import { usePrefs } from '../lib/preferences';
+import { playChime } from '../lib/sounds';
 import { theme, space, radius, type } from '../lib/theme';
 
 interface Row {
@@ -24,12 +27,28 @@ const SOURCES: Row[] = [
 
 export default function Settings() {
   const [forgotDone, setForgotDone] = useState(false);
+  const { prefs, toggleSound, toggleHaptics, setRadius } = usePrefs();
 
   const handleForgetMe = async () => {
     await forgetMe();
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (prefs.haptics) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
     setForgotDone(true);
     setTimeout(() => setForgotDone(false), 4000);
+  };
+
+  const handleToggleSound = async () => {
+    await toggleSound();
+    // Demo the new state immediately (only if just turned ON).
+    if (!prefs.sound) playChime().catch(() => {});
+  };
+
+  const handleToggleHaptics = async () => {
+    await toggleHaptics();
+    if (!prefs.haptics) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
   };
 
   return (
@@ -56,6 +75,47 @@ export default function Settings() {
           <Text style={{ color: theme.textMuted, fontSize: type.small, marginTop: space.sm }}>
             Bestimmt die Sprache für KI-Angebote, Beschreibungen und Hinweise.
           </Text>
+        </Section>
+
+        {/* App-Verhalten */}
+        <Section title="APP-VERHALTEN">
+          <ToggleRow
+            emoji="🔊"
+            label="Sound bei Annahme"
+            sub="Chime wenn ein Angebot angenommen oder QR gescannt wird"
+            value={prefs.sound}
+            onToggle={handleToggleSound}
+          />
+          <ToggleRow
+            emoji="📳"
+            label="Haptisches Feedback"
+            sub="Vibration bei Tap und Erfolg"
+            value={prefs.haptics}
+            onToggle={handleToggleHaptics}
+          />
+          <View style={{ gap: 6, marginTop: space.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: theme.text, fontSize: type.body, fontWeight: '700' }}>
+                🎯 Such-Radius
+              </Text>
+              <Text style={{ color: theme.primary, fontSize: type.body, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+                {prefs.radius_m < 1000 ? `${prefs.radius_m} m` : `${(prefs.radius_m / 1000).toFixed(1).replace('.', ',')} km`}
+              </Text>
+            </View>
+            <Slider
+              minimumValue={250}
+              maximumValue={2000}
+              step={250}
+              value={prefs.radius_m}
+              onValueChange={(v) => setRadius(v)}
+              minimumTrackTintColor={theme.primary}
+              maximumTrackTintColor={theme.border}
+              thumbTintColor={theme.primary}
+            />
+            <Text style={{ color: theme.textMuted, fontSize: type.small }}>
+              Wie weit die App nach Geschäften und Karte sucht.
+            </Text>
+          </View>
         </Section>
 
         {/* Privacy */}
@@ -125,6 +185,41 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </Text>
       {children}
     </MotiView>
+  );
+}
+
+function ToggleRow({
+  emoji, label, sub, value, onToggle,
+}: { emoji: string; label: string; sub?: string; value: boolean; onToggle: () => void }) {
+  return (
+    <Pressable onPress={onToggle}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.xs }}
+    >
+      <View style={{
+        width: 32, height: 32, borderRadius: radius.sm,
+        backgroundColor: theme.bgMuted, alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Text style={{ fontSize: type.bodyL }}>{emoji}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: theme.text, fontSize: type.body, fontWeight: '700' }}>{label}</Text>
+        {sub ? (
+          <Text style={{ color: theme.textMuted, fontSize: type.small, marginTop: 1 }}>{sub}</Text>
+        ) : null}
+      </View>
+      <View style={{
+        width: 48, height: 28, borderRadius: 14,
+        backgroundColor: value ? theme.primary : theme.border,
+        padding: 3, justifyContent: 'center',
+        alignItems: value ? 'flex-end' : 'flex-start',
+      }}>
+        <View style={{
+          width: 22, height: 22, borderRadius: 11,
+          backgroundColor: '#FFFFFF',
+          shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+        }} />
+      </View>
+    </Pressable>
   );
 }
 

@@ -36,7 +36,29 @@ app.route('/api/context', contextRoutes);
 app.get('/api/merchants/nearby', async (c) => {
   const geohash6 = c.req.query('geohash6');
   if (!geohash6) return c.json({ error: 'geohash6 required' }, 400);
-  return c.redirect(`/api/merchant/nearby?geohash6=${geohash6}`);
+  const { createClient } = await import('@supabase/supabase-js');
+  const ngeohash = (await import('ngeohash')).default;
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+  const neighbors = [geohash6, ...ngeohash.neighbors(geohash6)];
+  const { data, error } = await supabase
+    .from('merchants').select('*').in('geohash6', neighbors);
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data ?? []);
+});
+
+// Owned merchants for a device — the picker hits this.
+app.get('/api/merchants/owned', async (c) => {
+  const device_id = c.req.query('device_id');
+  if (!device_id) return c.json({ error: 'device_id required' }, 400);
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+  const { data, error } = await supabase
+    .from('merchants')
+    .select('id, name, type, goal, max_discount_pct, lat, lng, created_at')
+    .eq('owner_device_id', device_id)
+    .order('created_at', { ascending: false });
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json(data ?? []);
 });
 
 const port = parseInt(process.env.PORT ?? '3000', 10);

@@ -13,6 +13,8 @@ import Constants from 'expo-constants';
 import WidgetRenderer from '../../lib/generative/renderer';
 import { WidgetSpecType } from '../../lib/generative/widget-spec';
 import { encodeIntent, getDeviceHash } from '../../lib/privacy/intent-encoder';
+import { playChime } from '../../lib/sounds';
+import { hapticSuccess } from '../../lib/haptics';
 import { detectMovement } from '../../lib/context/movement';
 import { getStats, recordSaving, SavingsStats } from '../../lib/savings';
 import LiveHeader from '../../lib/components/LiveHeader';
@@ -131,6 +133,17 @@ export default function CustomerHome() {
 
   useEffect(() => { refreshStats(); generate(); }, []);
 
+  // First-time UX: if there's no merchant near the customer, seed one
+  // automatically once so the demo loop works without the user discovering
+  // the "Demo-Café hier erstellen" button.
+  const autoSeededRef = useRef(false);
+  useEffect(() => {
+    if (state.status === 'no_merchant' && !autoSeededRef.current && !seeding) {
+      autoSeededRef.current = true;
+      seedDemoMerchant();
+    }
+  }, [state.status, seeding, seedDemoMerchant]);
+
   // Auto-expire offer after validity_minutes
   useEffect(() => {
     if (state.status !== 'offer') return;
@@ -150,7 +163,8 @@ export default function CustomerHome() {
 
   const handleAccept = async () => {
     if (state.status !== 'offer') return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    hapticSuccess();
+    playChime().catch(() => {});
     setConfettiTrigger(t => t + 1);
 
     const spec = state.offer.widget_spec;

@@ -82,7 +82,18 @@ export default function MerchantDashboard() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [pulseKey, setPulseKey] = useState(0);
   const [eventToast, setEventToast] = useState<{ key: number; type: MerchantEvent['type']; cents?: number } | null>(null);
+  const [menuCount, setMenuCount] = useState<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchMenuCount = useCallback(async (id: string) => {
+    try {
+      const r = await fetch(`${API}/api/merchant/${id}/menu`);
+      if (r.ok) {
+        const data = await r.json();
+        setMenuCount(Array.isArray(data) ? data.length : 0);
+      }
+    } catch {}
+  }, []);
 
   const fetchStats = useCallback(async (id: string) => {
     try {
@@ -100,6 +111,7 @@ export default function MerchantDashboard() {
         if (r.ok) setMerchant(await r.json());
       } catch {}
       fetchStats(id);
+      fetchMenuCount(id);
 
       const unsub = subscribeMerchantChannel(id, (event) => {
         setFeed(prev => [{
@@ -268,19 +280,35 @@ export default function MerchantDashboard() {
         </View>
 
         {/* SPARKLINE — minimal, no card chrome around it */}
-        {(stats.weekly?.length ?? 0) > 0 && (
-          <View style={{ paddingHorizontal: 22, marginTop: 22 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '800' }}>
-                Annahmequote letzte 7 Tage
-              </Text>
-              <Text style={{ color: theme.primary, fontSize: 18, fontWeight: '900' }}>
-                {Math.round((lastWeek?.rate ?? 0) * 100)}%
-              </Text>
+        {(stats.weekly?.length ?? 0) > 0 && (() => {
+          const totalGenerated = (stats.weekly ?? []).reduce((s, b) => s + (b.generated ?? 0), 0);
+          const allZero = totalGenerated === 0;
+          return (
+            <View style={{ paddingHorizontal: 22, marginTop: 22 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '800' }}>
+                  Annahmequote letzte 7 Tage
+                </Text>
+                <Text style={{ color: allZero ? theme.textMuted : theme.primary, fontSize: 18, fontWeight: '900' }}>
+                  {allZero ? '—' : `${Math.round((lastWeek?.rate ?? 0) * 100)}%`}
+                </Text>
+              </View>
+              {allZero ? (
+                <View style={{
+                  height: 64, borderRadius: 12, backgroundColor: theme.bgMuted,
+                  alignItems: 'center', justifyContent: 'center', gap: 4,
+                  borderWidth: 1, borderColor: theme.border, borderStyle: 'dashed',
+                }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 12, fontWeight: '700' }}>
+                    📊 Noch keine Daten · wartet auf erstes Angebot
+                  </Text>
+                </View>
+              ) : (
+                <Sparkline values={(stats.weekly ?? []).map(b => b.rate * 100)} width={width - 44} height={64} />
+              )}
             </View>
-            <Sparkline values={(stats.weekly ?? []).map(b => b.rate * 100)} width={width - 44} height={64} />
-          </View>
-        )}
+          );
+        })()}
 
         {/* QUICK ACTIONS — 3-up tile row, varied tile shapes */}
         <View style={{ flexDirection: 'row', paddingHorizontal: 14, marginTop: 22, gap: 10 }}>
@@ -301,7 +329,8 @@ export default function MerchantDashboard() {
             onPress={() => merchant && router.push(`/(merchant)/menu?id=${merchant.id}`)}
             emoji="📋"
             title="Karte"
-            sub="Posten & KI"
+            sub={menuCount != null ? `${menuCount} Posten` : 'Posten & KI'}
+            badge={menuCount}
           />
         </View>
 
@@ -445,8 +474,8 @@ function FunnelRow({ label, value, max }: { label: string; value: number; max: n
 }
 
 function ActionTile({
-  onPress, emoji, title, sub, tone,
-}: { onPress: () => void; emoji: string; title: string; sub: string; tone?: 'primary' | 'muted' }) {
+  onPress, emoji, title, sub, tone, badge,
+}: { onPress: () => void; emoji: string; title: string; sub: string; tone?: 'primary' | 'muted'; badge?: number | null }) {
   const isPrimary = tone === 'primary';
   return (
     <Pressable
@@ -458,6 +487,7 @@ function ActionTile({
         borderWidth: 1, borderColor: isPrimary ? theme.primary + '55' : theme.border,
         gap: 8, minHeight: 110,
         transform: [{ scale: pressed ? 0.98 : 1 }],
+        position: 'relative',
       })}
     >
       <View style={{
@@ -467,6 +497,19 @@ function ActionTile({
       }}>
         <Text style={{ fontSize: 18 }}>{emoji}</Text>
       </View>
+      {badge != null && badge > 0 && (
+        <View style={{
+          position: 'absolute', top: 10, right: 10,
+          backgroundColor: theme.primary, borderRadius: 999,
+          minWidth: 22, height: 22, paddingHorizontal: 6,
+          alignItems: 'center', justifyContent: 'center',
+          borderWidth: 2, borderColor: isPrimary ? theme.primaryWash : theme.surface,
+        }}>
+          <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] }}>
+            {badge > 99 ? '99+' : badge}
+          </Text>
+        </View>
+      )}
       <View>
         <Text style={{ color: isPrimary ? theme.primaryDark : theme.text, fontSize: 15, fontWeight: '800' }}>
           {title}

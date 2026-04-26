@@ -59,30 +59,40 @@ export default function MenuScreen() {
   const [newPrice, setNewPrice] = useState('');
   const [newCategory, setNewCategory] = useState<typeof CATEGORIES[number]>('food');
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   const submitNew = async () => {
-    if (!merchantId || !newName.trim()) {
-      Alert.alert('Name fehlt', 'Bitte einen Posten-Namen eingeben.');
+    setAddError(null);
+    if (!merchantId) {
+      setAddError('Kein Geschäft eingerichtet.');
+      return;
+    }
+    if (!newName.trim()) {
+      setAddError('Bitte einen Namen eingeben.');
       return;
     }
     setAdding(true);
+    const name = newName.trim();
     try {
       const priceCents = newPrice ? Math.round(parseFloat(newPrice.replace(',', '.')) * 100) : null;
       const res = await fetch(`${API}/api/merchant/${merchantId}/menu`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), price_cents: priceCents, category: newCategory }),
+        body: JSON.stringify({ name, price_cents: priceCents, category: newCategory }),
       });
-      if (res.ok) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setNewName(''); setNewPrice(''); setNewCategory('food');
-        setAddOpen(false);
-        await load();
-      } else {
-        Alert.alert('Fehler', 'Konnte nicht gespeichert werden.');
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        setAddError(`HTTP ${res.status}${msg ? ' · ' + msg.slice(0, 80) : ''}`);
+        return;
       }
-    } catch {
-      Alert.alert('Fehler', 'Netzwerkfehler.');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewName(''); setNewPrice('');
+      setJustAdded(name);
+      setTimeout(() => setJustAdded(null), 2200);
+      await load();
+    } catch (e: any) {
+      setAddError(`Netzwerk: ${e?.message ?? 'Verbindung fehlgeschlagen'}`);
     } finally {
       setAdding(false);
     }
@@ -266,8 +276,33 @@ export default function MenuScreen() {
               {adding ? 'Wird gespeichert…' : '+ Posten hinzufügen'}
             </Text>
           </TouchableOpacity>
+          {addError ? (
+            <View style={{
+              backgroundColor: theme.danger + '11', borderRadius: 10, padding: 10,
+              borderWidth: 1, borderColor: theme.danger + '44',
+            }}>
+              <Text style={{ color: theme.danger, fontSize: 12, fontWeight: '700' }}>⚠ {addError}</Text>
+            </View>
+          ) : null}
         </MotiView>
       )}
+
+      {justAdded ? (
+        <MotiView
+          from={{ opacity: 0, translateY: -6 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'spring', damping: 18 }}
+          style={{
+            backgroundColor: theme.success + '22', borderRadius: 12, padding: 12,
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            borderWidth: 1, borderColor: theme.success + '44',
+          }}>
+          <Text style={{ fontSize: 16 }}>✅</Text>
+          <Text style={{ color: theme.success, fontSize: 13, fontWeight: '800', flex: 1 }} numberOfLines={1}>
+            "{justAdded}" hinzugefügt
+          </Text>
+        </MotiView>
+      ) : null}
 
       {/* Insights card */}
       {insights.length > 0 && (

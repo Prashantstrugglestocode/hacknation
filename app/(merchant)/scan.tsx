@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { theme } from '../../lib/theme';
 import i18n from '../../lib/i18n';
+import { playChime } from '../../lib/sounds';
+import { hapticSuccess } from '../../lib/haptics';
 
 const API = Constants.expoConfig?.extra?.apiUrl as string;
 const { width } = Dimensions.get('window');
@@ -41,7 +43,8 @@ export default function ScanScreen() {
       if (res.ok) {
         const offer = await res.json();
         setResult({ success: true, offer });
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        hapticSuccess();
+        playChime().catch(() => {});
       } else {
         const err = await res.json().catch(() => ({}));
         setResult({ success: false, error: err.error ?? i18n.t('errors.invalid_qr') });
